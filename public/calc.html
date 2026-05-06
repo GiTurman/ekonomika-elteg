@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KLEEMANN | ლიფტის კალკულატორი</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+<div id="loader" class="loader-overlay" style="display:none"><div class="spinner"></div></div>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">K</div>
+    <div>
+      <div class="logo-name">KLEEMANN</div>
+      <div class="logo-sub">Calculator Pro</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">პროექტები</div>
+  <div id="projectList" class="project-list"></div>
+  <button class="btn-new-project" onclick="newProject()">+ ახალი პროექტი</button>
+
+  <div class="sidebar-spacer"></div>
+  <div class="sidebar-section-nav">ნავიგაცია</div>
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-tab="dashboard">🏠 მთავარი</a>
+    <a class="nav-item" data-tab="units">🔧 დანადგარები</a>
+    <a class="nav-item" data-tab="mission">🚗 მივლინება</a>
+    <a class="nav-item" data-tab="results">📊 შედეგები</a>
+    <a class="nav-item" data-tab="analysis">📈 პროექტის ანალიზი</a>
+    <a class="nav-item" data-tab="final">📜 საბოლოო პროექტი</a>
+    <a class="nav-item" data-tab="full_analysis">🌍 სრული ანალიზი</a>
+    <a class="nav-item" data-tab="backup">💾 ბაზა</a>
+  </nav>
+</aside>
+
+<!-- ── MAIN AREA ── -->
+<div class="layout">
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+    <div class="topbar-project" id="topbarProject">–</div>
+    <div class="currency-pill" id="curPill">
+      <span>USD <input type="number" id="hUsd" class="cur-inp" step="0.0001" onchange="manualCurChange()"></span>
+      <span>EUR <input type="number" id="hEur" class="cur-inp" step="0.0001" onchange="manualCurChange()"></span>
+      <span class="cur-date" id="hDate"></span>
+      <button class="btn-cur" onclick="refreshRates()" title="NBG-დან განახლება">⟳</button>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <main class="content">
+
+    <!-- ════ DASHBOARD ════ -->
+    <section class="tab active" id="tab-dashboard">
+      <div class="flex-between mb">
+        <div class="page-title">🏠 პროექტის მიმოხილვა</div>
+        <div class="flex-row gap">
+          <button class="btn btn-sm btn-outline" onclick="exportToExcel('dashboard')">📥 XLSX ექსპორტი</button>
+          <button class="btn btn-sm btn-outline" onclick="printSection('dashboard')">🖨 ბეჭდვა</button>
+        </div>
+      </div>
+
+      <div class="proj-info-grid" id="projInfoGrid"></div>
+
+      <div class="metrics-strip" id="metricsStrip"></div>
+
+      <div class="card mt">
+        <div class="card-hd">📋 დანადგარების სარეზიუმე</div>
+        <div id="dashTable" class="table-wrap"></div>
+      </div>
+    </section>
+
+    <!-- ════ UNITS ════ -->
+    <section class="tab" id="tab-units">
+      <div class="flex-between mb">
+        <div class="page-title">🔧 დანადგარები</div>
+        <div class="flex-row gap">
+          <button class="btn btn-sm btn-outline" onclick="exportToExcel('units')">📥 XLSX ექსპორტი</button>
+          <button class="btn btn-sm btn-outline" onclick="printSection('units')">🖨 ბეჭდვა</button>
+          <button class="btn btn-sm btn-outline" onclick="addUnit('lift')">+ ლიფტი</button>
+          <button class="btn btn-sm btn-outline" onclick="addUnit('escalator')">+ ესკალატორი</button>
+          <button class="btn btn-sm btn-outline" onclick="addUnit('travelator')">+ ტრაველატორი</button>
+          <button class="btn btn-sm btn-success" onclick="saveUnits()">💾 შენახვა</button>
+        </div>
+      </div>
+
+      <!-- Global Markup -->
+      <div class="card mb">
+        <div class="card-hd">⚡ გლობალური ფასნამატი (ყველა დანადგარზე ერთდროულად)</div>
+        <div class="grid-4">
+          <div class="fg"><label>ლიფტის ფასნამატი %</label><input type="number" id="g_lift_pct" class="inp" step="0.5" oninput="previewGlobal()"></div>
+          <div class="fg"><label>მონტაჟის ფასნამატი %</label><input type="number" id="g_install_pct" class="inp" step="1" oninput="previewGlobal()"></div>
+          <div class="fg"><label>გაუთვ. ხარჯი %</label><input type="number" id="g_cont_pct" class="inp" step="0.5" oninput="previewGlobal()"></div>
+          <div class="fg" style="justify-content:flex-end;align-items:flex-end">
+            <button class="btn btn-warning" onclick="applyGlobalMarkup()">↓ ყველაზე გამოყენება</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unit type filter -->
+      <div class="type-filter mb" id="typeFilter">
+        <button class="tf-btn active" data-tf="all">ყველა</button>
+        <button class="tf-btn" data-tf="lift">🛗 ლიფტი</button>
+        <button class="tf-btn" data-tf="escalator">↕ ესკალატორი</button>
+        <button class="tf-btn" data-tf="travelator">↔ ტრაველატორი</button>
+      </div>
+
+      <div id="unitsContainer"></div>
+    </section>
+
+    <!-- ════ MISSION ════ -->
+    <section class="tab" id="tab-mission">
+      <div class="flex-between mb">
+        <div class="page-title">🚗 მივლინების ხარჯები</div>
+        <div class="flex-row gap">
+          <button class="btn btn-sm btn-outline" onclick="exportToExcel('mission')">📥 XLSX ექსპორტი</button>
+          <button class="btn btn-sm btn-outline" onclick="printSection('mission')">🖨 ბეჭდვა</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd">👥 გუნდი</div>
+        <div class="grid-3">
+          <div class="fg"><label>მექ. — რაოდ.</label><input type="number" id="m_mc" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>მექ. — დღეები</label><input type="number" id="m_md" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>მექ. — ვიზიტები</label><input type="number" id="m_mv" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>ელექ. — რაოდ.</label><input type="number" id="m_ec" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>ელექ. — დღეები</label><input type="number" id="m_ed" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>ელექ. — ვიზიტები</label><input type="number" id="m_ev" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>ადმ. — რაოდ.</label><input type="number" id="m_ac" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>ადმ. — დღეები</label><input type="number" id="m_ad" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>ადმ. — ვიზიტები</label><input type="number" id="m_av" class="inp" oninput="calcMission()"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="grid-3">
+          <div class="fg"><label>მანძილი (კმ)</label><input type="number" id="m_dist" class="inp" oninput="calcMission()"></div>
+          <div class="fg"><label>საწვავი (GEL/ლ)</label><input type="number" id="m_fp" class="inp" step="0.01" oninput="calcMission()"></div>
+          <div class="fg"><label>მოხმარება (ლ/100კმ)</label><input type="number" id="m_fc" class="inp" step="0.1" oninput="calcMission()"></div>
+          <div class="fg"><label>კვება (GEL/კაც/დღე)</label><input type="number" id="m_food" class="inp" step="0.01" oninput="calcMission()"></div>
+          <div class="fg"><label>სასტუმრო (GEL/კაც/დღე)</label><input type="number" id="m_acc" class="inp" step="0.01" oninput="calcMission()"></div>
+        </div>
+        <button class="btn btn-primary mt" onclick="saveMission()">💾 შენახვა</button>
+      </div>
+      <div class="card mt" id="missionResult"></div>
+    </section>
+
+    <!-- ════ RESULTS ════ -->
+    <section class="tab" id="tab-results">
+      <div class="flex-between mb">
+        <div class="page-title">📊 სრული ანალიზი</div>
+        <div class="flex-row gap">
+          <button class="btn btn-sm btn-outline" onclick="exportToExcel('results')">📥 XLSX ექსპორტი</button>
+          <button class="btn btn-sm btn-outline" onclick="printSection('results')">🖨 ბეჭდვა</button>
+        </div>
+        <div class="scenario-bar">
+          <button class="sc-btn active" id="sc_base" onclick="setScenario('base')">ბაზური</button>
+          <button class="sc-btn" id="sc_bull" onclick="setScenario('bull')">📈 ოპტიმ.</button>
+          <button class="sc-btn" id="sc_bear" onclick="setScenario('bear')">📉 პესიმ.</button>
+        </div>
+      </div>
+
+      <div class="card mb">
+        <div class="card-hd">🎚 სცენარის პარამეტრები</div>
+        <div class="grid-4">
+          <div class="fg"><label>ლიფტის ფასნამატი %</label><input type="number" id="sc_l" class="inp" oninput="recalcResults()"></div>
+          <div class="fg"><label>მონტ. ფასნამატი %</label><input type="number" id="sc_i" class="inp" oninput="recalcResults()"></div>
+          <div class="fg"><label>გაუთვ. ხარჯი %</label><input type="number" id="sc_c" class="inp" oninput="recalcResults()"></div>
+          <div class="fg"><label>ვალუტა</label>
+            <select id="sc_cur" class="inp" onchange="recalcResults()">
+              <option>EUR</option><option>USD</option><option>GEL</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="resultsContainer"></div>
+      <div class="card mt" id="grandSummary" style="display:none"></div>
+    </section>
+
+    <!-- ════ FINAL PROJECT ════ -->
+    <section class="tab" id="tab-final">
+      <div class="flex-between mb">
+        <div class="page-title">📜 საბოლოო პროექტი</div>
+        <div class="flex-row gap">
+          <button class="btn btn-sm btn-outline" onclick="exportToExcel('final')">📥 XLSX ექსპორტი</button>
+          <button class="btn btn-sm btn-outline" onclick="printSection('final')">🖨 ბეჭდვა</button>
+        </div>
+      </div>
+
+      <div class="card mb no-print">
+        <div class="card-hd">⚙️ შეთავაზების პარამეტრები</div>
+        <div class="grid-2">
+          <div class="fg"><label>დღგ-ს ტექსტი</label><input type="text" id="prop_vat" class="inp" onchange="saveProposalSettings()"></div>
+          <div class="fg"><label>გადახდის პირობა</label><input type="text" id="prop_pay" class="inp" onchange="saveProposalSettings()"></div>
+          <div class="fg"><label>გარანტია</label><input type="text" id="prop_gua" class="inp" onchange="saveProposalSettings()"></div>
+          <div class="fg"><label>ვალიდურობა</label><input type="text" id="prop_val" class="inp" onchange="saveProposalSettings()"></div>
+          <div class="fg"><label>ხელმოწერა (პრეფიქსი)</label><input type="text" id="prop_sp" class="inp" onchange="saveProposalSettings()"></div>
+          <div class="fg"><label>ხელმოწერა (სახელი)</label><input type="text" id="prop_sn" class="inp" onchange="saveProposalSettings()"></div>
+        </div>
+        <p class="muted mt">ცვლილებები ავტომატურად აისახება ქვემოთ მოცემულ წინადადებაზე.</p>
+      </div>
+
+      <div id="finalProjectContainer"></div>
+    </section>
+
+    <!-- ════ ANALYSIS ════ -->
+    <section class="tab" id="tab-analysis">
+      <div class="flex-between mb">
+        <div class="page-title">📈 პროექტის ანალიზი</div>
+        <div class="flex-row gap">
+          <button class="btn btn-sm btn-outline" onclick="exportToExcel('analysis')">📥 XLSX ექსპორტი</button>
+          <button class="btn btn-sm btn-outline" onclick="printSection('analysis')">🖨 ბეჭდვა</button>
+        </div>
+      </div>
+
+      <div class="grid-2 mb">
+        <div class="card">
+          <div class="card-hd">🏷️ ბრენდების მომგებიანობა (EUR)</div>
+          <div id="brandChart" class="chart-container"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd">🏢 სართულების გავლენა ფასზე</div>
+          <div id="floorChart" class="chart-container"></div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb">
+        <div class="card">
+          <div class="card-hd">📊 ABC ანალიზი (ღირებულების მიხედვით)</div>
+          <div id="abcTable" class="table-wrap"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd">⚡ პროექტის ეფექტურობა</div>
+          <div id="efficiencyStats" class="stats-grid"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">📅 დროითი ანალიზი (მიწოდების წლები)</div>
+        <div id="timeChart" class="chart-container"></div>
+      </div>
+    </section>
+
+    <!-- ════ FULL ANALYSIS ════ -->
+    <section class="tab" id="tab-full_analysis">
+      <div class="flex-between mb">
+        <div class="page-title">🌍 სრული 360° ანალიზი (ყველა პროექტი)</div>
+        <div class="flex-row gap">
+          <button class="btn btn-sm btn-outline" onclick="exportToExcel('full_analysis')">📥 XLSX ექსპორტი</button>
+          <button class="btn btn-sm btn-outline" onclick="printSection('full_analysis')">🖨 ბეჭდვა</button>
+        </div>
+      </div>
+
+      <div class="metrics-strip mb" id="fullMetricsStrip"></div>
+
+      <div class="grid-2 mb">
+        <div class="card">
+          <div class="card-hd">🏷️ ბრენდების მომგებიანობა (EUR) - ყველა პროექტი</div>
+          <div id="fullBrandChart" class="chart-container"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd">🏢 სართულების გავლენა ფასზე - გლობალური</div>
+          <div id="fullFloorChart" class="chart-container"></div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb">
+        <div class="card">
+          <div class="card-hd">📊 ABC ანალიზი (ყველა დანადგარი)</div>
+          <div id="fullAbcTable" class="table-wrap"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd">⚡ პროექტების ეფექტურობა</div>
+          <div id="fullEfficiencyStats" class="stats-grid"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">📅 დროითი ანალიზი (პროექტების ღირებულება წლების მიხედვით)</div>
+        <div id="fullTimeChart" class="chart-container"></div>
+      </div>
+    </section>
+
+    <!-- ════ BACKUP ════ -->
+    <section class="tab" id="tab-backup">
+      <div class="page-title">💾 მონაცემების მართვა</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-hd">📁 ბექაპის შექმნა</div>
+          <div class="fg"><label>სახელი (არჩევითი)</label>
+            <input type="text" id="bkName" class="inp" placeholder="მაგ: lotus_v2...">
+          </div>
+          <button class="btn btn-primary mt" onclick="createBackup()">💾 შექმნა</button>
+        </div>
+        <div class="card">
+          <div class="card-hd">📤 ატვირთვა / აღდგენა</div>
+          <div class="fg"><label>JSON ფაილი</label>
+            <input type="file" id="bkFile" class="inp" accept=".json">
+          </div>
+          <button class="btn btn-warning mt" onclick="uploadBackup()">📥 ატვირთვა</button>
+        </div>
+      </div>
+      <div class="card mt">
+        <div class="card-hd flex-between">
+          <span>📂 შენახული ბექაპები</span>
+          <button class="btn btn-sm btn-outline" onclick="loadBkList()">🔄</button>
+        </div>
+        <div id="bkList"><p class="muted">Loading...</p></div>
+      </div>
+      <div class="card mt">
+        <div class="card-hd">⚠️ გადატვირთვა</div>
+        <p class="muted warn">ყველა მიმდინარე მონაცემი შეიცვლება ნაგულისხმევი მნიშვნელობებით!</p>
+        <button class="btn btn-danger mt" onclick="doReset()">⚠️ გადატვირთვა</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
