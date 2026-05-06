@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiCalculateRouteImport } from './routes/api/calculate'
 import { Route as ApiRatesRefreshRouteImport } from './routes/api/rates.refresh'
+import { Route as ApiBackupRestoreRouteImport } from './routes/api/backup/restore'
 import { Route as ApiBackupListRouteImport } from './routes/api/backup/list'
 import { Route as ApiBackupCreateRouteImport } from './routes/api/backup/create'
 
@@ -36,6 +37,11 @@ const ApiRatesRefreshRoute = ApiRatesRefreshRouteImport.update({
   path: '/api/rates/refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBackupRestoreRoute = ApiBackupRestoreRouteImport.update({
+  id: '/api/backup/restore',
+  path: '/api/backup/restore',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBackupListRoute = ApiBackupListRouteImport.update({
   id: '/api/backup/list',
   path: '/api/backup/list',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/api/data': typeof ApiDataRoute
   '/api/backup/create': typeof ApiBackupCreateRoute
   '/api/backup/list': typeof ApiBackupListRoute
+  '/api/backup/restore': typeof ApiBackupRestoreRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/api/data': typeof ApiDataRoute
   '/api/backup/create': typeof ApiBackupCreateRoute
   '/api/backup/list': typeof ApiBackupListRoute
+  '/api/backup/restore': typeof ApiBackupRestoreRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/api/data': typeof ApiDataRoute
   '/api/backup/create': typeof ApiBackupCreateRoute
   '/api/backup/list': typeof ApiBackupListRoute
+  '/api/backup/restore': typeof ApiBackupRestoreRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/backup/create'
     | '/api/backup/list'
+    | '/api/backup/restore'
     | '/api/rates/refresh'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/backup/create'
     | '/api/backup/list'
+    | '/api/backup/restore'
     | '/api/rates/refresh'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/backup/create'
     | '/api/backup/list'
+    | '/api/backup/restore'
     | '/api/rates/refresh'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   ApiDataRoute: typeof ApiDataRoute
   ApiBackupCreateRoute: typeof ApiBackupCreateRoute
   ApiBackupListRoute: typeof ApiBackupListRoute
+  ApiBackupRestoreRoute: typeof ApiBackupRestoreRoute
   ApiRatesRefreshRoute: typeof ApiRatesRefreshRoute
 }
 
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRatesRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/backup/restore': {
+      id: '/api/backup/restore'
+      path: '/api/backup/restore'
+      fullPath: '/api/backup/restore'
+      preLoaderRoute: typeof ApiBackupRestoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/backup/list': {
       id: '/api/backup/list'
       path: '/api/backup/list'
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDataRoute: ApiDataRoute,
   ApiBackupCreateRoute: ApiBackupCreateRoute,
   ApiBackupListRoute: ApiBackupListRoute,
+  ApiBackupRestoreRoute: ApiBackupRestoreRoute,
   ApiRatesRefreshRoute: ApiRatesRefreshRoute,
 }
 export const routeTree = rootRouteImport
