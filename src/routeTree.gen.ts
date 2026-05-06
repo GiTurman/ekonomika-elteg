@@ -10,33 +10,141 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiCalculateRouteImport } from './routes/api/calculate'
+import { Route as ApiRatesRefreshRouteImport } from './routes/api/rates.refresh'
+import { Route as ApiBackupUploadRouteImport } from './routes/api/backup/upload'
+import { Route as ApiBackupRestoreRouteImport } from './routes/api/backup/restore'
+import { Route as ApiBackupListRouteImport } from './routes/api/backup/list'
+import { Route as ApiBackupCreateRouteImport } from './routes/api/backup/create'
+import { Route as ApiBackupDownloadNameRouteImport } from './routes/api/backup/download.$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDataRoute = ApiDataRouteImport.update({
+  id: '/api/data',
+  path: '/api/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalculateRoute = ApiCalculateRouteImport.update({
+  id: '/api/calculate',
+  path: '/api/calculate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRatesRefreshRoute = ApiRatesRefreshRouteImport.update({
+  id: '/api/rates/refresh',
+  path: '/api/rates/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBackupUploadRoute = ApiBackupUploadRouteImport.update({
+  id: '/api/backup/upload',
+  path: '/api/backup/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBackupRestoreRoute = ApiBackupRestoreRouteImport.update({
+  id: '/api/backup/restore',
+  path: '/api/backup/restore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBackupListRoute = ApiBackupListRouteImport.update({
+  id: '/api/backup/list',
+  path: '/api/backup/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBackupCreateRoute = ApiBackupCreateRouteImport.update({
+  id: '/api/backup/create',
+  path: '/api/backup/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBackupDownloadNameRoute = ApiBackupDownloadNameRouteImport.update({
+  id: '/api/backup/download/$name',
+  path: '/api/backup/download/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/calculate': typeof ApiCalculateRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/backup/create': typeof ApiBackupCreateRoute
+  '/api/backup/list': typeof ApiBackupListRoute
+  '/api/backup/restore': typeof ApiBackupRestoreRoute
+  '/api/backup/upload': typeof ApiBackupUploadRoute
+  '/api/rates/refresh': typeof ApiRatesRefreshRoute
+  '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/calculate': typeof ApiCalculateRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/backup/create': typeof ApiBackupCreateRoute
+  '/api/backup/list': typeof ApiBackupListRoute
+  '/api/backup/restore': typeof ApiBackupRestoreRoute
+  '/api/backup/upload': typeof ApiBackupUploadRoute
+  '/api/rates/refresh': typeof ApiRatesRefreshRoute
+  '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/calculate': typeof ApiCalculateRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/backup/create': typeof ApiBackupCreateRoute
+  '/api/backup/list': typeof ApiBackupListRoute
+  '/api/backup/restore': typeof ApiBackupRestoreRoute
+  '/api/backup/upload': typeof ApiBackupUploadRoute
+  '/api/rates/refresh': typeof ApiRatesRefreshRoute
+  '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/api/calculate'
+    | '/api/data'
+    | '/api/backup/create'
+    | '/api/backup/list'
+    | '/api/backup/restore'
+    | '/api/backup/upload'
+    | '/api/rates/refresh'
+    | '/api/backup/download/$name'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/api/calculate'
+    | '/api/data'
+    | '/api/backup/create'
+    | '/api/backup/list'
+    | '/api/backup/restore'
+    | '/api/backup/upload'
+    | '/api/rates/refresh'
+    | '/api/backup/download/$name'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/calculate'
+    | '/api/data'
+    | '/api/backup/create'
+    | '/api/backup/list'
+    | '/api/backup/restore'
+    | '/api/backup/upload'
+    | '/api/rates/refresh'
+    | '/api/backup/download/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiCalculateRoute: typeof ApiCalculateRoute
+  ApiDataRoute: typeof ApiDataRoute
+  ApiBackupCreateRoute: typeof ApiBackupCreateRoute
+  ApiBackupListRoute: typeof ApiBackupListRoute
+  ApiBackupRestoreRoute: typeof ApiBackupRestoreRoute
+  ApiBackupUploadRoute: typeof ApiBackupUploadRoute
+  ApiRatesRefreshRoute: typeof ApiRatesRefreshRoute
+  ApiBackupDownloadNameRoute: typeof ApiBackupDownloadNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +156,75 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/data': {
+      id: '/api/data'
+      path: '/api/data'
+      fullPath: '/api/data'
+      preLoaderRoute: typeof ApiDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calculate': {
+      id: '/api/calculate'
+      path: '/api/calculate'
+      fullPath: '/api/calculate'
+      preLoaderRoute: typeof ApiCalculateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rates/refresh': {
+      id: '/api/rates/refresh'
+      path: '/api/rates/refresh'
+      fullPath: '/api/rates/refresh'
+      preLoaderRoute: typeof ApiRatesRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/backup/upload': {
+      id: '/api/backup/upload'
+      path: '/api/backup/upload'
+      fullPath: '/api/backup/upload'
+      preLoaderRoute: typeof ApiBackupUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/backup/restore': {
+      id: '/api/backup/restore'
+      path: '/api/backup/restore'
+      fullPath: '/api/backup/restore'
+      preLoaderRoute: typeof ApiBackupRestoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/backup/list': {
+      id: '/api/backup/list'
+      path: '/api/backup/list'
+      fullPath: '/api/backup/list'
+      preLoaderRoute: typeof ApiBackupListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/backup/create': {
+      id: '/api/backup/create'
+      path: '/api/backup/create'
+      fullPath: '/api/backup/create'
+      preLoaderRoute: typeof ApiBackupCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/backup/download/$name': {
+      id: '/api/backup/download/$name'
+      path: '/api/backup/download/$name'
+      fullPath: '/api/backup/download/$name'
+      preLoaderRoute: typeof ApiBackupDownloadNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiCalculateRoute: ApiCalculateRoute,
+  ApiDataRoute: ApiDataRoute,
+  ApiBackupCreateRoute: ApiBackupCreateRoute,
+  ApiBackupListRoute: ApiBackupListRoute,
+  ApiBackupRestoreRoute: ApiBackupRestoreRoute,
+  ApiBackupUploadRoute: ApiBackupUploadRoute,
+  ApiRatesRefreshRoute: ApiRatesRefreshRoute,
+  ApiBackupDownloadNameRoute: ApiBackupDownloadNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
