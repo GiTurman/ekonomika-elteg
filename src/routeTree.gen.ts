@@ -16,6 +16,7 @@ import { Route as ApiRatesRefreshRouteImport } from './routes/api/rates.refresh'
 import { Route as ApiBackupRestoreRouteImport } from './routes/api/backup/restore'
 import { Route as ApiBackupListRouteImport } from './routes/api/backup/list'
 import { Route as ApiBackupCreateRouteImport } from './routes/api/backup/create'
+import { Route as ApiBackupDownloadNameRouteImport } from './routes/api/backup/download.$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,11 @@ const ApiBackupCreateRoute = ApiBackupCreateRouteImport.update({
   path: '/api/backup/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBackupDownloadNameRoute = ApiBackupDownloadNameRouteImport.update({
+  id: '/api/backup/download/$name',
+  path: '/api/backup/download/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/api/backup/list': typeof ApiBackupListRoute
   '/api/backup/restore': typeof ApiBackupRestoreRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
+  '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/api/backup/list': typeof ApiBackupListRoute
   '/api/backup/restore': typeof ApiBackupRestoreRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
+  '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/api/backup/list': typeof ApiBackupListRoute
   '/api/backup/restore': typeof ApiBackupRestoreRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
+  '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/api/backup/list'
     | '/api/backup/restore'
     | '/api/rates/refresh'
+    | '/api/backup/download/$name'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/api/backup/list'
     | '/api/backup/restore'
     | '/api/rates/refresh'
+    | '/api/backup/download/$name'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/api/backup/list'
     | '/api/backup/restore'
     | '/api/rates/refresh'
+    | '/api/backup/download/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   ApiBackupListRoute: typeof ApiBackupListRoute
   ApiBackupRestoreRoute: typeof ApiBackupRestoreRoute
   ApiRatesRefreshRoute: typeof ApiRatesRefreshRoute
+  ApiBackupDownloadNameRoute: typeof ApiBackupDownloadNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBackupCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/backup/download/$name': {
+      id: '/api/backup/download/$name'
+      path: '/api/backup/download/$name'
+      fullPath: '/api/backup/download/$name'
+      preLoaderRoute: typeof ApiBackupDownloadNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBackupListRoute: ApiBackupListRoute,
   ApiBackupRestoreRoute: ApiBackupRestoreRoute,
   ApiRatesRefreshRoute: ApiRatesRefreshRoute,
+  ApiBackupDownloadNameRoute: ApiBackupDownloadNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
