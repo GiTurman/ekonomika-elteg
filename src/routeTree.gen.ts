@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiCalculateRouteImport } from './routes/api/calculate'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,30 +23,39 @@ const ApiDataRoute = ApiDataRouteImport.update({
   path: '/api/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCalculateRoute = ApiCalculateRouteImport.update({
+  id: '/api/calculate',
+  path: '/api/calculate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/calculate': typeof ApiCalculateRoute
   '/api/data': typeof ApiDataRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/calculate': typeof ApiCalculateRoute
   '/api/data': typeof ApiDataRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/calculate': typeof ApiCalculateRoute
   '/api/data': typeof ApiDataRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/data'
+  fullPaths: '/' | '/api/calculate' | '/api/data'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/data'
-  id: '__root__' | '/' | '/api/data'
+  to: '/' | '/api/calculate' | '/api/data'
+  id: '__root__' | '/' | '/api/calculate' | '/api/data'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiCalculateRoute: typeof ApiCalculateRoute
   ApiDataRoute: typeof ApiDataRoute
 }
 
@@ -65,11 +75,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/calculate': {
+      id: '/api/calculate'
+      path: '/api/calculate'
+      fullPath: '/api/calculate'
+      preLoaderRoute: typeof ApiCalculateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiCalculateRoute: ApiCalculateRoute,
   ApiDataRoute: ApiDataRoute,
 }
 export const routeTree = rootRouteImport
