@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiCalculateRouteImport } from './routes/api/calculate'
+import { Route as ApiRatesRefreshRouteImport } from './routes/api/rates.refresh'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const ApiCalculateRoute = ApiCalculateRouteImport.update({
   path: '/api/calculate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRatesRefreshRoute = ApiRatesRefreshRouteImport.update({
+  id: '/api/rates/refresh',
+  path: '/api/rates/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/calculate': typeof ApiCalculateRoute
   '/api/data': typeof ApiDataRoute
+  '/api/rates/refresh': typeof ApiRatesRefreshRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/calculate': typeof ApiCalculateRoute
   '/api/data': typeof ApiDataRoute
+  '/api/rates/refresh': typeof ApiRatesRefreshRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/calculate': typeof ApiCalculateRoute
   '/api/data': typeof ApiDataRoute
+  '/api/rates/refresh': typeof ApiRatesRefreshRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/calculate' | '/api/data'
+  fullPaths: '/' | '/api/calculate' | '/api/data' | '/api/rates/refresh'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/calculate' | '/api/data'
-  id: '__root__' | '/' | '/api/calculate' | '/api/data'
+  to: '/' | '/api/calculate' | '/api/data' | '/api/rates/refresh'
+  id: '__root__' | '/' | '/api/calculate' | '/api/data' | '/api/rates/refresh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiCalculateRoute: typeof ApiCalculateRoute
   ApiDataRoute: typeof ApiDataRoute
+  ApiRatesRefreshRoute: typeof ApiRatesRefreshRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCalculateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/rates/refresh': {
+      id: '/api/rates/refresh'
+      path: '/api/rates/refresh'
+      fullPath: '/api/rates/refresh'
+      preLoaderRoute: typeof ApiRatesRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiCalculateRoute: ApiCalculateRoute,
   ApiDataRoute: ApiDataRoute,
+  ApiRatesRefreshRoute: ApiRatesRefreshRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
