@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiCalculateRouteImport } from './routes/api/calculate'
 import { Route as ApiRatesRefreshRouteImport } from './routes/api/rates.refresh'
+import { Route as ApiBackupUploadRouteImport } from './routes/api/backup/upload'
 import { Route as ApiBackupRestoreRouteImport } from './routes/api/backup/restore'
 import { Route as ApiBackupListRouteImport } from './routes/api/backup/list'
 import { Route as ApiBackupCreateRouteImport } from './routes/api/backup/create'
@@ -36,6 +37,11 @@ const ApiCalculateRoute = ApiCalculateRouteImport.update({
 const ApiRatesRefreshRoute = ApiRatesRefreshRouteImport.update({
   id: '/api/rates/refresh',
   path: '/api/rates/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBackupUploadRoute = ApiBackupUploadRouteImport.update({
+  id: '/api/backup/upload',
+  path: '/api/backup/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiBackupRestoreRoute = ApiBackupRestoreRouteImport.update({
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/api/backup/create': typeof ApiBackupCreateRoute
   '/api/backup/list': typeof ApiBackupListRoute
   '/api/backup/restore': typeof ApiBackupRestoreRoute
+  '/api/backup/upload': typeof ApiBackupUploadRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
   '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/api/backup/create': typeof ApiBackupCreateRoute
   '/api/backup/list': typeof ApiBackupListRoute
   '/api/backup/restore': typeof ApiBackupRestoreRoute
+  '/api/backup/upload': typeof ApiBackupUploadRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
   '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/api/backup/create': typeof ApiBackupCreateRoute
   '/api/backup/list': typeof ApiBackupListRoute
   '/api/backup/restore': typeof ApiBackupRestoreRoute
+  '/api/backup/upload': typeof ApiBackupUploadRoute
   '/api/rates/refresh': typeof ApiRatesRefreshRoute
   '/api/backup/download/$name': typeof ApiBackupDownloadNameRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/api/backup/create'
     | '/api/backup/list'
     | '/api/backup/restore'
+    | '/api/backup/upload'
     | '/api/rates/refresh'
     | '/api/backup/download/$name'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/api/backup/create'
     | '/api/backup/list'
     | '/api/backup/restore'
+    | '/api/backup/upload'
     | '/api/rates/refresh'
     | '/api/backup/download/$name'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/api/backup/create'
     | '/api/backup/list'
     | '/api/backup/restore'
+    | '/api/backup/upload'
     | '/api/rates/refresh'
     | '/api/backup/download/$name'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   ApiBackupCreateRoute: typeof ApiBackupCreateRoute
   ApiBackupListRoute: typeof ApiBackupListRoute
   ApiBackupRestoreRoute: typeof ApiBackupRestoreRoute
+  ApiBackupUploadRoute: typeof ApiBackupUploadRoute
   ApiRatesRefreshRoute: typeof ApiRatesRefreshRoute
   ApiBackupDownloadNameRoute: typeof ApiBackupDownloadNameRoute
 }
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/api/rates/refresh'
       fullPath: '/api/rates/refresh'
       preLoaderRoute: typeof ApiRatesRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/backup/upload': {
+      id: '/api/backup/upload'
+      path: '/api/backup/upload'
+      fullPath: '/api/backup/upload'
+      preLoaderRoute: typeof ApiBackupUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/backup/restore': {
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBackupCreateRoute: ApiBackupCreateRoute,
   ApiBackupListRoute: ApiBackupListRoute,
   ApiBackupRestoreRoute: ApiBackupRestoreRoute,
+  ApiBackupUploadRoute: ApiBackupUploadRoute,
   ApiRatesRefreshRoute: ApiRatesRefreshRoute,
   ApiBackupDownloadNameRoute: ApiBackupDownloadNameRoute,
 }
