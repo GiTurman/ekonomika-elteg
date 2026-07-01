@@ -94,17 +94,23 @@ function Index() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="project">
-          <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto">
-            <TabsTrigger value="project">პროექტის მონაცემები</TabsTrigger>
-            {isFull && <TabsTrigger value="finance">ფინანსური დაშვებები</TabsTrigger>}
+        <Tabs defaultValue="input">
+          <TabsList className="grid grid-cols-2 md:grid-cols-4 h-auto">
+            <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>
             {isFull && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
             <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>
             <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>
           </TabsList>
           <div className="mt-4">
-            <TabsContent value="project"><ProjectDataSheet /></TabsContent>
-            {isFull && <TabsContent value="finance"><FinancialAssumptionsSheet /></TabsContent>}
+            <TabsContent value="input" className="space-y-6">
+              <ProjectDataSheet />
+              {isFull && (
+                <div className="border-t pt-6">
+                  <h2 className="text-base font-semibold mb-4">ფინანსური დაშვებები</h2>
+                  <FinancialAssumptionsSheet />
+                </div>
+              )}
+            </TabsContent>
             {isFull && <TabsContent value="economics"><EconomicsSheet /></TabsContent>}
             <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>
             <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>
