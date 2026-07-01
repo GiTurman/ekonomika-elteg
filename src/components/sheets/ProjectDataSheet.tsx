@@ -25,6 +25,18 @@ const UNIT_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: stri
   { key: "installWeeks", label: "მონტაჟი (კვ)", kind: "num" },
 ];
 
+const UNIT_FINANCIAL_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string }> = [
+  { key: "factoryPrice", label: "ქარხნული ფასი ($)" },
+  { key: "bankCommission", label: "საბანკო საკომისიო ($)" },
+  { key: "intTransport", label: "საერთაშ. ტრანსპ. ($)" },
+  { key: "terminal", label: "ტერმინალი ($)" },
+  { key: "localTransport", label: "ადგ. ტრანსპ. ($)" },
+  { key: "materials", label: "მასალები ($)" },
+  { key: "otherCost", label: "სხვა ხარჯი ($)" },
+  { key: "grounding", label: "დამიწება/ზედამხედვ. ($)" },
+  { key: "brokerCommission", label: "საშუამავლო საკ. ($)" },
+];
+
 export function ProjectDataSheet() {
   const { state, updateProject, updateUnit, addUnit, removeUnit } = useEconStore();
   const p = state.project;
@@ -41,13 +53,13 @@ export function ProjectDataSheet() {
         <CardHeader><CardTitle>1. ზოგადი ინფორმაცია</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">პროექტის დასახელება</span>
-            <TextInput value={p.projectName} onChange={(v) => updateProject({ projectName: v })} /></label>
+          <TextInput value={p.projectName} onChange={(v) => updateProject({ projectName: v })} /></label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">მონტაჟის ადგილმდებარეობა</span>
-            <TextInput value={p.location} onChange={(v) => updateProject({ location: v })} /></label>
+          <TextInput value={p.location} onChange={(v) => updateProject({ location: v })} /></label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">ნაგებობის ტიპი</span>
-            <TextInput value={p.buildingType} onChange={(v) => updateProject({ buildingType: v })} /></label>
+          <TextInput value={p.buildingType} onChange={(v) => updateProject({ buildingType: v })} /></label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">პროექტის ჩაბარების წელი</span>
-            <NumberInput value={p.completionYear} onChange={(v) => updateProject({ completionYear: v })} /></label>
+          <NumberInput value={p.completionYear} onChange={(v) => updateProject({ completionYear: v })} /></label>
           <div className="md:col-span-2 text-sm text-muted-foreground">
             დანადგარების რაოდენობა (ავტომატურად): <span className="font-mono font-semibold">{p.units.length}</span>
           </div>
@@ -91,7 +103,33 @@ export function ProjectDataSheet() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>3. მივლინების მონაცემები — პერსონალი და ლოჯისტიკა</CardTitle></CardHeader>
+        <CardHeader><CardTitle>3. დანადგარების ფინანსური მონაცემები — თვითღირებულების შემადგენელი მუხლები ($)</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap text-xs">#</TableHead>
+                {UNIT_FINANCIAL_COLS.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {p.units.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell className="p-1 font-semibold">{u.id}</TableCell>
+                  {UNIT_FINANCIAL_COLS.map((c) => (
+                    <TableCell key={c.key} className="p-1 min-w-[110px]">
+                      <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>4. მივლინების მონაცემები — პერსონალი და ლოჯისტიკა</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <Table>
             <TableHeader>
@@ -116,11 +154,11 @@ export function ProjectDataSheet() {
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">მანძილი ოფისიდან ობიექტამდე, კმ (ერთი მიმართულებით)</span>
-              <NumberInput value={t.distanceKm} onChange={(v) => setTravel({ distanceKm: v })} /></label>
+            <NumberInput value={t.distanceKm} onChange={(v) => setTravel({ distanceKm: v })} /></label>
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">ავტომობილის საწვავის ხარჯი, ლ/100კმ</span>
-              <NumberInput value={t.fuelConsumption} onChange={(v) => setTravel({ fuelConsumption: v })} /></label>
+            <NumberInput value={t.fuelConsumption} onChange={(v) => setTravel({ fuelConsumption: v })} /></label>
             <label className="grid gap-1 md:col-span-2"><span className="text-xs text-muted-foreground">სამუშაო დღეები კვირაში</span>
-              <TextInput value={t.workDays} onChange={(v) => setTravel({ workDays: v })} /></label>
+            <TextInput value={t.workDays} onChange={(v) => setTravel({ workDays: v })} /></label>
           </div>
         </CardContent>
       </Card>
