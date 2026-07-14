@@ -15,6 +15,7 @@ import { Cloud, Download, Loader2, CheckCircle2, KeyRound } from "lucide-react";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
 import { ArchiveDialog } from "@/components/ArchiveDialog";
+import { DataRequestDialog } from "@/components/DataRequestDialog";
 import { saveToArchive } from "@/lib/archive";
 
 export const Route = createFileRoute("/")({
@@ -76,6 +77,7 @@ function Index() {
               <Download className="h-4 w-4 mr-1" /> Excel
             </Button>
             <ArchiveDialog />
+            <DataRequestDialog />
             <Button size="sm" onClick={handleFinish} disabled={finishing}>
               {finishing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
               დასრულება და შენახვა
