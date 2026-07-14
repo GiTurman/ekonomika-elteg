@@ -3,10 +3,11 @@
 
 import * as XLSX from "xlsx";
 import type { AppState } from "./econ-types";
-import { computeEconomics } from "./econ-calc";
+import { computeEconomics, allocateProjectCosts } from "./econ-calc";
 
 export function exportToXlsx(state: AppState) {
   const eco = computeEconomics(state);
+  const alloc = allocateProjectCosts(state);
   const wb = XLSX.utils.book_new();
   const p = state.project;
   const f = state.finance;
@@ -42,15 +43,19 @@ export function exportToXlsx(state: AppState) {
     ["USD → GEL", f.usdRate], ["EUR → GEL", f.eurRate], ["თარიღი", f.rateDate], [],
     ["დღგ", f.vatRate], ["საშემოსავლო", f.incomeTaxRate], ["საპენსიო", f.pensionRate], [],
     ["კვება/დღე", f.mealPerDay], ["საწვავი ₾/ლ", f.fuelPricePerL],
-    ["სასტუმრო-მექანიკოსები", f.hotelMechanics], ["სასტუმრო-ელექტრიკოსები", f.hotelElectricians], ["სასტუმრო-ადმინი", f.hotelAdmin], [],
-    ["მონტაჟი ₾/სართული", f.mechRateGel], ["ელექტრომონტაჟი ₾/სართული", f.elecRateGel], [],
-    ["დანადგარის ფასნამატი %", f.equipmentMarkupPct], ["მონტაჟის ფასნამატი %", f.installMarkupPct],
-    ["გაუთვალისწინებელი %", f.contingencyPct], ["FX რისკი %", f.fxRiskPct], [],
-    ["გარანტიის %", f.warrantyPct], ["თვიური სერვისი USD", f.monthlyServiceUsd], ["უფასო სერვისი, თვე", f.freeServiceMonths], [],
+    ["სასტუმროს დღიური ტარიფი-მექანიკოსები", f.hotelMechanics], ["სასტუმროს დღიური ტარიფი-ელექტრიკოსები", f.hotelElectricians], ["სასტუმროს დღიური ტარიფი-ადმინი", f.hotelAdmin], [],
+    ["საბანკო საკომისიო — პროექტის ჯამი", p.bankCommissionTotal], ["საერთაშ. ტრანსპ. — პროექტის ჯამი", p.intTransportTotal],
+    ["ტერმინალი — პროექტის ჯამი", p.terminalTotal], ["ადგ. ტრანსპ. — პროექტის ჯამი", p.localTransportTotal], [],
+    ["გარანტიის %", "დანადგარის მიხედვით"], ["თვიური სერვისი USD", f.monthlyServiceUsd], ["უფასო სერვისი, თვე", f.freeServiceMonths], [],
     ["საბანკო გარანტიის %", f.guaranteePct], ["დღეები", f.guaranteeDays], ["წლიური საკომ. %", f.guaranteeAnnualPct], [],
     ["დანადგარების ხარჯები (USD)"],
-    ["#", "ქარხნული", "საბანკო", "საერთ.ტრანსპ.", "ტერმინალი", "ადგ.ტრანსპ.", "მასალები", "სხვა", "დამიწება", "საშუამავლო"],
-    ...p.units.map(u => [u.id, u.factoryPrice, u.bankCommission, u.intTransport, u.terminal, u.localTransport, u.materials, u.otherCost, u.grounding, u.brokerCommission]),
+    ["#", "ქარხნული", "საბანკო (გადანაწ.)", "საერთ.ტრანსპ.(გადანაწ.)", "ტერმინალი(გადანაწ.)", "ადგ.ტრანსპ.(გადანაწ.)", "მასალები", "სხვა", "დამიწება", "საშუამავლო %", "მონტ.₾/სართ", "ელ.მონტ.₾/სართ", "დანადგ.ფასნამატი%", "მონტ.ფასნამატი%", "გაუთვ.%", "FXრისკი%", "გარანტია%"],
+    ...p.units.map(u => [
+      u.id, u.factoryPrice,
+      alloc.bank.get(u.id) ?? 0, alloc.intTransport.get(u.id) ?? 0, alloc.terminal.get(u.id) ?? 0, alloc.localTransport.get(u.id) ?? 0,
+      u.materials, u.otherCost, u.grounding, u.brokerCommissionPct,
+      u.mechRateGel, u.elecRateGel, u.equipmentMarkupPct, u.installMarkupPct, u.contingencyPct, u.fxRiskPct, u.warrantyPct,
+    ]),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s2), "ფინანსური დაშვებები");
 

@@ -1,17 +1,18 @@
 import { useEconStore } from "@/lib/econ-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { NumberInput, PercentInput, TextInput, fmtGel, fmtUsd, linkedCls, computedCls } from "./sheet-ui";
-import { computeTravel } from "@/lib/econ-calc";
+import { NumberInput, PercentInput, TextInput, fmtGel, fmtUsd, fmtPct, linkedCls, computedCls } from "./sheet-ui";
+import { computeTravel, allocateProjectCosts } from "@/lib/econ-calc";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 export function FinancialAssumptionsSheet() {
-  const { state, updateFinance, updateUnit } = useEconStore();
+  const { state, updateFinance } = useEconStore();
   const f = state.finance;
   const units = state.project.units;
   const travel = computeTravel(state);
+  const alloc = allocateProjectCosts(state);
   const [refreshing, setRefreshing] = useState(false);
 
   const refreshRates = async () => {
@@ -77,12 +78,16 @@ export function FinancialAssumptionsSheet() {
               <NumberInput value={f.fuelPricePerL} onChange={(v) => updateFinance({ fuelPricePerL: v })} /></label>
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">საწვავი ₾/კმ</span>
               <div className={computedCls}>{travel.fuelPerKm.toFixed(4)}</div></label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმრო — მექანიკოსები</span>
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — მექანიკოსები (₾/დღე)</span>
               <NumberInput value={f.hotelMechanics} onChange={(v) => updateFinance({ hotelMechanics: v })} /></label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმრო — ელექტრიკოსები</span>
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — ელექტრიკოსები (₾/დღე)</span>
               <NumberInput value={f.hotelElectricians} onChange={(v) => updateFinance({ hotelElectricians: v })} /></label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმრო — ადმინისტრაცია</span>
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — ადმინისტრაცია (₾/დღე)</span>
               <NumberInput value={f.hotelAdmin} onChange={(v) => updateFinance({ hotelAdmin: v })} /></label>
+            <p className="md:col-span-3 text-xs text-muted-foreground">
+              გამოიყენება მხოლოდ იმ ჯგუფებისთვის, რომლებსაც «პროექტის მონაცემები» ფურცელზე „საცხოვრებელი" = სასტუმრო
+              აქვთ არჩეული (ჯამი = ტარიფი × დღეები). „სახლი ქირით" რეჟიმისთვის ჯამური თანხა შეიყვანება უშუალოდ იქვე.
+            </p>
           </div>
 
           <div className="rounded border p-2">
@@ -123,8 +128,11 @@ export function FinancialAssumptionsSheet() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>4. დანადგარების პირდაპირი ხარჯები (USD)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>4. დანადგარების პირდაპირი ხარჯები (USD) — მიმოხილვა</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
+          <p className="text-xs text-muted-foreground mb-2">
+            რედაქტირებადია «პროექტის მონაცემები» ფურცელზე (3, 3.1). აქ მხოლოდ საინფორმაციო ჯამია.
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
@@ -137,28 +145,29 @@ export function FinancialAssumptionsSheet() {
                 <TableHead>მასალები</TableHead>
                 <TableHead>სხვა</TableHead>
                 <TableHead>დამიწება/ზედამხ.</TableHead>
-                <TableHead>საშუამავლო</TableHead>
-                <TableHead>ჯამი</TableHead>
+                <TableHead>საშუამავლო %</TableHead>
+                <TableHead>ჯამი (საშუამავლოს გარეშე)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {units.map((u) => {
-                const sum = u.factoryPrice + u.bankCommission + u.intTransport + u.terminal + u.localTransport + u.materials + u.otherCost + u.grounding + u.brokerCommission;
-                const N = (k: keyof typeof u) => (
-                  <NumberInput value={u[k] as number} onChange={(v) => updateUnit(u.id, { [k]: v } as any)} />
-                );
+                const bank = alloc.bank.get(u.id) ?? 0;
+                const intT = alloc.intTransport.get(u.id) ?? 0;
+                const term = alloc.terminal.get(u.id) ?? 0;
+                const local = alloc.localTransport.get(u.id) ?? 0;
+                const sum = u.factoryPrice + bank + intT + term + local + u.materials + u.otherCost + u.grounding;
                 return (
                   <TableRow key={u.id}>
                     <TableCell className={linkedCls}>{u.id}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("factoryPrice")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("bankCommission")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("intTransport")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("terminal")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("localTransport")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("materials")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("otherCost")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("grounding")}</TableCell>
-                    <TableCell className="p-1 min-w-[100px]">{N("brokerCommission")}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.factoryPrice)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(bank)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(intT)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(term)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(local)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.materials)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.otherCost)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.grounding)}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtPct(u.brokerCommissionPct)}</TableCell>
                     <TableCell className={"text-right " + computedCls}>{fmtUsd(sum)}</TableCell>
                   </TableRow>
                 );
@@ -169,36 +178,12 @@ export function FinancialAssumptionsSheet() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>4.1 მონტაჟის ანაზღაურების განაკვეთები (₾/სართული, ხელზე)</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">მონტაჟი (₾/სართული)</span>
-            <NumberInput value={f.mechRateGel} onChange={(v) => updateFinance({ mechRateGel: v })} /></label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">ელექტრომონტაჟი (₾/სართული)</span>
-            <NumberInput value={f.elecRateGel} onChange={(v) => updateFinance({ elecRateGel: v })} /></label>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>5. მარჟისა და რისკის პარამეტრები</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">დანადგარის ფასნამატი %</span>
-            <PercentInput value={f.equipmentMarkupPct} onChange={(v) => updateFinance({ equipmentMarkupPct: v })} /></label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">მონტაჟის ფასნამატი %</span>
-            <PercentInput value={f.installMarkupPct} onChange={(v) => updateFinance({ installMarkupPct: v })} /></label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">გაუთვალისწინებელი %</span>
-            <PercentInput value={f.contingencyPct} onChange={(v) => updateFinance({ contingencyPct: v })} /></label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">საბანკო სავალუტო რისკი %</span>
-            <PercentInput value={f.fxRiskPct} onChange={(v) => updateFinance({ fxRiskPct: v })} /></label>
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader><CardTitle>6. გარანტია და მომსახურება</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის ვადა (წელი)</span>
             <NumberInput value={f.warrantyYears} onChange={(v) => updateFinance({ warrantyYears: v })} /></label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის % (ქარხნული ფასიდან)</span>
-            <PercentInput value={f.warrantyPct} onChange={(v) => updateFinance({ warrantyPct: v })} /></label>
+          <div className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის % (ქარხნული ფასიდან)</span>
+            <span className="text-xs text-muted-foreground">დანადგარის მიხედვით — «პროექტის მონაცემები» (3.2)</span></div>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">თვიური სერვისი (USD)</span>
             <NumberInput value={f.monthlyServiceUsd} onChange={(v) => updateFinance({ monthlyServiceUsd: v })} /></label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">უფასო სერვისის ვადა (თვე)</span>
