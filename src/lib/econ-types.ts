@@ -21,21 +21,29 @@ export interface Unit {
 
   // Financial (per-unit direct costs, USD)
   factoryPrice: number;      // ქარხნული ფასი
-  bankCommission: number;    // საბანკო საკომისიო
-  intTransport: number;      // საერთაშ. ტრანსპ.
-  terminal: number;          // ტერმინალის მომსახურება
-  localTransport: number;    // ადგ. ტრანსპ. და დაცლა
   materials: number;         // მასალები
   otherCost: number;         // სხვა ხარჯი
   grounding: number;         // დამიწება/ზედამხედვ.
-  brokerCommission: number;  // საშუამავლო საკომისიო
+  brokerCommissionPct: number; // საშუამავლო საკომისიო, % — ემატება საბოლოო ფასს (დღგ+გარანტიის შემდეგ)
+
+  // Labor rates (₾/floor, net take-home) — per unit
+  mechRateGel: number;
+  elecRateGel: number;
+
+  // Margin & risk parameters — per unit
+  equipmentMarkupPct: number;
+  installMarkupPct: number;
+  contingencyPct: number;
+  fxRiskPct: number;
+  warrantyPct: number;       // % of factory price
 }
 
 export interface TravelGroup {
   headcount: number;
   days: number;
-  trips: number;             // ობიექტზე ჩასვლების რაოდენობა
-  hotelTotal: number;        // სასტუმროს ჯამური ღირებულება (₾)
+  trips: number;                          // ობიექტზე ჩასვლების რაოდენობა
+  accommodationMode: "house" | "hotel";   // "house" = სახლი ქირით (თვის ჯამური ფასი), "hotel" = სასტუმრო (დღიური ტარიფი × დღეები)
+  houseRentTotal: number;                 // "house" რეჟიმის თვის ჯამური ღირებულება (₾)
 }
 
 export interface ProjectData {
@@ -44,6 +52,12 @@ export interface ProjectData {
   buildingType: string;
   completionYear: number;
   units: Unit[];
+  // Purchase-cost items entered once for the whole project (USD) and
+  // auto-distributed across active units in proportion to factoryPrice.
+  bankCommissionTotal: number;   // საბანკო საკომისიო — ჯამური თანხა
+  intTransportTotal: number;     // საერთაშ. ტრანსპ. — ჯამური თანხა
+  terminalTotal: number;         // ტერმინალის მომსახურება — ჯამური თანხა
+  localTransportTotal: number;   // ადგ. ტრანსპ. და დაცლა — ჯამური თანხა
   travel: {
     mechanics: TravelGroup;
     electricians: TravelGroup;
@@ -65,21 +79,12 @@ export interface FinancialAssumptions {
   pensionRate: number;   // 0.04 (საპენსიო)
   // Travel per-diem rates (GEL)
   mealPerDay: number;
-  hotelMechanics: number;   // reserved
-  hotelElectricians: number;
-  hotelAdmin: number;
+  hotelMechanics: number;   // სასტუმროს დღიური ტარიფი — მექანიკოსები (₾/დღე)
+  hotelElectricians: number; // სასტუმროს დღიური ტარიფი — ელექტრიკოსები (₾/დღე)
+  hotelAdmin: number;        // სასტუმროს დღიური ტარიფი — ადმინისტრაცია (₾/დღე)
   fuelPricePerL: number;
-  // Labor (GEL/floor, net take-home)
-  mechRateGel: number;   // 280
-  elecRateGel: number;   // 80
-  // Margins & risk
-  equipmentMarkupPct: number; // 0.03
-  installMarkupPct: number;   // 0.50
-  contingencyPct: number;     // 0.03
-  fxRiskPct: number;          // 0.02
   // Warranty & service
   warrantyYears: number;
-  warrantyPct: number;        // % of factory price
   monthlyServiceUsd: number;
   freeServiceMonths: number;
   // Bank guarantee

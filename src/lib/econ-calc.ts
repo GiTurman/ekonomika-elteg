@@ -1,23 +1,23 @@
 // Calculation engine — mirrors the Excel template
 // "განფასება_შაბლონი_GT_v3.xlsx" (Fuji Hitech / KLEEMANN Economic Model)
 
-import type { AppState, Unit, FinancialAssumptions, PaymentScenario } from "./econ-types";
+import type { AppState, Unit, FinancialAssumptions, PaymentScenario, TravelGroup } from "./econ-types";
 
 export interface UnitEconomics {
   id: string;
   floors: number;
-  purchaseCost: number; // D = factory + bank + intT + terminal + localT
+  purchaseCost: number; // D = factory + allocated(bank + intT + terminal + localT)
   installCost: number; // E = floors*(mech+elec)/(1-inc)/(1-pen) + materials + per-unit travel share
   totalCost: number; // F = D + E
-  markup: number; // G = D*eqMk + E*instMk
+  markup: number; // G = D*eqMk + E*instMk (unit's own markup rates)
   priceNoExtras: number; // H = F + G
-  extras: number; // I = H*cont + (factory+bank)*fx + other + grounding + broker + factory*warranty + monthlyService*freeMonths
+  extras: number; // I = H*cont + (factory+allocatedBank)*fx + other + grounding + factory*warranty + monthlyService*freeMonths
   priceNoVat: number; // J = H + I
   vat: number; // K = J * vatRate
   bankGuarantee: number; // L
-  finalPrice: number; // M = J + K + L
+  finalPrice: number; // M_final = (J + K + L) * (1 + brokerCommissionPct)
   marginPct: number; // N = G / J
-  projectShare: number; // O = M / total_M
+  projectShare: number; // O = M_final / total_M_final
 }
 
 export interface TravelBreakdown {
@@ -58,7 +58,7 @@ export interface ProjectReport {
   fxRisk: number; // D63
   otherTotal: number; // D64
   groundingTotal: number; // D65
-  brokerTotal: number; // D66
+  brokerTotal: number; // D66 — now derived from per-unit % applied at the final stage
   warrantyCost: number; // D67
   freeServiceCost: number; // D68
   extrasTotal: number; // D69
@@ -114,6 +114,54 @@ function activeUnits(units: Unit[]) {
   return units.filter((u) => u.id && u.id.trim() !== "");
 }
 
+// Distributes a project-level total (e.g. bank commission) across active units
+// in proportion to each unit's factoryPrice. If no unit has a factory price,
+// falls back to an even split. Any rounding remainder is assigned to the last
+// unit so the allocated amounts always sum EXACTLY to `total` — this keeps
+// report.checkDiff at 0 regardless of rounding.
+export function distributeByFactoryPrice(units: Unit[], total: number): Map<string, number> {
+  const map = new Map<string, number>();
+  if (units.length === 0) return map;
+  const totalFactory = units.reduce((s, u) => s + u.factoryPrice, 0);
+  let allocated = 0;
+  units.forEach((u, i) => {
+    const isLast = i === units.length - 1;
+    if (isLast) {
+      map.set(u.id, Math.round((total - allocated) * 100) / 100);
+      return;
+    }
+    const share = totalFactory > 0 ? u.factoryPrice / totalFactory : 1 / units.length;
+    const amount = Math.round(total * share * 100) / 100;
+    allocated += amount;
+    map.set(u.id, amount);
+  });
+  return map;
+}
+
+export interface UnitAllocations {
+  bank: number;
+  intTransport: number;
+  terminal: number;
+  localTransport: number;
+}
+
+// Convenience: allocation maps for all 4 project-level purchase-cost totals at once.
+export function allocateProjectCosts(state: AppState): {
+  bank: Map<string, number>;
+  intTransport: Map<string, number>;
+  terminal: Map<string, number>;
+  localTransport: Map<string, number>;
+} {
+  const units = activeUnits(state.project.units);
+  const p = state.project;
+  return {
+    bank: distributeByFactoryPrice(units, p.bankCommissionTotal),
+    intTransport: distributeByFactoryPrice(units, p.intTransportTotal),
+    terminal: distributeByFactoryPrice(units, p.terminalTotal),
+    localTransport: distributeByFactoryPrice(units, p.localTransportTotal),
+  };
+}
+
 export function computeTravel(state: AppState): TravelBreakdown {
   const f = state.finance;
   const t = state.project.travel;
@@ -125,6 +173,9 @@ export function computeTravel(state: AppState): TravelBreakdown {
     f.mealPerDay * g.headcount * g.days;
   const fuel = (g: { trips: number }) =>
     t.distanceKm * 2 * g.trips * fuelPerKm;
+  // "hotel" mode: daily tariff (finance.hotelX) × days. "house" mode: flat monthly total.
+  const accommodation = (g: TravelGroup, dailyRate: number) =>
+    g.accommodationMode === "hotel" ? dailyRate * g.days : g.houseRentTotal;
 
   const meals = {
     mechanics: meal(t.mechanics),
@@ -135,11 +186,12 @@ export function computeTravel(state: AppState): TravelBreakdown {
   meals.total = meals.mechanics + meals.electricians + meals.admin;
 
   const hotel = {
-    mechanics: f.hotelMechanics,
-    electricians: f.hotelElectricians,
-    admin: f.hotelAdmin,
-    total: f.hotelMechanics + f.hotelElectricians + f.hotelAdmin,
+    mechanics: accommodation(t.mechanics, f.hotelMechanics),
+    electricians: accommodation(t.electricians, f.hotelElectricians),
+    admin: accommodation(t.admin, f.hotelAdmin),
+    total: 0,
   };
+  hotel.total = hotel.mechanics + hotel.electricians + hotel.admin;
 
   const fuelBd = {
     mechanics: fuel(t.mechanics),
@@ -173,45 +225,58 @@ export function computeTravel(state: AppState): TravelBreakdown {
 
 // Per-unit install cost (matches template E-column)
 // Note: template uses labor rates in GEL directly without USD conversion —
-// preserved verbatim for parity with the spreadsheet.
+// preserved verbatim for parity with the spreadsheet. mechRateGel/elecRateGel
+// are now per-unit fields (previously global assumptions).
 function unitInstallCost(u: Unit, f: FinancialAssumptions) {
   const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
-  return u.floors * f.mechRateGel * grossFactor
-    + u.floors * f.elecRateGel * grossFactor
+  return u.floors * u.mechRateGel * grossFactor
+    + u.floors * u.elecRateGel * grossFactor
     + u.materials;
 }
 
-function unitPurchaseCost(u: Unit) {
-  return u.factoryPrice + u.bankCommission + u.intTransport + u.terminal + u.localTransport;
+function unitPurchaseCost(u: Unit, allocated: UnitAllocations) {
+  return u.factoryPrice + allocated.bank + allocated.intTransport + allocated.terminal + allocated.localTransport;
 }
 
 export function computeEconomics(state: AppState): FullEconomics {
   const f = state.finance;
-  const units = activeUnits(state.project.units);
+  const p = state.project;
+  const units = activeUnits(p.units);
   const travel = computeTravel(state);
 
+  const alloc = allocateProjectCosts(state);
+  const allocationOf = (u: Unit): UnitAllocations => ({
+    bank: alloc.bank.get(u.id) ?? 0,
+    intTransport: alloc.intTransport.get(u.id) ?? 0,
+    terminal: alloc.terminal.get(u.id) ?? 0,
+    localTransport: alloc.localTransport.get(u.id) ?? 0,
+  });
+  // Shared per-unit purchase/install cost helpers — used both by the primary
+  // per-unit pass (rows) and the independent "check row" report below, so the
+  // underlying D/E formulas can never drift out of sync between the two.
+  const purchaseCostOf = (u: Unit) => unitPurchaseCost(u, allocationOf(u));
+  const installCostOf = (u: Unit) => unitInstallCost(u, f) + travel.perUnitUsd;
+
   // First pass — compute everything except projectShare
-  // FIX: travel cost (per-unit share) was previously omitted from the per-unit
-  // install cost, causing the "check row" (report.checkDiff) to diverge from
-  // the sum of per-unit final prices by the travel amount. Now included.
   const rows: UnitEconomics[] = units.map((u) => {
-    const D = unitPurchaseCost(u);
-    const E = unitInstallCost(u, f) + travel.perUnitUsd;
+    const allocated = allocationOf(u);
+    const D = purchaseCostOf(u);
+    const E = installCostOf(u);
     const F = D + E;
-    const G = D * f.equipmentMarkupPct + E * f.installMarkupPct;
+    const G = D * u.equipmentMarkupPct + E * u.installMarkupPct;
     const H = F + G;
     const I =
-      H * f.contingencyPct +
-      (u.factoryPrice + u.bankCommission) * f.fxRiskPct +
+      H * u.contingencyPct +
+      (u.factoryPrice + allocated.bank) * u.fxRiskPct +
       u.otherCost +
       u.grounding +
-      u.brokerCommission +
-      u.factoryPrice * f.warrantyPct +
+      u.factoryPrice * u.warrantyPct +
       f.monthlyServiceUsd * f.freeServiceMonths;
     const J = H + I;
     const K = J * f.vatRate;
     const L = (((J + K) * f.guaranteePct) * f.guaranteeAnnualPct * f.guaranteeDays / 365) * (1 + f.vatRate);
     const M = J + K + L;
+    const finalPrice = M * (1 + u.brokerCommissionPct);
     return {
       id: u.id,
       floors: u.floors,
@@ -224,7 +289,7 @@ export function computeEconomics(state: AppState): FullEconomics {
       priceNoVat: J,
       vat: K,
       bankGuarantee: L,
-      finalPrice: M,
+      finalPrice,
       marginPct: J ? G / J : 0,
       projectShare: 0,
     };
@@ -249,46 +314,61 @@ export function computeEconomics(state: AppState): FullEconomics {
     marginPct: sum("priceNoExtras") ? sum("markup") / sum("priceNoVat") : 0,
   };
 
-  // Detailed project report (independent calculation, "check row")
+  // Detailed project report (independent recomputation from raw unit/finance
+  // data, "check row"). Purchase-cost totals now come directly from the
+  // project-level input fields (by construction equal to the sum of the
+  // allocated per-unit amounts). Labor rates and margin/risk % are per-unit,
+  // so those sub-totals are summed per unit rather than aggregate×rate.
   const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
-  const sumU = (k: keyof Unit) =>
-    units.reduce((s, u) => s + (u[k] as number), 0);
-  const sumFloors = units.reduce((s, u) => s + u.floors, 0);
 
-  const factoryTotal = sumU("factoryPrice");
-  const bankCommTotal = sumU("bankCommission");
-  const intTransportTotal = sumU("intTransport");
-  const terminalTotal = sumU("terminal");
-  const localTransportTotal = sumU("localTransport");
+  const factoryTotal = units.reduce((s, u) => s + u.factoryPrice, 0);
+  const bankCommTotal = p.bankCommissionTotal;
+  const intTransportTotal = p.intTransportTotal;
+  const terminalTotal = p.terminalTotal;
+  const localTransportTotal = p.localTransportTotal;
   const purchaseTotal = factoryTotal + bankCommTotal + intTransportTotal + terminalTotal + localTransportTotal;
 
-  const mechPayroll = sumFloors * f.mechRateGel * grossFactor;
-  const elecPayroll = sumFloors * f.elecRateGel * grossFactor;
+  const mechPayroll = units.reduce((s, u) => s + u.floors * u.mechRateGel * grossFactor, 0);
+  const elecPayroll = units.reduce((s, u) => s + u.floors * u.elecRateGel * grossFactor, 0);
   const reportTravelTotal = travel.totalUsd;
-  const materialsTotal = sumU("materials");
+  const materialsTotal = units.reduce((s, u) => s + u.materials, 0);
   const installTotal = mechPayroll + elecPayroll + reportTravelTotal + materialsTotal;
   const costTotal = purchaseTotal + installTotal;
 
-  const equipmentMarkup = purchaseTotal * f.equipmentMarkupPct;
-  const installMarkup = installTotal * f.installMarkupPct;
+  const equipmentMarkup = units.reduce((s, u) => s + purchaseCostOf(u) * u.equipmentMarkupPct, 0);
+  const installMarkup = units.reduce((s, u) => s + installCostOf(u) * u.installMarkupPct, 0);
   const markupTotal = equipmentMarkup + installMarkup;
   const reportPriceNoExtras = costTotal + markupTotal;
 
-  const contingency = reportPriceNoExtras * f.contingencyPct;
-  const fxRisk = (factoryTotal + bankCommTotal) * f.fxRiskPct;
-  const otherTotal = sumU("otherCost");
-  const groundingTotal = sumU("grounding");
-  const brokerTotal = sumU("brokerCommission");
-  const warrantyCost = factoryTotal * f.warrantyPct;
+  const contingency = units.reduce((s, u) => {
+    const D = purchaseCostOf(u);
+    const E = installCostOf(u);
+    const H = D + E + D * u.equipmentMarkupPct + E * u.installMarkupPct;
+    return s + H * u.contingencyPct;
+  }, 0);
+  const fxRisk = units.reduce((s, u) => s + (u.factoryPrice + (alloc.bank.get(u.id) ?? 0)) * u.fxRiskPct, 0);
+  const otherTotal = units.reduce((s, u) => s + u.otherCost, 0);
+  const groundingTotal = units.reduce((s, u) => s + u.grounding, 0);
+  const warrantyCost = units.reduce((s, u) => s + u.factoryPrice * u.warrantyPct, 0);
   const freeServiceCost = f.monthlyServiceUsd * f.freeServiceMonths;
-  const extrasTotal = contingency + fxRisk + otherTotal + groundingTotal + brokerTotal + warrantyCost + freeServiceCost;
+  // Broker commission no longer sits in the extras/cost stack — it's applied
+  // multiplicatively at the very end (see rows above). Recomputed here from
+  // each unit's own pre-broker final price (M) and % for the check row.
+  const brokerTotal = rows.reduce((s, r, i) => {
+    const pct = units[i].brokerCommissionPct;
+    if (!pct) return s;
+    const M = r.finalPrice / (1 + pct);
+    return s + (r.finalPrice - M);
+  }, 0);
+  const extrasTotal = contingency + fxRisk + otherTotal + groundingTotal + warrantyCost + freeServiceCost;
 
   const reportPriceNoVat = reportPriceNoExtras + extrasTotal;
   const reportVat = reportPriceNoVat * f.vatRate;
   const priceWithVat = reportPriceNoVat + reportVat;
   const guaranteeBase = priceWithVat * f.guaranteePct;
   const guaranteeFee = (guaranteeBase * f.guaranteeAnnualPct * f.guaranteeDays) / 365;
-  const finalContractPrice = (reportPriceNoVat + guaranteeFee) * (1 + f.vatRate);
+  const finalContractPriceExBroker = (reportPriceNoVat + guaranteeFee) * (1 + f.vatRate);
+  const finalContractPrice = finalContractPriceExBroker + brokerTotal;
   const totalMarginPct = reportPriceNoVat ? markupTotal / reportPriceNoVat : 0;
 
   const report: ProjectReport = {
