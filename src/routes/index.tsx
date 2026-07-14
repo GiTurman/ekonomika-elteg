@@ -37,11 +37,17 @@ function Index() {
   useEffect(() => { load(); }, [load]);
 
   const eco = computeEconomics(state);
-  // ორივე კოდით ყველა მონაცემი და ტაბი სრულად ხელმისაწვდომია.
-  // როლი ახლა მხოლოდ "ჯამური მარჟის" ფორმულის არჩევანზე მოქმედებს:
-  // Full (Elteg_2026_GT!) — ფასნამატი / ფასი დღგ-ს გარეშე (ფინანსური ლოგიკა)
-  // Partner (Elteg_2026!) — ფასნამატი / გასაყიდი ფასი დღგ-ს ჩათვლით (გაყიდვების ლოგიკა)
+  // ორივე კოდით ყველა მონაცემი და ტაბი სრულად ხელმისაწვდომია (დეტალური
+  // ცხრილები/ანგარიშები არ იცვლება — იქ ორივე ველი, დღგ-ს გარეშე და დღგ-ით,
+  // გამჭვირვალედაა ნაჩვენები აუდიტისთვის). სათაურის KPI-ებში კი როლის
+  // მიხედვით სხვადასხვა "მთავარი" თანხა და მარჟა გამოისახება:
+  // Full (Elteg_2026_GT!) — ფინანსების "სუფთა" ხედი: ფასი დღგ-ს გარეშე,
+  //   ფასნამატი / ფასი დღგ-ს გარეშე (ხელფასები აქაც ყოველთვის გაგროსილებულია)
+  // Partner (Elteg_2026!) — სრული, დღგ-ს ჩათვლით საბოლოო ფასი,
+  //   ფასნამატი / გასაყიდი ფასი დღგ-ს ჩათვლით
   const salesMarginPct = eco.totals.finalPrice ? eco.report.markupTotal / eco.totals.finalPrice : 0;
+  const headlinePrice = isFull ? eco.report.priceNoVat : eco.totals.finalPrice;
+  const headlinePriceLabel = isFull ? "ფასი დღგ-ს გარეშე" : "საბოლოო ფასი (დღგ-ს ჩათვლით)";
 
   const handleFinish = async () => {
     const name = (state.project.projectName || "პროექტი") + " — " + new Date().toLocaleDateString("ka-GE");
@@ -91,7 +97,7 @@ function Index() {
           <div className="container mx-auto px-4 pb-2 text-xs text-emerald-600">{savedMsg}</div>
         )}
         <div className="container mx-auto px-4 pb-3 grid grid-cols-2 md:grid-cols-5 gap-2">
-          <Kpi label="საბოლოო ფასი" value={fmtUsd(eco.totals.finalPrice)} />
+          <Kpi label={headlinePriceLabel} value={fmtUsd(headlinePrice)} />
           <Kpi label="სულ თვითღ." value={fmtUsd(eco.totals.totalCost)} />
           <Kpi label="ჯამური მოგების თანხა" value={fmtUsd(eco.report.markupTotal)} />
           <Kpi label="ჯამური მარჟა" value={fmtPct(isFull ? eco.report.totalMarginPct : salesMarginPct)} />

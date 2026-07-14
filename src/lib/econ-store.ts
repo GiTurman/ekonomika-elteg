@@ -58,9 +58,20 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   },
   addUnit: () => {
     set((s) => {
-      const n = s.state.project.units.length + 1;
-      const nu = emptyUnit(`L${n}`);
-      return { state: { ...s.state, project: { ...s.state.project, units: [...s.state.project.units, nu] } } };
+      const units = s.state.project.units;
+      const last = units[units.length - 1];
+      let nu: Unit;
+      if (last) {
+        // ახალი დანადგარი = წინას სრული ასლი (id-ის გარდა) — მომხმარებელი
+        // ხელით შეცვლის მხოლოდ იმ ველებს, რაც განსხვავებულია.
+        const m = last.id.match(/^([A-Za-z]+)(\d+)$/);
+        const prefix = m ? m[1] : "L";
+        const num = m ? parseInt(m[2], 10) + 1 : units.length + 1;
+        nu = { ...last, id: `${prefix}${num}` };
+      } else {
+        nu = emptyUnit("L1");
+      }
+      return { state: { ...s.state, project: { ...s.state.project, units: [...units, nu] } } };
     });
     scheduleSave(get);
   },
