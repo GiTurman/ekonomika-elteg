@@ -81,3 +81,71 @@ export const defaultAppState: AppState = {
 };
 
 export const emptyUnit = mkUnit;
+
+// ცარიელი დანადგარი — ტექნიკური სტრუქტურა შენარჩუნებულია (id, კატეგორიები),
+// მაგრამ ყველა ფინანსური/რაოდენობრივი ველი ნულოვანია.
+const blankUnit = (id: string): Unit => ({
+  id,
+  capacity: 0,
+  floors: 0,
+  currency: "USD",
+  brand: "",
+  model: "",
+  country: "",
+  kind: "",
+  type: "",
+  delivery: "",
+  mrType: "",
+  specDate: new Date().toISOString().slice(0, 10),
+  variant: 1,
+  productionWeeks: 0,
+  transportWeeks: 0,
+  reserveWeeks: 0,
+  installWeeks: 0,
+  factoryPrice: 0,
+  materials: 0,
+  otherCost: 0,
+  grounding: 0,
+  brokerCommissionPct: 0,
+  mechRateGel: 0,
+  elecRateGel: 0,
+  equipmentMarkupPct: 0,
+  installMarkupPct: 0,
+  contingencyPct: 0,
+  fxRiskPct: 0,
+  warrantyPct: 0,
+});
+
+// ახალი, სუფთა (ნულოვანი) პროექტი — "დასრულება და შენახვა" შემდეგ ამით
+// იწყება მუშაობა, ძველი პროექტის სანიმუშო მონაცემების ნაცვლად.
+// ფინანსური მუდმივები (კურსი, დღგ, გადასახადები, გადახდის სცენარები) —
+// ესენი პროექტისგან დამოუკიდებელი წესებია და მუშა მნიშვნელობებით რჩება.
+export function blankAppState(): AppState {
+  return {
+    project: {
+      projectName: "",
+      location: "",
+      buildingType: "",
+      completionYear: new Date().getFullYear(),
+      units: [blankUnit("L1"), blankUnit("L2")],
+      bankCommissionTotal: 0,
+      intTransportTotal: 0,
+      terminalTotal: 0,
+      localTransportTotal: 0,
+      travel: {
+        mechanics:    { headcount: 0, days: 0, trips: 0, accommodationMode: "hotel", houseRentTotal: 0 },
+        electricians: { headcount: 0, days: 0, trips: 0, accommodationMode: "hotel", houseRentTotal: 0 },
+        admin:        { headcount: 0, days: 0, trips: 0, accommodationMode: "hotel", houseRentTotal: 0 },
+        distanceKm: 0,
+        fuelConsumption: 0,
+        workDays: "",
+      },
+    },
+    finance: { ...defaultAppState.finance, rateDate: new Date().toISOString().slice(0, 10) },
+    payment: {
+      procurementAdvancePct: defaultAppState.payment.procurementAdvancePct,
+      scenarioA: { ...defaultAppState.payment.scenarioA },
+      scenarioB: { ...defaultAppState.payment.scenarioB },
+    },
+  };
+}

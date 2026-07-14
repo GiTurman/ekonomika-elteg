@@ -11,6 +11,7 @@ import { FinancialAssumptionsSheet } from "@/components/sheets/FinancialAssumpti
 import { EconomicsSheet } from "@/components/sheets/EconomicsSheet";
 import { PaymentScheduleSheet } from "@/components/sheets/PaymentScheduleSheet";
 import { InstallationTariffsSheet } from "@/components/sheets/InstallationTariffsSheet";
+import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
 import { Cloud, Download, Loader2, CheckCircle2, KeyRound } from "lucide-react";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
@@ -107,11 +108,12 @@ function Index() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs defaultValue="input">
-          <TabsList className="grid grid-cols-2 md:grid-cols-4 h-auto">
+          <TabsList className={"grid h-auto " + (isFull ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-4")}>
             <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>
             <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>
             <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>
             <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>
+            {isFull && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
           </TabsList>
           <div className="mt-4">
             <TabsContent value="input" className="space-y-6">
@@ -124,6 +126,7 @@ function Index() {
             <TabsContent value="economics"><EconomicsSheet /></TabsContent>
             <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>
             <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>
+            {isFull && <TabsContent value="analytics"><AnalyticsSheet /></TabsContent>}
           </div>
         </Tabs>
       </main>

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AppState, Unit } from "./econ-types";
-import { defaultAppState, emptyUnit } from "./econ-defaults";
+import { defaultAppState, emptyUnit, blankAppState } from "./econ-defaults";
 import { supabase } from "@/integrations/supabase/client";
 
 interface StoreShape {
@@ -89,7 +89,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   },
 
   reset: () => {
-    set({ state: defaultAppState });
+    set({ state: blankAppState() });
     scheduleSave(get);
   },
 

@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2 } from "lucide-react";
-import { deleteArchiveEntry, listArchive, loadArchiveEntry, type ArchiveEntry } from "@/lib/archive";
+import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser } from "lucide-react";
+import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, type ArchiveEntry } from "@/lib/archive";
 import { useEconStore } from "@/lib/econ-store";
 
 export function ArchiveDialog() {
@@ -17,6 +17,7 @@ export function ArchiveDialog() {
   const [items, setItems] = useState<ArchiveEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
   const { setState } = useEconStore();
 
   const refresh = async () => {
@@ -62,6 +63,21 @@ export function ArchiveDialog() {
     }
   };
 
+  const handleClearAll = async () => {
+    if (items.length === 0) return;
+    if (!confirm(`დარწმუნებული ხართ? წაიშლება არქივის ყველა ჩანაწერი (${items.length} ცალი). ეს მოქმედება შეუქცევადია.`)) return;
+    setClearing(true);
+    try {
+      await clearArchive();
+      await refresh();
+    } catch (e) {
+      console.error("[archive] clear failed", e);
+      alert("არქივის გასუფთავება ვერ მოხერხდა.");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -71,7 +87,15 @@ export function ArchiveDialog() {
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>დასრულებული განფასებების არქივი</DialogTitle>
+          <DialogTitle className="flex items-center justify-between pr-6">
+            <span>დასრულებული განფასებების არქივი</span>
+            {items.length > 0 && (
+              <Button size="sm" variant="outline" onClick={handleClearAll} disabled={clearing}>
+                {clearing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eraser className="h-4 w-4 mr-1" />}
+                არქივის გასუფთავება
+              </Button>
+            )}
+          </DialogTitle>
         </DialogHeader>
         {loading ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">

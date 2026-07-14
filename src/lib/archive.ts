@@ -41,3 +41,26 @@ export async function deleteArchiveEntry(id: string): Promise<void> {
   const { error } = await supabase.from("app_backups").delete().eq("id", id);
   if (error) throw error;
 }
+
+// წაშლის არქივის ყველა ჩანაწერს — გამოიყენება "არქივის გასუფთავება" ღილაკით.
+export async function clearArchive(): Promise<void> {
+  const { error } = await supabase
+    .from("app_backups")
+    .delete()
+    .not("id", "is", null); // matches all rows
+  if (error) throw error;
+}
+
+export interface ArchiveEntryFull extends ArchiveEntry {
+  data: AppState;
+}
+
+// ანალიტიკის დაშბორდისთვის — არქივის ყველა ჩანაწერი სრული მონაცემით.
+export async function listArchiveFull(): Promise<ArchiveEntryFull[]> {
+  const { data, error } = await supabase
+    .from("app_backups")
+    .select("id, name, created_at, size_bytes, data")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as ArchiveEntryFull[];
+}
