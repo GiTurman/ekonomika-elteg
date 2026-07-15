@@ -12,8 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, RefreshCw, ChevronDown, X } from "lucide-react";
 import { fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList,
 } from "recharts";
+
+// მარჟის ფერის სკალა: დაბალი მარჟა → წითელი/ნარინჯისფერი, მაღალი → მწვანე
+function marginColor(pct: number): string {
+  if (pct >= 0.20) return "#16a34a";   // emerald-600
+  if (pct >= 0.14) return "#65a30d";   // lime-600
+  if (pct >= 0.08) return "#d97706";   // amber-600
+  return "#dc2626";                     // red-600
+}
 
 interface UnitRecord {
   projectName: string;
@@ -187,6 +195,29 @@ export function AnalyticsSheet() {
       .sort((a, b) => b.costNet - a.costNet);
   }, [filtered, groupBy]);
 
+  // ბრენდების მომგებიანობა — ყოველთვის ჩანს, მიმდინარე ფილტრების გათვალისწინებით,
+  // დამოუკიდებელი მთავარი "დაჯგუფება" არჩევანისგან
+  const brandProfitability = useMemo(() => {
+    const map = new Map<string, { count: number; costNet: number; markup: number; marginWeightSum: number }>();
+    for (const u of filtered) {
+      const cur = map.get(u.brand) ?? { count: 0, costNet: 0, markup: 0, marginWeightSum: 0 };
+      cur.count += 1;
+      cur.costNet += u.priceNoVat;
+      cur.markup += u.markup;
+      cur.marginWeightSum += u.marginPct * u.priceNoVat;
+      map.set(u.brand, cur);
+    }
+    return Array.from(map.entries())
+      .map(([brand, v]) => ({
+        brand,
+        count: v.count,
+        costNet: v.costNet,
+        markup: v.markup,
+        marginPct: v.costNet ? v.marginWeightSum / v.costNet : 0,
+      }))
+      .sort((a, b) => b.marginPct - a.marginPct);
+  }, [filtered]);
+
   const totals = useMemo(() => {
     const units = filtered.length;
     const floors = filtered.reduce((s, u) => s + u.floors, 0);
@@ -283,19 +314,60 @@ export function AnalyticsSheet() {
             <Kpi label="საშუალო მარჟა (შეწონილი)" value={fmtPct(totals.marginWeighted)} />
           </div>
 
+          {/* Brand profitability — always visible, independent of Group-by selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>ბრენდების მომგებიანობა (მარჟა %)</CardTitle>
+              <p className="text-xs text-muted-foreground">დალაგებულია მარჟის კლებადობით — ფერი გვიჩვენებს დონეს (მწვანე = მაღალი, წითელი = დაბალი)</p>
+            </CardHeader>
+            <CardContent>
+              <div style={{ height: Math.max(220, brandProfitability.length * 34) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={brandProfitability} layout="vertical" margin={{ left: 8, right: 36, top: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                    <XAxis type="number" tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="brand" width={110} fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      formatter={(v: number, key: string) => key === "marginPct" ? [fmtPct(v), "მარჟა"] : [fmtUsd(v), key]}
+                      labelFormatter={(label) => label}
+                      contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                    />
+                    <Bar dataKey="marginPct" radius={[0, 4, 4, 0]}>
+                      {brandProfitability.map((r) => (
+                        <Cell key={r.brand} fill={marginColor(r.marginPct)} />
+                      ))}
+                      <LabelList dataKey="marginPct" position="right" formatter={(v: number) => fmtPct(v)} fontSize={11} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Grouped report */}
           <Card>
             <CardHeader><CardTitle>{GROUP_LABELS[groupBy]} ({groupedRows.length} row)</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {groupedRows.length > 1 && (
-                <div className="h-56">
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={groupedRows.slice(0, 12).map((r) => ({ name: r.label.length > 22 ? r.label.slice(0, 22) + "…" : r.label, ღირებულება: Math.round(r.costNet) }))}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" fontSize={10} angle={-20} textAnchor="end" height={60} interval={0} />
-                      <YAxis fontSize={12} />
-                      <Tooltip formatter={(v: number) => fmtUsd(v)} />
-                      <Bar dataKey="ღირებულება" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <BarChart
+                      data={groupedRows.slice(0, 12).map((r) => ({ name: r.label.length > 20 ? r.label.slice(0, 20) + "…" : r.label, ღირებულება: Math.round(r.costNet), მარჟა: r.avgMarginPct }))}
+                      margin={{ top: 20, right: 8, left: 0, bottom: 8 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" fontSize={10} angle={-25} textAnchor="end" height={64} interval={0} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip
+                        formatter={(v: number, key: string) => key === "ღირებულება" ? [fmtUsd(v), "ღირებულება"] : [v, key]}
+                        contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                      />
+                      <Bar dataKey="ღირებულება" radius={[4, 4, 0, 0]}>
+                        {groupedRows.slice(0, 12).map((r) => (
+                          <Cell key={r.key} fill={marginColor(r.avgMarginPct)} />
+                        ))}
+                        <LabelList dataKey="მარჟა" position="top" formatter={(v: number) => fmtPct(v)} fontSize={10} fill="hsl(var(--muted-foreground))" />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -314,15 +386,20 @@ export function AnalyticsSheet() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {groupedRows.map((r) => (
-                      <TableRow key={r.key}>
+                    {groupedRows.map((r, i) => (
+                      <TableRow key={r.key} className={i % 2 === 1 ? "bg-muted/30" : ""}>
                         <TableCell className="font-medium">{r.label}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.purchase + r.install)}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markup)}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
-                        <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
+                        <TableCell className="text-right">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-block h-2 w-2 rounded-full" style={{ background: marginColor(r.avgMarginPct) }} />
+                            <span className={computedCls}>{fmtPct(r.avgMarginPct)}</span>
+                          </span>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
