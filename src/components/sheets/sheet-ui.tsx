@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import type { InputHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type InputHTMLAttributes } from "react";
 
 // Blue text = user input (per template legend)
 export const inputCls =
@@ -33,16 +33,36 @@ interface NumInProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "value"
   step?: string | number;
 }
 export function NumberInput({ value, onChange, className, step = "any", ...rest }: NumInProps) {
+  const [text, setText] = useState(() => (Number.isFinite(value) ? String(value) : "0"));
+  const focused = useRef(false);
+
+  // Only resync display from the external value while the field isn't being typed in,
+  // so a re-render mid-keystroke can't fight the user's cursor position.
+  useEffect(() => {
+    if (!focused.current) setText(Number.isFinite(value) ? String(value) : "0");
+  }, [value]);
+
   return (
     <Input
       {...rest}
       type="number"
       inputMode="decimal"
       step={step}
-      value={Number.isFinite(value) ? value : 0}
+      value={text}
+      onFocus={(e) => {
+        focused.current = true;
+        e.target.select(); // clicking into a "0" field selects it, so typing replaces it entirely
+      }}
       onChange={(e) => {
         const v = e.target.value;
-        onChange(v === "" ? 0 : Number(v));
+        setText(v);
+        if (v === "" || v === "-" || v === ".") return; // let the user keep typing
+        const n = Number(v);
+        if (Number.isFinite(n)) onChange(n);
+      }}
+      onBlur={() => {
+        focused.current = false;
+        setText(Number.isFinite(value) ? String(value) : "0");
       }}
       className={cn(inputCls, "text-right", className)}
     />
@@ -55,13 +75,34 @@ interface PctInProps {
   className?: string;
 }
 export function PercentInput({ value, onChange, className }: PctInProps) {
+  const [text, setText] = useState(() => (value * 100).toFixed(2));
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setText((value * 100).toFixed(2));
+  }, [value]);
+
   return (
     <Input
       type="number"
       inputMode="decimal"
       step="0.01"
-      value={(value * 100).toFixed(2)}
-      onChange={(e) => onChange(Number(e.target.value) / 100)}
+      value={text}
+      onFocus={(e) => {
+        focused.current = true;
+        e.target.select();
+      }}
+      onChange={(e) => {
+        const v = e.target.value;
+        setText(v);
+        if (v === "" || v === "-" || v === ".") return;
+        const n = Number(v);
+        if (Number.isFinite(n)) onChange(n / 100);
+      }}
+      onBlur={() => {
+        focused.current = false;
+        setText((value * 100).toFixed(2));
+      }}
       className={cn(inputCls, "text-right", className)}
     />
   );
