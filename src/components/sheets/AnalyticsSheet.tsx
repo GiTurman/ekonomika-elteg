@@ -4,90 +4,87 @@ import { computeEconomics } from "@/lib/econ-calc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, RefreshCw, ChevronDown, X } from "lucide-react";
 import { fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
-interface ProjectRow {
-  id: string;
-  name: string;
-  date: string;
-  unitsCount: number;
-  floorsSum: number;
-  costNet: number; // ფასი დღგ-ს გარეშე
-  marginPct: number;
-  checkDiff: number;
-}
-
-interface UnitTypeRow {
-  prefix: string;
-  count: number;
-  floorsSum: number;
-  avgFloors: number;
-  costNet: number; // ჯამური თვითღირებულება+ფასნამატი (დღგ-ს გარეშე)
-  avgFactoryPrice: number;
-  markupSum: number;
-  avgMarginPct: number;
-}
-
-interface FloorRow {
+interface UnitRecord {
+  projectName: string;
+  projectDate: string;
+  unitId: string;
+  brand: string;
+  kind: string;
   floors: number;
-  count: number;
-  costNet: number;
-  avgCostPerUnit: number;
-  markupSum: number;
-  avgMarginPct: number;
+  purchaseCost: number;
+  installCost: number;
+  markup: number;
+  priceNoVat: number;
+  marginPct: number;
 }
 
-interface GroupRow {
-  key: string;
-  count: number;
-  floorsSum: number;
-  costNet: number;
-  markupSum: number;
-  avgMarginPct: number;
-}
+type GroupBy = "project" | "unit" | "project_brand" | "brand_kind" | "brand" | "floor_project_brand";
 
-const KIND_LABEL: Record<string, string> = { L: "ლიფტი", E: "ესკალატორი", P: "პლატფორმა" };
+const GROUP_LABELS: Record<GroupBy, string> = {
+  project: "პროექტი — ჯამური მომგებიანობა",
+  unit: "დანადგარი — თითოეულის მომგებიანობა",
+  project_brand: "პროექტი + ბრენდი",
+  brand_kind: "ბრენდი + დანადგარის ტიპი",
+  brand: "ბრენდი — ჯამურად",
+  floor_project_brand: "სართული + პროექტი + ბრენდი",
+};
 
-function aggregate(entries: ArchiveEntryFull[], keyFn: (u: any) => string) {
-  const map = new Map<string, { count: number; floorsSum: number; costNet: number; markupSum: number; marginSum: number }>();
-  for (const entry of entries) {
-    let eco;
-    try {
-      eco = computeEconomics(entry.data);
-    } catch {
-      continue;
-    }
-    entry.data.project.units.forEach((u: any, i: number) => {
-      const key = keyFn(u) || "სხვა";
-      const row = eco.units[i];
-      const cur = map.get(key) ?? { count: 0, floorsSum: 0, costNet: 0, markupSum: 0, marginSum: 0 };
-      cur.count += 1;
-      cur.floorsSum += u.floors;
-      cur.costNet += row ? row.priceNoVat : 0;
-      cur.markupSum += row ? row.markup : 0;
-      cur.marginSum += row ? row.marginPct : 0;
-      map.set(key, cur);
-    });
-  }
-  const rows: GroupRow[] = Array.from(map.entries()).map(([key, v]) => ({
-    key,
-    count: v.count,
-    floorsSum: v.floorsSum,
-    costNet: v.costNet,
-    markupSum: v.markupSum,
-    avgMarginPct: v.count ? v.marginSum / v.count : 0,
-  }));
-  return rows.sort((a, b) => b.costNet - a.costNet);
+function MultiSelect({ label, options, selected, onChange }: {
+  label: string; options: string[]; selected: Set<string>; onChange: (s: Set<string>) => void;
+}) {
+  const allSelected = selected.size === 0;
+  const toggle = (opt: string) => {
+    const next = new Set(selected);
+    if (next.has(opt)) next.delete(opt); else next.add(opt);
+    onChange(next);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="justify-between min-w-[140px]">
+          <span className="truncate">{label}{!allSelected && ` (${selected.size})`}</span>
+          <ChevronDown className="h-3 w-3 ml-1 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 max-h-80 overflow-y-auto p-2" align="start">
+        <div className="flex items-center justify-between mb-1 px-1">
+          <span className="text-xs text-muted-foreground">{options.length} ვარიანტი</span>
+          {!allSelected && (
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onChange(new Set())}>გასუფთავება</Button>
+          )}
+        </div>
+        {options.map((opt) => (
+          <label key={opt} className="flex items-center gap-2 px-1 py-1.5 text-sm hover:bg-muted/50 rounded cursor-pointer">
+            <Checkbox checked={allSelected || selected.has(opt)} onCheckedChange={() => toggle(opt)} />
+            <span className="truncate">{opt}</span>
+          </label>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function AnalyticsSheet() {
   const [entries, setEntries] = useState<ArchiveEntryFull[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [groupBy, setGroupBy] = useState<GroupBy>("project");
+  const [selProjects, setSelProjects] = useState<Set<string>>(new Set());
+  const [selBrands, setSelBrands] = useState<Set<string>>(new Set());
+  const [selKinds, setSelKinds] = useState<Set<string>>(new Set());
+  const [floorRange, setFloorRange] = useState<[number, number] | null>(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -104,16 +101,8 @@ export function AnalyticsSheet() {
 
   useEffect(() => { refresh(); }, []);
 
-  const { projectRows, unitTypeRows, floorRows, brandRows, kindRows, totals } = useMemo(() => {
-    const projectRows: ProjectRow[] = [];
-    const unitTypeMap = new Map<string, { count: number; floorsSum: number; costNet: number; factorySum: number; markupSum: number; marginSum: number }>();
-    const floorMap = new Map<number, { count: number; costNet: number; markupSum: number; marginSum: number }>();
-
-    let totalUnits = 0;
-    let totalFloors = 0;
-    let totalCostNet = 0;
-    let marginWeightedSum = 0;
-
+  const allUnits: UnitRecord[] = useMemo(() => {
+    const out: UnitRecord[] = [];
     for (const entry of entries) {
       let eco;
       try {
@@ -122,92 +111,94 @@ export function AnalyticsSheet() {
         console.error("[analytics] compute failed for", entry.id, e);
         continue;
       }
-      const unitsCount = eco.units.length;
-      const floorsSum = eco.units.reduce((s, u) => s + u.floors, 0);
-
-      projectRows.push({
-        id: entry.id,
-        name: entry.name,
-        date: entry.created_at,
-        unitsCount,
-        floorsSum,
-        costNet: eco.report.priceNoVat,
-        marginPct: eco.report.totalMarginPct,
-        checkDiff: eco.report.checkDiff,
-      });
-
-      totalUnits += unitsCount;
-      totalFloors += floorsSum;
-      totalCostNet += eco.report.priceNoVat;
-      marginWeightedSum += eco.report.totalMarginPct * eco.report.priceNoVat;
-
       entry.data.project.units.forEach((u, i) => {
-        if (!u.id || !u.id.trim()) return;
-        const prefix = (u.id.match(/^[A-Za-z]+/)?.[0] ?? "სხვა").toUpperCase();
         const row = eco.units[i];
-        const cur = unitTypeMap.get(prefix) ?? { count: 0, floorsSum: 0, costNet: 0, factorySum: 0, markupSum: 0, marginSum: 0 };
-        cur.count += 1;
-        cur.floorsSum += u.floors;
-        cur.costNet += row ? row.priceNoVat : 0;
-        cur.factorySum += u.factoryPrice;
-        cur.markupSum += row ? row.markup : 0;
-        cur.marginSum += row ? row.marginPct : 0;
-        unitTypeMap.set(prefix, cur);
-
-        const fCur = floorMap.get(u.floors) ?? { count: 0, costNet: 0, markupSum: 0, marginSum: 0 };
-        fCur.count += 1;
-        fCur.costNet += row ? row.priceNoVat : 0;
-        fCur.markupSum += row ? row.markup : 0;
-        fCur.marginSum += row ? row.marginPct : 0;
-        floorMap.set(u.floors, fCur);
+        if (!row) return;
+        out.push({
+          projectName: entry.name,
+          projectDate: entry.created_at,
+          unitId: u.id || "?",
+          brand: (u.brand || "").trim() || "სხვა",
+          kind: (u.kind || "").trim() || "სხვა",
+          floors: u.floors,
+          purchaseCost: row.purchaseCost,
+          installCost: row.installCost,
+          markup: row.markup,
+          priceNoVat: row.priceNoVat,
+          marginPct: row.marginPct,
+        });
       });
     }
-
-    const unitTypeRows: UnitTypeRow[] = Array.from(unitTypeMap.entries())
-      .map(([prefix, v]) => ({
-        prefix,
-        count: v.count,
-        floorsSum: v.floorsSum,
-        avgFloors: v.count ? v.floorsSum / v.count : 0,
-        costNet: v.costNet,
-        avgFactoryPrice: v.count ? v.factorySum / v.count : 0,
-        markupSum: v.markupSum,
-        avgMarginPct: v.count ? v.marginSum / v.count : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-
-    const floorRows: FloorRow[] = Array.from(floorMap.entries())
-      .map(([floors, v]) => ({
-        floors,
-        count: v.count,
-        costNet: v.costNet,
-        avgCostPerUnit: v.count ? v.costNet / v.count : 0,
-        markupSum: v.markupSum,
-        avgMarginPct: v.count ? v.marginSum / v.count : 0,
-      }))
-      .sort((a, b) => a.floors - b.floors);
-
-    const brandRows = aggregate(entries, (u) => (u.brand || "").trim() || "სხვა");
-    const kindRows = aggregate(entries, (u) => (u.kind || "").trim() || "სხვა");
-
-    return {
-      projectRows: projectRows.sort((a, b) => (a.date < b.date ? 1 : -1)),
-      unitTypeRows,
-      floorRows,
-      brandRows,
-      kindRows,
-      totals: {
-        projects: projectRows.length,
-        units: totalUnits,
-        floors: totalFloors,
-        costNet: totalCostNet,
-        avgMargin: totalCostNet ? marginWeightedSum / totalCostNet : 0,
-      },
-    };
+    return out;
   }, [entries]);
 
+  const projectOptions = useMemo(() => Array.from(new Set(allUnits.map((u) => u.projectName))).sort(), [allUnits]);
+  const brandOptions = useMemo(() => Array.from(new Set(allUnits.map((u) => u.brand))).sort(), [allUnits]);
+  const kindOptions = useMemo(() => Array.from(new Set(allUnits.map((u) => u.kind))).sort(), [allUnits]);
+  const floorBounds = useMemo(() => {
+    if (allUnits.length === 0) return [0, 1] as [number, number];
+    const floors = allUnits.map((u) => u.floors);
+    return [Math.min(...floors), Math.max(...floors)] as [number, number];
+  }, [allUnits]);
+
+  const effectiveFloorRange = floorRange ?? floorBounds;
+
+  const filtered = useMemo(() => {
+    return allUnits.filter((u) =>
+      (selProjects.size === 0 || selProjects.has(u.projectName)) &&
+      (selBrands.size === 0 || selBrands.has(u.brand)) &&
+      (selKinds.size === 0 || selKinds.has(u.kind)) &&
+      u.floors >= effectiveFloorRange[0] && u.floors <= effectiveFloorRange[1]
+    );
+  }, [allUnits, selProjects, selBrands, selKinds, effectiveFloorRange]);
+
+  const activeFilterCount = selProjects.size + selBrands.size + selKinds.size + (floorRange ? 1 : 0);
+  const clearAllFilters = () => {
+    setSelProjects(new Set()); setSelBrands(new Set()); setSelKinds(new Set()); setFloorRange(null);
+  };
+
+  const keyFn = (u: UnitRecord): { key: string; label: string } => {
+    switch (groupBy) {
+      case "project": return { key: u.projectName, label: u.projectName };
+      case "unit": return { key: `${u.projectName}::${u.unitId}`, label: `${u.projectName} — ${u.unitId}` };
+      case "project_brand": return { key: `${u.projectName}::${u.brand}`, label: `${u.projectName} / ${u.brand}` };
+      case "brand_kind": return { key: `${u.brand}::${u.kind}`, label: `${u.brand} / ${u.kind}` };
+      case "brand": return { key: u.brand, label: u.brand };
+      case "floor_project_brand": return { key: `${u.floors}::${u.projectName}::${u.brand}`, label: `${u.floors} სართ. / ${u.projectName} / ${u.brand}` };
+    }
+  };
+
+  const groupedRows = useMemo(() => {
+    const map = new Map<string, { label: string; count: number; floorsSum: number; purchase: number; install: number; markup: number; costNet: number; marginSum: number }>();
+    for (const u of filtered) {
+      const { key, label } = keyFn(u);
+      const cur = map.get(key) ?? { label, count: 0, floorsSum: 0, purchase: 0, install: 0, markup: 0, costNet: 0, marginSum: 0 };
+      cur.count += 1;
+      cur.floorsSum += u.floors;
+      cur.purchase += u.purchaseCost;
+      cur.install += u.installCost;
+      cur.markup += u.markup;
+      cur.costNet += u.priceNoVat;
+      cur.marginSum += u.marginPct;
+      map.set(key, cur);
+    }
+    return Array.from(map.entries())
+      .map(([key, v]) => ({ key, ...v, avgMarginPct: v.count ? v.marginSum / v.count : 0 }))
+      .sort((a, b) => b.costNet - a.costNet);
+  }, [filtered, groupBy]);
+
+  const totals = useMemo(() => {
+    const units = filtered.length;
+    const floors = filtered.reduce((s, u) => s + u.floors, 0);
+    const costNet = filtered.reduce((s, u) => s + u.priceNoVat, 0);
+    const markupSum = filtered.reduce((s, u) => s + u.markup, 0);
+    const marginWeighted = costNet ? filtered.reduce((s, u) => s + u.marginPct * u.priceNoVat, 0) / costNet : 0;
+    const projects = new Set(filtered.map((u) => u.projectName)).size;
+    return { units, floors, costNet, markupSum, marginWeighted, projects };
+  }, [filtered]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           დაშბორდი აგებულია არქივში შენახული ყველა დასრულებული პროექტის მონაცემებზე (დღგ-ს გარეშე, სუფთა ფინანსური ხედვა). მხოლოდ ფინანსების წვდომას უჩანს.
@@ -228,178 +219,115 @@ export function AnalyticsSheet() {
         <p className="py-8 text-center text-sm text-muted-foreground">არქივი ცარიელია — ჯერ არცერთი პროექტი არ არის დასრულებული/შენახული.</p>
       ) : (
         <>
+          {/* Filters */}
+          <Card>
+            <CardContent className="p-3 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <MultiSelect label="პროექტი" options={projectOptions} selected={selProjects} onChange={setSelProjects} />
+                <MultiSelect label="ბრენდი" options={brandOptions} selected={selBrands} onChange={setSelBrands} />
+                <MultiSelect label="ტიპი" options={kindOptions} selected={selKinds} onChange={setSelKinds} />
+                <div className="flex items-center gap-2 min-w-[220px] px-2">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">სართ. {effectiveFloorRange[0]}–{effectiveFloorRange[1]}</span>
+                  <Slider
+                    className="w-32"
+                    min={floorBounds[0]} max={floorBounds[1]} step={1}
+                    value={effectiveFloorRange}
+                    onValueChange={(v) => setFloorRange([v[0], v[1]])}
+                  />
+                </div>
+                {activeFilterCount > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-8 text-xs">
+                    <X className="h-3 w-3 mr-1" /> ფილტრების გასუფთავება ({activeFilterCount})
+                  </Button>
+                )}
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">დაჯგუფება:</span>
+                  <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+                    <SelectTrigger className="w-64 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(GROUP_LABELS) as GroupBy[]).map((g) => (
+                        <SelectItem key={g} value={g}>{GROUP_LABELS[g]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {(selProjects.size > 0 || selBrands.size > 0 || selKinds.size > 0) && (
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(selProjects).map((p) => (
+                    <Badge key={"p" + p} variant="secondary" className="text-xs cursor-pointer" onClick={() => { const s = new Set(selProjects); s.delete(p); setSelProjects(s); }}>
+                      {p} <X className="h-3 w-3 ml-1" />
+                    </Badge>
+                  ))}
+                  {Array.from(selBrands).map((b) => (
+                    <Badge key={"b" + b} variant="secondary" className="text-xs cursor-pointer" onClick={() => { const s = new Set(selBrands); s.delete(b); setSelBrands(s); }}>
+                      {b} <X className="h-3 w-3 ml-1" />
+                    </Badge>
+                  ))}
+                  {Array.from(selKinds).map((k) => (
+                    <Badge key={"k" + k} variant="secondary" className="text-xs cursor-pointer" onClick={() => { const s = new Set(selKinds); s.delete(k); setSelKinds(s); }}>
+                      {k} <X className="h-3 w-3 ml-1" />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* KPIs reflect current filter */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             <Kpi label="პროექტები" value={String(totals.projects)} />
             <Kpi label="დანადგარები" value={String(totals.units)} />
             <Kpi label="ჯამური სართული" value={String(totals.floors)} />
             <Kpi label="ჯამური ღირებულება (დღგ-ს გარეშე)" value={fmtUsd(totals.costNet)} />
-            <Kpi label="საშუალო მარჟა (შეწონილი)" value={fmtPct(totals.avgMargin)} />
+            <Kpi label="საშუალო მარჟა (შეწონილი)" value={fmtPct(totals.marginWeighted)} />
           </div>
 
+          {/* Grouped report */}
           <Card>
-            <CardHeader><CardTitle>1. პროექტის ჭრილი</CardTitle></CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-xs">
-                    <TableHead>პროექტი</TableHead>
-                    <TableHead>თარიღი</TableHead>
-                    <TableHead className="text-right">დანადგ.</TableHead>
-                    <TableHead className="text-right">სართ. ჯამი</TableHead>
-                    <TableHead className="text-right">ფასი დღგ-ს გარეშე</TableHead>
-                    <TableHead className="text-right">მარჟა %</TableHead>
-                    <TableHead className="text-right">შემოწმება</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {projectRows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(r.date).toLocaleDateString("ka-GE")}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.unitsCount}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.marginPct)}</TableCell>
-                      <TableCell className={"text-right font-mono text-xs " + (Math.abs(r.checkDiff) < 0.5 ? "text-emerald-600" : "text-destructive")}>{fmtUsd(r.checkDiff)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>2. დანადგარის ჭრილი (L/E/P კატეგორია, ყველა პროექტში)</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{GROUP_LABELS[groupBy]} ({groupedRows.length} row)</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={unitTypeRows.map((r) => ({ name: KIND_LABEL[r.prefix] ?? r.prefix, ღირებულება: Math.round(r.costNet) }))}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <Tooltip formatter={(v: number) => fmtUsd(v)} />
-                    <Bar dataKey="ღირებულება" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              {groupedRows.length > 1 && (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={groupedRows.slice(0, 12).map((r) => ({ name: r.label.length > 22 ? r.label.slice(0, 22) + "…" : r.label, ღირებულება: Math.round(r.costNet) }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" fontSize={10} angle={-20} textAnchor="end" height={60} interval={0} />
+                      <YAxis fontSize={12} />
+                      <Tooltip formatter={(v: number) => fmtUsd(v)} />
+                      <Bar dataKey="ღირებულება" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-xs">
+                      <TableHead>{groupBy === "unit" ? "პროექტი / დანადგარი" : "ჯგუფი"}</TableHead>
+                      <TableHead className="text-right">რაოდ.</TableHead>
+                      <TableHead className="text-right">სართ. ჯამი</TableHead>
+                      <TableHead className="text-right">შესყ.+მონტ. თვითღ.</TableHead>
+                      <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
+                      <TableHead className="text-right">ღირებულება (დღგ-ს გარეშე)</TableHead>
+                      <TableHead className="text-right">საშ. მარჟა %</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupedRows.map((r) => (
+                      <TableRow key={r.key}>
+                        <TableCell className="font-medium">{r.label}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{fmtUsd(r.purchase + r.install)}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markup)}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-xs">
-                    <TableHead>ტიპი</TableHead>
-                    <TableHead className="text-right">რაოდ.</TableHead>
-                    <TableHead className="text-right">სართ. ჯამი</TableHead>
-                    <TableHead className="text-right">საშ. სართული</TableHead>
-                    <TableHead className="text-right">საშ. ქარხნული ფასი</TableHead>
-                    <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
-                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
-                    <TableHead className="text-right">საშ. მარჟა %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {unitTypeRows.map((r) => (
-                    <TableRow key={r.prefix}>
-                      <TableCell className="font-medium">{KIND_LABEL[r.prefix] ?? r.prefix} <span className="text-xs text-muted-foreground">({r.prefix})</span></TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.avgFloors.toFixed(1)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.avgFactoryPrice)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>3. მომგებიანობა ბრენდის მიხედვით</CardTitle></CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-xs">
-                    <TableHead>ბრენდი</TableHead>
-                    <TableHead className="text-right">დანადგ. რაოდ.</TableHead>
-                    <TableHead className="text-right">სართ. ჯამი</TableHead>
-                    <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
-                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
-                    <TableHead className="text-right">საშ. მარჟა %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {brandRows.map((r) => (
-                    <TableRow key={r.key}>
-                      <TableCell className="font-medium">{r.key}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>4. მომგებიანობა დანადგარის ტიპის მიხედვით (Passenger / შშმპ პლატფორმა / DUMBWAITER)</CardTitle></CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-xs">
-                    <TableHead>ტიპი</TableHead>
-                    <TableHead className="text-right">დანადგ. რაოდ.</TableHead>
-                    <TableHead className="text-right">სართ. ჯამი</TableHead>
-                    <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
-                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
-                    <TableHead className="text-right">საშ. მარჟა %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {kindRows.map((r) => (
-                    <TableRow key={r.key}>
-                      <TableCell className="font-medium">{r.key}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>5. მომგებიანობა სართულის მიხედვით (ყველა დანადგარი, ყველა პროექტში)</CardTitle></CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-xs">
-                    <TableHead className="text-right">სართულები</TableHead>
-                    <TableHead className="text-right">დანადგ. რაოდ.</TableHead>
-                    <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
-                    <TableHead className="text-right">საშ. ღირებ./დანადგარი</TableHead>
-                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
-                    <TableHead className="text-right">საშ. მარჟა %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {floorRows.map((r) => (
-                    <TableRow key={r.floors}>
-                      <TableCell className="font-medium text-right">{r.floors}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.avgCostPerUnit)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
-                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </CardContent>
           </Card>
         </>
