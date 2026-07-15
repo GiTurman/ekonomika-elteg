@@ -28,6 +28,7 @@ interface UnitTypeRow {
   avgFloors: number;
   costNet: number; // ჯამური თვითღირებულება+ფასნამატი (დღგ-ს გარეშე)
   avgFactoryPrice: number;
+  markupSum: number;
   avgMarginPct: number;
 }
 
@@ -36,9 +37,52 @@ interface FloorRow {
   count: number;
   costNet: number;
   avgCostPerUnit: number;
+  markupSum: number;
+  avgMarginPct: number;
+}
+
+interface GroupRow {
+  key: string;
+  count: number;
+  floorsSum: number;
+  costNet: number;
+  markupSum: number;
+  avgMarginPct: number;
 }
 
 const KIND_LABEL: Record<string, string> = { L: "ლიფტი", E: "ესკალატორი", P: "პლატფორმა" };
+
+function aggregate(entries: ArchiveEntryFull[], keyFn: (u: any) => string) {
+  const map = new Map<string, { count: number; floorsSum: number; costNet: number; markupSum: number; marginSum: number }>();
+  for (const entry of entries) {
+    let eco;
+    try {
+      eco = computeEconomics(entry.data);
+    } catch {
+      continue;
+    }
+    entry.data.project.units.forEach((u: any, i: number) => {
+      const key = keyFn(u) || "სხვა";
+      const row = eco.units[i];
+      const cur = map.get(key) ?? { count: 0, floorsSum: 0, costNet: 0, markupSum: 0, marginSum: 0 };
+      cur.count += 1;
+      cur.floorsSum += u.floors;
+      cur.costNet += row ? row.priceNoVat : 0;
+      cur.markupSum += row ? row.markup : 0;
+      cur.marginSum += row ? row.marginPct : 0;
+      map.set(key, cur);
+    });
+  }
+  const rows: GroupRow[] = Array.from(map.entries()).map(([key, v]) => ({
+    key,
+    count: v.count,
+    floorsSum: v.floorsSum,
+    costNet: v.costNet,
+    markupSum: v.markupSum,
+    avgMarginPct: v.count ? v.marginSum / v.count : 0,
+  }));
+  return rows.sort((a, b) => b.costNet - a.costNet);
+}
 
 export function AnalyticsSheet() {
   const [entries, setEntries] = useState<ArchiveEntryFull[]>([]);
@@ -60,10 +104,10 @@ export function AnalyticsSheet() {
 
   useEffect(() => { refresh(); }, []);
 
-  const { projectRows, unitTypeRows, floorRows, totals } = useMemo(() => {
+  const { projectRows, unitTypeRows, floorRows, brandRows, kindRows, totals } = useMemo(() => {
     const projectRows: ProjectRow[] = [];
-    const unitTypeMap = new Map<string, { count: number; floorsSum: number; costNet: number; factorySum: number; marginSum: number }>();
-    const floorMap = new Map<number, { count: number; costNet: number }>();
+    const unitTypeMap = new Map<string, { count: number; floorsSum: number; costNet: number; factorySum: number; markupSum: number; marginSum: number }>();
+    const floorMap = new Map<number, { count: number; costNet: number; markupSum: number; marginSum: number }>();
 
     let totalUnits = 0;
     let totalFloors = 0;
@@ -101,17 +145,20 @@ export function AnalyticsSheet() {
         if (!u.id || !u.id.trim()) return;
         const prefix = (u.id.match(/^[A-Za-z]+/)?.[0] ?? "სხვა").toUpperCase();
         const row = eco.units[i];
-        const cur = unitTypeMap.get(prefix) ?? { count: 0, floorsSum: 0, costNet: 0, factorySum: 0, marginSum: 0 };
+        const cur = unitTypeMap.get(prefix) ?? { count: 0, floorsSum: 0, costNet: 0, factorySum: 0, markupSum: 0, marginSum: 0 };
         cur.count += 1;
         cur.floorsSum += u.floors;
         cur.costNet += row ? row.priceNoVat : 0;
         cur.factorySum += u.factoryPrice;
+        cur.markupSum += row ? row.markup : 0;
         cur.marginSum += row ? row.marginPct : 0;
         unitTypeMap.set(prefix, cur);
 
-        const fCur = floorMap.get(u.floors) ?? { count: 0, costNet: 0 };
+        const fCur = floorMap.get(u.floors) ?? { count: 0, costNet: 0, markupSum: 0, marginSum: 0 };
         fCur.count += 1;
         fCur.costNet += row ? row.priceNoVat : 0;
+        fCur.markupSum += row ? row.markup : 0;
+        fCur.marginSum += row ? row.marginPct : 0;
         floorMap.set(u.floors, fCur);
       });
     }
@@ -124,6 +171,7 @@ export function AnalyticsSheet() {
         avgFloors: v.count ? v.floorsSum / v.count : 0,
         costNet: v.costNet,
         avgFactoryPrice: v.count ? v.factorySum / v.count : 0,
+        markupSum: v.markupSum,
         avgMarginPct: v.count ? v.marginSum / v.count : 0,
       }))
       .sort((a, b) => b.count - a.count);
@@ -134,13 +182,20 @@ export function AnalyticsSheet() {
         count: v.count,
         costNet: v.costNet,
         avgCostPerUnit: v.count ? v.costNet / v.count : 0,
+        markupSum: v.markupSum,
+        avgMarginPct: v.count ? v.marginSum / v.count : 0,
       }))
       .sort((a, b) => a.floors - b.floors);
+
+    const brandRows = aggregate(entries, (u) => (u.brand || "").trim() || "სხვა");
+    const kindRows = aggregate(entries, (u) => (u.kind || "").trim() || "სხვა");
 
     return {
       projectRows: projectRows.sort((a, b) => (a.date < b.date ? 1 : -1)),
       unitTypeRows,
       floorRows,
+      brandRows,
+      kindRows,
       totals: {
         projects: projectRows.length,
         units: totalUnits,
@@ -214,7 +269,7 @@ export function AnalyticsSheet() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>2. დანადგარის ჭრილი (ტიპის მიხედვით, ყველა პროექტში)</CardTitle></CardHeader>
+            <CardHeader><CardTitle>2. დანადგარის ჭრილი (L/E/P კატეგორია, ყველა პროექტში)</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
@@ -236,6 +291,7 @@ export function AnalyticsSheet() {
                     <TableHead className="text-right">საშ. სართული</TableHead>
                     <TableHead className="text-right">საშ. ქარხნული ფასი</TableHead>
                     <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
+                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
                     <TableHead className="text-right">საშ. მარჟა %</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -248,6 +304,7 @@ export function AnalyticsSheet() {
                       <TableCell className={"text-right " + computedCls}>{r.avgFloors.toFixed(1)}</TableCell>
                       <TableCell className={"text-right " + computedCls}>{fmtUsd(r.avgFactoryPrice)}</TableCell>
                       <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
                       <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
                     </TableRow>
                   ))}
@@ -257,7 +314,67 @@ export function AnalyticsSheet() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>3. სართულის ჭრილი (ყველა დანადგარი, ყველა პროექტში)</CardTitle></CardHeader>
+            <CardHeader><CardTitle>3. მომგებიანობა ბრენდის მიხედვით</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs">
+                    <TableHead>ბრენდი</TableHead>
+                    <TableHead className="text-right">დანადგ. რაოდ.</TableHead>
+                    <TableHead className="text-right">სართ. ჯამი</TableHead>
+                    <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
+                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
+                    <TableHead className="text-right">საშ. მარჟა %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {brandRows.map((r) => (
+                    <TableRow key={r.key}>
+                      <TableCell className="font-medium">{r.key}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>4. მომგებიანობა დანადგარის ტიპის მიხედვით (Passenger / შშმპ პლატფორმა / DUMBWAITER)</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs">
+                    <TableHead>ტიპი</TableHead>
+                    <TableHead className="text-right">დანადგ. რაოდ.</TableHead>
+                    <TableHead className="text-right">სართ. ჯამი</TableHead>
+                    <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
+                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
+                    <TableHead className="text-right">საშ. მარჟა %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {kindRows.map((r) => (
+                    <TableRow key={r.key}>
+                      <TableCell className="font-medium">{r.key}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{r.floorsSum}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>5. მომგებიანობა სართულის მიხედვით (ყველა დანადგარი, ყველა პროექტში)</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -266,6 +383,8 @@ export function AnalyticsSheet() {
                     <TableHead className="text-right">დანადგ. რაოდ.</TableHead>
                     <TableHead className="text-right">ჯამური ღირებ. (დღგ-ს გარეშე)</TableHead>
                     <TableHead className="text-right">საშ. ღირებ./დანადგარი</TableHead>
+                    <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
+                    <TableHead className="text-right">საშ. მარჟა %</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -275,6 +394,8 @@ export function AnalyticsSheet() {
                       <TableCell className={"text-right " + computedCls}>{r.count}</TableCell>
                       <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
                       <TableCell className={"text-right " + computedCls}>{fmtUsd(r.avgCostPerUnit)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markupSum)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtPct(r.avgMarginPct)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
