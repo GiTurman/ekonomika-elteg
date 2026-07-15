@@ -124,10 +124,13 @@ export function EconomicsSheet() {
             ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
           ]}/>
           {isFull ? (
-            <ReportBlock title="საბოლოო ფასი (დღგ-ს გარეშე)" rows={[
+            <ReportBlock title="საბოლოო ფასი" rows={[
               ["ფასი დღგ-ს გარეშე", eco.report.priceNoVat, true],
+              ["დღგ", eco.report.vat],
+              ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
               ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
               ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
+              ["გასაყიდი ფასი (დღგ-ს ჩათვლით)", eco.report.finalContractPrice, true],
             ]}/>
           ) : (
             <ReportBlock title="საბოლოო ფასი (დღგ-ს ჩათვლით)" rows={[

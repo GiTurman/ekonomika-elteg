@@ -97,8 +97,9 @@ function Index() {
         {savedMsg && (
           <div className="container mx-auto px-4 pb-2 text-xs text-emerald-600">{savedMsg}</div>
         )}
-        <div className="container mx-auto px-4 pb-3 grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className={"container mx-auto px-4 pb-3 grid grid-cols-2 gap-2 " + (isFull ? "md:grid-cols-6" : "md:grid-cols-5")}>
           <Kpi label={headlinePriceLabel} value={fmtUsd(headlinePrice)} />
+          {isFull && <Kpi label="გასაყიდი ფასი (დღგ-ს ჩათვლით)" value={fmtUsd(eco.totals.finalPrice)} />}
           <Kpi label="სულ თვითღ." value={fmtUsd(eco.totals.totalCost)} />
           <Kpi label="ჯამური მოგების თანხა" value={fmtUsd(eco.report.markupTotal)} />
           <Kpi label="ჯამური მარჟა" value={fmtPct(isFull ? eco.report.totalMarginPct : salesMarginPct)} />
