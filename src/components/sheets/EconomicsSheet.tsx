@@ -72,13 +72,14 @@ export function EconomicsSheet() {
                 {!isFull && <TableHead className="text-right">დღგ</TableHead>}
                 <TableHead className="text-right">საბ. გარანტია</TableHead>
                 {!isFull && <TableHead className="text-right">საბოლოო ფასი</TableHead>}
-                <TableHead className="text-right">მარჟა %</TableHead>
-                <TableHead className="text-right">წილი %</TableHead>
+                <TableHead className="text-right sticky right-24 w-24 bg-background z-10 border-l">მარჟა %</TableHead>
+                <TableHead className="text-right sticky right-0 w-24 bg-background z-10 border-l">წილი %</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {eco.units.map((r) => {
                 const flagged = r.belowMinAmount || r.belowMinMargin;
+                const stickyBg = flagged ? "bg-destructive/10" : "bg-background";
                 return (
                 <TableRow key={r.id} className={flagged ? "bg-destructive/10" : ""}>
                   <TableCell className="font-semibold">{r.id}</TableCell>
@@ -93,8 +94,8 @@ export function EconomicsSheet() {
                   {!isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(r.vat)}</TableCell>}
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.bankGuarantee)}</TableCell>
                   {!isFull && <TableCell className={"text-right font-semibold " + computedCls}>{fmtUsd(r.finalPrice)}</TableCell>}
-                  <TableCell className={"text-right " + (r.belowMinMargin ? "text-destructive font-semibold " : "") + computedCls}>{fmtPct(r.marginPct)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtPct(r.projectShare)}</TableCell>
+                  <TableCell className={"text-right sticky right-24 w-24 z-10 border-l " + stickyBg + " " + (r.belowMinMargin ? "text-destructive font-semibold " : "") + computedCls}>{fmtPct(r.marginPct)}</TableCell>
+                  <TableCell className={"text-right sticky right-0 w-24 z-10 border-l " + stickyBg + " " + computedCls}>{fmtPct(r.projectShare)}</TableCell>
                 </TableRow>
                 );
               })}
@@ -110,8 +111,8 @@ export function EconomicsSheet() {
                 {!isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.vat)}</TableCell>}
                 <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.bankGuarantee)}</TableCell>
                 {!isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.finalPrice)}</TableCell>}
-                <TableCell className={"text-right " + computedCls}>{fmtPct(eco.totals.marginPct)}</TableCell>
-                <TableCell className={"text-right " + computedCls}>100.00%</TableCell>
+                <TableCell className={"text-right sticky right-24 w-24 bg-muted z-10 border-l " + computedCls}>{fmtPct(eco.totals.marginPct)}</TableCell>
+                <TableCell className={"text-right sticky right-0 w-24 bg-muted z-10 border-l " + computedCls}>100.00%</TableCell>
               </TableRow>
             </TableBody>
           </Table>

@@ -23,6 +23,19 @@ function marginColor(pct: number): string {
   return "#dc2626";                     // red-600
 }
 
+// ბრენდის სახელები ხშირად სხვადასხვა რეგისტრში შედის ("KLEEMANN" vs "Kleemann"),
+// რაც ჯგუფვისას მათ სხვადასხვა ბრენდად აქცევდა (ორი ცალკე ბარი ერთი ბრენდისთვის).
+// ვნორმალიზებთ ერთიან ("Title Case") ფორმაში მხოლოდ ანალიტიკის ჯგუფვისა და
+// ჩვენებისთვის — საწყისი მონაცემი (არქივი/მიმდინარე პროექტი) უცვლელი რჩება.
+function normalizeBrand(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return trimmed
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 interface UnitRecord {
   projectName: string;
   projectDate: string;
@@ -126,7 +139,7 @@ export function AnalyticsSheet() {
           projectName: entry.name,
           projectDate: entry.created_at,
           unitId: u.id || "?",
-          brand: (u.brand || "").trim() || "სხვა",
+          brand: normalizeBrand(u.brand || "") || "სხვა",
           kind: (u.kind || "").trim() || "სხვა",
           floors: u.floors,
           purchaseCost: row.purchaseCost,
