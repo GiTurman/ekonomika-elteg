@@ -256,6 +256,11 @@ export function computeEconomics(state: AppState): FullEconomics {
   // underlying D/E formulas can never drift out of sync between the two.
   const purchaseCostOf = (u: Unit) => unitPurchaseCost(u, allocationOf(u));
   const installCostOf = (u: Unit) => unitInstallCost(u, f) + travel.perUnitUsd;
+  // "თავისუფალი სერვისი" (monthlyServiceUsd × freeServiceMonths) — ეს პროექტის
+  // დონის ერთჯერადი ჯამია, არა თითოეული დანადგარისთვის ცალ-ცალკე გამეორებადი.
+  // ვანაწილებთ დანადგარებზე თანაბრად, რომ ჯამში ზუსტად პროექტის ჯამს გაუტოლდეს
+  // (ისევე, როგორც მოგზაურობის ხარჯი perUnitUsd-ით ნაწილდება).
+  const freeServicePerUnit = (f.monthlyServiceUsd * f.freeServiceMonths) / (units.length || 1);
 
   // First pass — compute everything except projectShare
   const rows: UnitEconomics[] = units.map((u) => {
@@ -271,7 +276,7 @@ export function computeEconomics(state: AppState): FullEconomics {
       u.otherCost +
       u.grounding +
       u.factoryPrice * u.warrantyPct +
-      f.monthlyServiceUsd * f.freeServiceMonths;
+      freeServicePerUnit;
     const J = H + I;
     const K = J * f.vatRate;
     const L = (((J + K) * f.guaranteePct) * f.guaranteeAnnualPct * f.guaranteeDays / 365) * (1 + f.vatRate);
