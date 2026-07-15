@@ -1,70 +1,22 @@
 import { useEconStore } from "@/lib/econ-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fmtNum, computedCls } from "./sheet-ui";
+import { NumberInput, PercentInput, fmtNum, computedCls } from "./sheet-ui";
+import { EQUIPMENT_CATEGORY_LABEL, type EquipmentCategory, type InstallTariffs } from "@/lib/econ-types";
 
-// Reference price list — independent (does not participate in the current project's economics)
-// Prices in USD (net = C column). Gross adjusts for income + pension deductions.
-
-interface Tariff { label: string; usdNet: number; }
-const capUnder1000: Tariff[] = [
-  { label: "სართულები ≤ 4 (ჯამური ფასი)", usdNet: 600 },
-  { label: "სართულები ≥ 5 (დამატებითი ფასი 1 სართულზე)", usdNet: 150 },
-];
-const capOver1000: Tariff[] = [
-  { label: "სართულები ≤ 4 (ჯამური ფასი)", usdNet: 800 },
-  { label: "სართულები ≥ 5 (დამატებითი ფასი 1 სართულზე)", usdNet: 200 },
-];
-const elec: Tariff[] = [
-  { label: "სართულები ≤ 4 (ჯამური ფასი)", usdNet: 300 },
-  { label: "სართულები ≥ 5 (დამატებითი ფასი 1 სართულზე)", usdNet: 50 },
-];
-const helper: Tariff[] = [
-  { label: "დამხმარეს ანაზღაურება", usdNet: 20 },
+const SECTIONS: Array<{ key: keyof InstallTariffs; title: string }> = [
+  { key: "capUnder1000", title: "სამონტაჟო სამუშაო — ტვირთამწეობა < 1000 კგ" },
+  { key: "capOver1000", title: "სამონტაჟო სამუშაო — ტვირთამწეობა ≥ 1000 კგ" },
+  { key: "elec", title: "ელექტრომონტაჟი" },
+  { key: "helper", title: "დამხმარე პერსონალი" },
 ];
 
-function TariffTable({ title, rows, incomeTax, pension, cross }: { title: string; rows: Tariff[]; incomeTax: number; pension: number; cross: number }) {
-  const grossFactor = 1 / ((1 - incomeTax) * (1 - pension));
-  return (
-    <Card>
-      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-      <CardContent className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>კატეგორია</TableHead>
-              <TableHead className="text-right">USD ნეტო</TableHead>
-              <TableHead className="text-right">USD გროსი</TableHead>
-              <TableHead className="text-right">EUR ნეტო</TableHead>
-              <TableHead className="text-right">EUR გროსი</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => {
-              const gross = r.usdNet * grossFactor;
-              const eurNet = cross ? r.usdNet / cross : 0;
-              const eurGross = cross ? gross / cross : 0;
-              return (
-                <TableRow key={r.label}>
-                  <TableCell>{r.label}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>$ {fmtNum(r.usdNet)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>$ {fmtNum(gross)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>€ {fmtNum(eurNet)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>€ {fmtNum(eurGross)}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
-}
+const CATEGORY_ORDER: EquipmentCategory[] = ["lift", "escalator", "travelator", "parking", "platform"];
 
 export function InstallationTariffsSheet() {
-  const { state } = useEconStore();
+  const { state, setTariffRow, setProfitThreshold } = useEconStore();
   const f = state.finance;
-  const cross = f.eurRate / f.usdRate || 1;
+  const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
 
   return (
     <div className="space-y-4">
@@ -72,14 +24,79 @@ export function InstallationTariffsSheet() {
         <CardHeader><CardTitle>მონტაჟის მომსახურების სატარიფო ცხრილი</CardTitle></CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           დამოუკიდებელი მონტაჟის მომსახურების ფასების ცნობარი (მაგ. ლიფტზე, რომელიც არ არის ამ კომპანიის მიერ მიწოდებული).
-          იგი <b>არ მონაწილეობს</b> მიმდინარე პროექტის «ეკონომიკა» ფურცლის გაანგარიშებაში.
-          გროსი ფასი მოიცავს საშემოსავლო და საპენსიო დარიცხვებს.
+          იგი <b>არ მონაწილეობს</b> მიმდინარე პროექტის «ეკონომიკა» ფურცლის გაანგარიშებაში. ღირებულებები კორექტირებადია და
+          ინახება ავტომატურად. გროსი ფასი ავტომატურად ითვლის საშემოსავლო და საპენსიო დარიცხვებს (ნეტოდან) — მხოლოდ დოლარში.
         </CardContent>
       </Card>
-      <TariffTable title="სამონტაჟო სამუშაო — ტვირთამწეობა C < 1000 კგ" rows={capUnder1000} incomeTax={f.incomeTaxRate} pension={f.pensionRate} cross={cross} />
-      <TariffTable title="სამონტაჟო სამუშაო — ტვირთამწეობა C ≥ 1000 კგ" rows={capOver1000} incomeTax={f.incomeTaxRate} pension={f.pensionRate} cross={cross} />
-      <TariffTable title="ელექტრომონტაჟი" rows={elec} incomeTax={f.incomeTaxRate} pension={f.pensionRate} cross={cross} />
-      <TariffTable title="დამხმარე პერსონალი" rows={helper} incomeTax={f.incomeTaxRate} pension={f.pensionRate} cross={cross} />
+
+      {SECTIONS.map((sec) => (
+        <Card key={sec.key}>
+          <CardHeader><CardTitle>{sec.title}</CardTitle></CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>კატეგორია</TableHead>
+                  <TableHead className="text-right">USD ნეტო</TableHead>
+                  <TableHead className="text-right">USD გროსი</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {state.tariffs[sec.key].map((r, i) => {
+                  const gross = r.usdNet * grossFactor;
+                  return (
+                    <TableRow key={r.label}>
+                      <TableCell className="text-sm">{r.label}</TableCell>
+                      <TableCell className="p-1 w-36">
+                        <NumberInput value={r.usdNet} onChange={(v) => setTariffRow(sec.key, i, v)} />
+                      </TableCell>
+                      <TableCell className={"text-right " + computedCls}>$ {fmtNum(gross)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Card>
+        <CardHeader><CardTitle>მინიმალური მოგების ზღვრები დანადგარის კატეგორიის მიხედვით</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            თუ დანადგარის ფასნამატის თანხა ან მარჟა ამ ზღვარს ჩამოცდება, «ეკონომიკა» ფურცელზე შესაბამისი დანადგარი
+            გაწითლდება და გამოჩნდება გაფრთხილება — თუმცა მუშაობა (შენახვა, გაგრძელება) ისევ შესაძლებელი იქნება.
+            ნულოვანი მნიშვნელობა ნიშნავს, რომ ზღვარი გამორთულია.
+          </p>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>დანადგარის კატეგორია</TableHead>
+                  <TableHead className="text-right">მინ. მოგების თანხა ($)</TableHead>
+                  <TableHead className="text-right">მინ. მოგების მარჟა (%)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {CATEGORY_ORDER.map((cat) => {
+                  const th = state.profitThresholds[cat];
+                  return (
+                    <TableRow key={cat}>
+                      <TableCell className="text-sm font-medium">{EQUIPMENT_CATEGORY_LABEL[cat]}</TableCell>
+                      <TableCell className="p-1 w-36">
+                        <NumberInput value={th.minAmount} onChange={(v) => setProfitThreshold(cat, { minAmount: v })} />
+                      </TableCell>
+                      <TableCell className="p-1 w-36">
+                        <PercentInput value={th.minMarginPct} onChange={(v) => setProfitThreshold(cat, { minMarginPct: v })} />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

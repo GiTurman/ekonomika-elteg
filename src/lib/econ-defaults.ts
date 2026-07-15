@@ -1,7 +1,8 @@
-import type { AppState, Unit } from "./econ-types";
+import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold } from "./econ-types";
 
 const mkUnit = (id: string, floors = 19): Unit => ({
   id,
+  category: "lift",
   capacity: 1600,
   floors,
   currency: "USD",
@@ -31,6 +32,33 @@ const mkUnit = (id: string, floors = 19): Unit => ({
   fxRiskPct: 0.02,
   warrantyPct: 0,
 });
+
+export const defaultTariffs: InstallTariffs = {
+  capUnder1000: [
+    { label: "სართულები ≤ 4 (ჯამური ფასი)", usdNet: 600 },
+    { label: "სართულები ≥ 5 (დამატებითი ფასი 1 სართულზე)", usdNet: 150 },
+  ],
+  capOver1000: [
+    { label: "სართულები ≤ 4 (ჯამური ფასი)", usdNet: 800 },
+    { label: "სართულები ≥ 5 (დამატებითი ფასი 1 სართულზე)", usdNet: 200 },
+  ],
+  elec: [
+    { label: "სართულები ≤ 4 (ჯამური ფასი)", usdNet: 300 },
+    { label: "სართულები ≥ 5 (დამატებითი ფასი 1 სართულზე)", usdNet: 50 },
+  ],
+  helper: [
+    { label: "დამხმარეს ანაზღაურება", usdNet: 20 },
+  ],
+};
+
+const zeroThreshold: ProfitThreshold = { minAmount: 0, minMarginPct: 0 };
+export const defaultProfitThresholds: Record<EquipmentCategory, ProfitThreshold> = {
+  lift: { ...zeroThreshold },
+  escalator: { ...zeroThreshold },
+  travelator: { ...zeroThreshold },
+  parking: { ...zeroThreshold },
+  platform: { ...zeroThreshold },
+};
 
 export const defaultAppState: AppState = {
   project: {
@@ -78,6 +106,8 @@ export const defaultAppState: AppState = {
     scenarioA: { name: "სცენარი V1 (25/30/35/10)", tranche1: 0.25, tranche2: 0.30, tranche3: 0.35 },
     scenarioB: { name: "სცენარი V2 (20/30/35/15)", tranche1: 0.20, tranche2: 0.30, tranche3: 0.35 },
   },
+  tariffs: defaultTariffs,
+  profitThresholds: defaultProfitThresholds,
 };
 
 export const emptyUnit = mkUnit;
@@ -86,6 +116,7 @@ export const emptyUnit = mkUnit;
 // მაგრამ ყველა ფინანსური/რაოდენობრივი ველი ნულოვანია.
 const blankUnit = (id: string): Unit => ({
   id,
+  category: "lift",
   capacity: 0,
   floors: 0,
   currency: "USD",
@@ -115,6 +146,24 @@ const blankUnit = (id: string): Unit => ({
   fxRiskPct: 0,
   warrantyPct: 0,
 });
+
+// ძველი შენახული/არქივირებული მდგომარეობები შესაძლოა მოკლებული იყვნენ ახლახან
+// დამატებულ ველებს (category, tariffs, profitThresholds) — ამ ფუნქციით ნებისმიერი
+// ნაწილობრივი AppState ივსება ნაგულისხმევი მნიშვნელობებით, უსაფრთხოდ.
+export function normalizeAppState(loaded: Partial<AppState>): AppState {
+  const loadedProject = loaded.project ?? defaultAppState.project;
+  const units = (loadedProject.units ?? defaultAppState.project.units).map((u: Unit) => ({
+    ...u,
+    category: u.category ?? "lift",
+  }));
+  return {
+    project: { ...defaultAppState.project, ...loadedProject, units },
+    finance: { ...defaultAppState.finance, ...(loaded.finance ?? {}) },
+    payment: { ...defaultAppState.payment, ...(loaded.payment ?? {}) },
+    tariffs: { ...defaultAppState.tariffs, ...(loaded.tariffs ?? {}) },
+    profitThresholds: { ...defaultAppState.profitThresholds, ...(loaded.profitThresholds ?? {}) },
+  };
+}
 
 // ახალი, სუფთა (ნულოვანი) პროექტი — "დასრულება და შენახვა" შემდეგ ამით
 // იწყება მუშაობა, ძველი პროექტის სანიმუშო მონაცემების ნაცვლად.
@@ -147,5 +196,7 @@ export function blankAppState(): AppState {
       scenarioA: { ...defaultAppState.payment.scenarioA },
       scenarioB: { ...defaultAppState.payment.scenarioB },
     },
+    tariffs: JSON.parse(JSON.stringify(defaultAppState.tariffs)),
+    profitThresholds: JSON.parse(JSON.stringify(defaultAppState.profitThresholds)),
   };
 }

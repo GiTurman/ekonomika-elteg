@@ -1,7 +1,18 @@
 // Types matching the Excel template "განფასება_შაბლონი_GT_v3.xlsx"
 
+export type EquipmentCategory = "lift" | "escalator" | "travelator" | "parking" | "platform";
+
+export const EQUIPMENT_CATEGORY_LABEL: Record<EquipmentCategory, string> = {
+  lift: "ლიფტი",
+  escalator: "ესკალატორი",
+  travelator: "ტრაველატორი",
+  parking: "საპარკინგე სისტემა",
+  platform: "შშმ პლატფორმა",
+};
+
 export interface Unit {
   id: string;           // e.g. "L1"
+  category: EquipmentCategory; // მინიმალური მოგების ზღვრების დასათვლელად
   capacity: number;     // ტვირთამწეობა, kg
   floors: number;       // სართულების რაოდენობა
   currency: "USD" | "EUR" | "GEL";
@@ -107,8 +118,26 @@ export interface PaymentSchedule {
   scenarioB: PaymentScenario;
 }
 
+export interface TariffRow {
+  label: string;
+  usdNet: number; // მხოლოდ დოლარი — კორექტირებადი
+}
+export interface InstallTariffs {
+  capUnder1000: TariffRow[]; // ტვირთამწეობა < 1000 კგ
+  capOver1000: TariffRow[];  // ტვირთამწეობა ≥ 1000 კგ
+  elec: TariffRow[];         // ელექტრომონტაჟი
+  helper: TariffRow[];       // დამხმარე პერსონალი
+}
+
+export interface ProfitThreshold {
+  minAmount: number;    // მინიმალური მოგების თანხა დანადგარზე, USD
+  minMarginPct: number; // მინიმალური მოგების მარჟა, fraction (0..1)
+}
+
 export interface AppState {
   project: ProjectData;
   finance: FinancialAssumptions;
   payment: PaymentSchedule;
+  tariffs: InstallTariffs;
+  profitThresholds: Record<EquipmentCategory, ProfitThreshold>;
 }

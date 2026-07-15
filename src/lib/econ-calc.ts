@@ -1,10 +1,12 @@
 // Calculation engine — mirrors the Excel template
 // "განფასება_შაბლონი_GT_v3.xlsx" (Fuji Hitech / KLEEMANN Economic Model)
 
-import type { AppState, Unit, FinancialAssumptions, PaymentScenario, TravelGroup } from "./econ-types";
+import type { AppState, Unit, FinancialAssumptions, PaymentScenario, TravelGroup, EquipmentCategory, ProfitThreshold } from "./econ-types";
+import { defaultProfitThresholds } from "./econ-defaults";
 
 export interface UnitEconomics {
   id: string;
+  category: EquipmentCategory;
   floors: number;
   purchaseCost: number; // D = factory + allocated(bank + intT + terminal + localT)
   installCost: number; // E = floors*(mech+elec)/(1-inc)/(1-pen) + materials + per-unit travel share
@@ -18,6 +20,8 @@ export interface UnitEconomics {
   finalPrice: number; // M_final = (J + K + L) * (1 + brokerCommissionPct)
   marginPct: number; // N = G / J
   projectShare: number; // O = M_final / total_M_final
+  belowMinAmount: boolean; // G < profitThresholds[category].minAmount
+  belowMinMargin: boolean; // marginPct < profitThresholds[category].minMarginPct
 }
 
 export interface TravelBreakdown {
@@ -262,8 +266,13 @@ export function computeEconomics(state: AppState): FullEconomics {
   // (ისევე, როგორც მოგზაურობის ხარჯი perUnitUsd-ით ნაწილდება).
   const freeServicePerUnit = (f.monthlyServiceUsd * f.freeServiceMonths) / (units.length || 1);
 
+  // ძველ (არქივირებულ) პროექტებს შესაძლოა არ ჰქონდეთ profitThresholds/category —
+  // დაცვის მიზნით ნაგულისხმევებზე ვბრუნდებით, რომ გაანგარიშება არასდროს ავარდეს.
+  const thresholds = state.profitThresholds ?? defaultProfitThresholds;
+
   // First pass — compute everything except projectShare
   const rows: UnitEconomics[] = units.map((u) => {
+    const category: EquipmentCategory = u.category ?? "lift";
     const allocated = allocationOf(u);
     const D = purchaseCostOf(u);
     const E = installCostOf(u);
@@ -282,8 +291,11 @@ export function computeEconomics(state: AppState): FullEconomics {
     const L = (((J + K) * f.guaranteePct) * f.guaranteeAnnualPct * f.guaranteeDays / 365) * (1 + f.vatRate);
     const M = J + K + L;
     const finalPrice = M * (1 + u.brokerCommissionPct);
+    const marginPct = J ? G / J : 0;
+    const threshold: ProfitThreshold = thresholds[category] ?? { minAmount: 0, minMarginPct: 0 };
     return {
       id: u.id,
+      category,
       floors: u.floors,
       purchaseCost: D,
       installCost: E,
@@ -295,8 +307,10 @@ export function computeEconomics(state: AppState): FullEconomics {
       vat: K,
       bankGuarantee: L,
       finalPrice,
-      marginPct: J ? G / J : 0,
+      marginPct,
       projectShare: 0,
+      belowMinAmount: G < threshold.minAmount,
+      belowMinMargin: marginPct < threshold.minMarginPct,
     };
   });
   const totalM = rows.reduce((s, r) => s + r.finalPrice, 0);

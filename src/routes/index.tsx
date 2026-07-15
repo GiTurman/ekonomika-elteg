@@ -109,11 +109,11 @@ function Index() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs defaultValue="input">
-          <TabsList className={"grid h-auto " + (isFull ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-4")}>
+          <TabsList className={"grid h-auto " + (isFull ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-3")}>
             <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>
             <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>
             <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>
-            <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>
+            {isFull && <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>}
             {isFull && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
           </TabsList>
           <div className="mt-4">
@@ -126,7 +126,7 @@ function Index() {
             </TabsContent>
             <TabsContent value="economics"><EconomicsSheet /></TabsContent>
             <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>
-            <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>
+            {isFull && <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>}
             {isFull && <TabsContent value="analytics"><AnalyticsSheet /></TabsContent>}
           </div>
         </Tabs>

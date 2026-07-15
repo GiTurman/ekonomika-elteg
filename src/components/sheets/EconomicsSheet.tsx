@@ -4,6 +4,8 @@ import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fmtUsd, fmtPct, computedCls } from "./sheet-ui";
+import { EQUIPMENT_CATEGORY_LABEL } from "@/lib/econ-types";
+import { AlertTriangle } from "lucide-react";
 
 export function EconomicsSheet() {
   const { state } = useEconStore();
@@ -16,9 +18,36 @@ export function EconomicsSheet() {
   //   რეალურად გადასახდელი, დღგ-ს ჩათვლით საბოლოო ფასი.
   const salesMarginPct = eco.totals.finalPrice ? eco.report.markupTotal / eco.totals.finalPrice : 0;
   const marginPct = isFull ? eco.report.totalMarginPct : salesMarginPct;
+  const belowThreshold = eco.units.filter((r) => r.belowMinAmount || r.belowMinMargin);
 
   return (
     <div className="space-y-6">
+      {isFull && belowThreshold.length > 0 && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-destructive">
+                  {belowThreshold.length} დანადგარი ჩამოცდა მინიმალურ მოგების ზღვარს (იხ. «მონტაჟის ტარიფები»)
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  {belowThreshold.map((r) => (
+                    <li key={r.id}>
+                      <span className="font-medium text-destructive">{r.id}</span> ({EQUIPMENT_CATEGORY_LABEL[r.category]}) —{" "}
+                      {r.belowMinAmount && <span>მოგება {fmtUsd(r.markup)} &lt; მინიმუმი</span>}
+                      {r.belowMinAmount && r.belowMinMargin && "; "}
+                      {r.belowMinMargin && <span>მარჟა {fmtPct(r.marginPct)} &lt; მინიმუმი</span>}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground pt-1">ეს მხოლოდ გაფრთხილებაა — მუშაობის გაგრძელება შესაძლებელია.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>1. დანადგარების ეკონომიკა — ერთი სტრიქონი = ერთი დანადგარი</CardTitle>
@@ -48,24 +77,27 @@ export function EconomicsSheet() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {eco.units.map((r) => (
-                <TableRow key={r.id}>
+              {eco.units.map((r) => {
+                const flagged = r.belowMinAmount || r.belowMinMargin;
+                return (
+                <TableRow key={r.id} className={flagged ? "bg-destructive/10" : ""}>
                   <TableCell className="font-semibold">{r.id}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{r.floors}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.purchaseCost)}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.installCost)}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.totalCost)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markup)}</TableCell>
+                  <TableCell className={"text-right " + (r.belowMinAmount ? "text-destructive font-semibold " : "") + computedCls}>{fmtUsd(r.markup)}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.priceNoExtras)}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.extras)}</TableCell>
                   <TableCell className={"text-right " + (isFull ? "font-semibold " : "") + computedCls}>{fmtUsd(r.priceNoVat)}</TableCell>
                   {!isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(r.vat)}</TableCell>}
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.bankGuarantee)}</TableCell>
                   {!isFull && <TableCell className={"text-right font-semibold " + computedCls}>{fmtUsd(r.finalPrice)}</TableCell>}
-                  <TableCell className={"text-right " + computedCls}>{fmtPct(r.marginPct)}</TableCell>
+                  <TableCell className={"text-right " + (r.belowMinMargin ? "text-destructive font-semibold " : "") + computedCls}>{fmtPct(r.marginPct)}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtPct(r.projectShare)}</TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
               <TableRow className="bg-muted font-semibold">
                 <TableCell colSpan={2}>სულ პროექტში</TableCell>
                 <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.purchaseCost)}</TableCell>

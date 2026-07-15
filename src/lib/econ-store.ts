@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { AppState, Unit } from "./econ-types";
-import { defaultAppState, emptyUnit, blankAppState } from "./econ-defaults";
+import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold } from "./econ-types";
+import { defaultAppState, emptyUnit, blankAppState, normalizeAppState } from "./econ-defaults";
 import { supabase } from "@/integrations/supabase/client";
 
 interface StoreShape {
@@ -14,6 +14,8 @@ interface StoreShape {
   updateUnit: (id: string, patch: Partial<Unit>) => void;
   addUnit: () => void;
   removeUnit: (id: string) => void;
+  setTariffRow: (section: keyof InstallTariffs, index: number, usdNet: number) => void;
+  setProfitThreshold: (category: EquipmentCategory, patch: Partial<ProfitThreshold>) => void;
   load: () => Promise<void>;
   save: () => Promise<void>;
   reset: () => void;
@@ -88,6 +90,26 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     scheduleSave(get);
   },
 
+  setTariffRow: (section, index, usdNet) => {
+    set((s) => {
+      const rows = s.state.tariffs[section].map((r, i) => (i === index ? { ...r, usdNet } : r));
+      return { state: { ...s.state, tariffs: { ...s.state.tariffs, [section]: rows } } };
+    });
+    scheduleSave(get);
+  },
+  setProfitThreshold: (category, patch) => {
+    set((s) => ({
+      state: {
+        ...s.state,
+        profitThresholds: {
+          ...s.state.profitThresholds,
+          [category]: { ...s.state.profitThresholds[category], ...patch },
+        },
+      },
+    }));
+    scheduleSave(get);
+  },
+
   reset: () => {
     set({ state: blankAppState() });
     scheduleSave(get);
@@ -102,16 +124,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
         .maybeSingle();
       if (error) throw error;
       if (data?.data) {
-        // Shallow-merge with defaults so new fields default correctly
-        const loaded = data.data as Partial<AppState>;
-        set({
-          state: {
-            project: { ...defaultAppState.project, ...(loaded.project ?? {}) },
-            finance: { ...defaultAppState.finance, ...(loaded.finance ?? {}) },
-            payment: { ...defaultAppState.payment, ...(loaded.payment ?? {}) },
-          },
-          loaded: true,
-        });
+        set({ state: normalizeAppState(data.data as Partial<AppState>), loaded: true });
       } else {
         set({ loaded: true });
       }

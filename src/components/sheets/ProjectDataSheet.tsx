@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumberInput, PercentInput, TextInput, fmtUsd, computedCls } from "./sheet-ui";
 import { allocateProjectCosts } from "@/lib/econ-calc";
+import { EQUIPMENT_CATEGORY_LABEL, type EquipmentCategory } from "@/lib/econ-types";
 import { Plus, Trash2 } from "lucide-react";
 
 const UNIT_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string; kind: "text" | "num" }> = [
@@ -88,6 +89,7 @@ export function ProjectDataSheet() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="whitespace-nowrap text-xs">კატეგორია</TableHead>
                 {UNIT_COLS.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
                 <TableHead />
               </TableRow>
@@ -95,6 +97,16 @@ export function ProjectDataSheet() {
             <TableBody>
               {p.units.map((u) => (
                 <TableRow key={u.id}>
+                  <TableCell className="p-1 min-w-[140px]">
+                    <Select value={u.category} onValueChange={(v) => updateUnit(u.id, { category: v as EquipmentCategory })}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(EQUIPMENT_CATEGORY_LABEL) as EquipmentCategory[]).map((c) => (
+                          <SelectItem key={c} value={c}>{EQUIPMENT_CATEGORY_LABEL[c]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   {UNIT_COLS.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[92px]">
                       {c.kind === "num"

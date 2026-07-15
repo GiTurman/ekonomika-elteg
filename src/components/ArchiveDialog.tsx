@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser } from "lucide-react";
 import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, type ArchiveEntry } from "@/lib/archive";
+import { normalizeAppState } from "@/lib/econ-defaults";
 import { useEconStore } from "@/lib/econ-store";
 
 export function ArchiveDialog() {
@@ -40,7 +41,7 @@ export function ArchiveDialog() {
     setBusyId(id);
     try {
       const state = await loadArchiveEntry(id);
-      setState(() => state);
+      setState(() => normalizeAppState(state));
       setOpen(false);
     } catch (e) {
       console.error("[archive] load failed", e);
