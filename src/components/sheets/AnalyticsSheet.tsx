@@ -47,6 +47,7 @@ interface UnitRecord {
   installCost: number;
   markup: number;
   priceNoVat: number;
+  finalPrice: number; // გასაყიდი ფასი, დღგ-ს ჩათვლით
   marginPct: number;
 }
 
@@ -146,6 +147,7 @@ export function AnalyticsSheet() {
           installCost: row.installCost,
           markup: row.markup,
           priceNoVat: row.priceNoVat,
+          finalPrice: row.finalPrice,
           marginPct: row.marginPct,
         });
       });
@@ -190,16 +192,17 @@ export function AnalyticsSheet() {
   };
 
   const groupedRows = useMemo(() => {
-    const map = new Map<string, { label: string; count: number; floorsSum: number; purchase: number; install: number; markup: number; costNet: number; marginSum: number }>();
+    const map = new Map<string, { label: string; count: number; floorsSum: number; purchase: number; install: number; markup: number; costNet: number; finalPriceSum: number; marginSum: number }>();
     for (const u of filtered) {
       const { key, label } = keyFn(u);
-      const cur = map.get(key) ?? { label, count: 0, floorsSum: 0, purchase: 0, install: 0, markup: 0, costNet: 0, marginSum: 0 };
+      const cur = map.get(key) ?? { label, count: 0, floorsSum: 0, purchase: 0, install: 0, markup: 0, costNet: 0, finalPriceSum: 0, marginSum: 0 };
       cur.count += 1;
       cur.floorsSum += u.floors;
       cur.purchase += u.purchaseCost;
       cur.install += u.installCost;
       cur.markup += u.markup;
       cur.costNet += u.priceNoVat;
+      cur.finalPriceSum += u.finalPrice;
       cur.marginSum += u.marginPct;
       map.set(key, cur);
     }
@@ -235,10 +238,11 @@ export function AnalyticsSheet() {
     const units = filtered.length;
     const floors = filtered.reduce((s, u) => s + u.floors, 0);
     const costNet = filtered.reduce((s, u) => s + u.priceNoVat, 0);
+    const finalPriceSum = filtered.reduce((s, u) => s + u.finalPrice, 0);
     const markupSum = filtered.reduce((s, u) => s + u.markup, 0);
     const marginWeighted = costNet ? filtered.reduce((s, u) => s + u.marginPct * u.priceNoVat, 0) / costNet : 0;
     const projects = new Set(filtered.map((u) => u.projectName)).size;
-    return { units, floors, costNet, markupSum, marginWeighted, projects };
+    return { units, floors, costNet, finalPriceSum, markupSum, marginWeighted, projects };
   }, [filtered]);
 
   return (
@@ -319,11 +323,12 @@ export function AnalyticsSheet() {
           </Card>
 
           {/* KPIs reflect current filter */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
             <Kpi label="პროექტები" value={String(totals.projects)} />
             <Kpi label="დანადგარები" value={String(totals.units)} />
             <Kpi label="ჯამური სართული" value={String(totals.floors)} />
             <Kpi label="ჯამური ღირებულება (დღგ-ს გარეშე)" value={fmtUsd(totals.costNet)} />
+            <Kpi label="გასაყიდი ფასი (დღგ-ს ჩათვლით)" value={fmtUsd(totals.finalPriceSum)} />
             <Kpi label="საშუალო მარჟა (შეწონილი)" value={fmtPct(totals.marginWeighted)} />
           </div>
 
@@ -395,6 +400,7 @@ export function AnalyticsSheet() {
                       <TableHead className="text-right">შესყ.+მონტ. თვითღ.</TableHead>
                       <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
                       <TableHead className="text-right">ღირებულება (დღგ-ს გარეშე)</TableHead>
+                      <TableHead className="text-right">გასაყიდი ფასი (დღგ-ს ჩათვლით)</TableHead>
                       <TableHead className="text-right">საშ. მარჟა %</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -407,6 +413,7 @@ export function AnalyticsSheet() {
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.purchase + r.install)}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markup)}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{fmtUsd(r.finalPriceSum)}</TableCell>
                         <TableCell className="text-right">
                           <span className="inline-flex items-center gap-1.5">
                             <span className="inline-block h-2 w-2 rounded-full" style={{ background: marginColor(r.avgMarginPct) }} />
