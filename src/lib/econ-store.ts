@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold } from "./econ-types";
+import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold, PaymentTranche, PaymentExpenseItem } from "./econ-types";
 import { defaultAppState, emptyUnit, blankAppState, normalizeAppState } from "./econ-defaults";
+import { suggestPaymentExpenses } from "./econ-calc";
 import { supabase } from "@/integrations/supabase/client";
 
 interface StoreShape {
@@ -16,6 +17,13 @@ interface StoreShape {
   removeUnit: (id: string) => void;
   setTariffRow: (section: keyof InstallTariffs, index: number, usdNet: number) => void;
   setProfitThreshold: (category: EquipmentCategory, patch: Partial<ProfitThreshold>) => void;
+  addTranche: (which: "A" | "B") => void;
+  removeTranche: (which: "A" | "B", index: number) => void;
+  updateTranche: (which: "A" | "B", index: number, patch: Partial<PaymentTranche>) => void;
+  addExpense: (which: "A" | "B", afterTranche: number) => void;
+  removeExpense: (which: "A" | "B", index: number) => void;
+  updateExpense: (which: "A" | "B", index: number, patch: Partial<PaymentExpenseItem>) => void;
+  applySuggestedExpenses: (which: "A" | "B") => void;
   load: () => Promise<void>;
   save: () => Promise<void>;
   reset: () => void;
@@ -23,6 +31,19 @@ interface StoreShape {
 
 const STATE_ID = "singleton";
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ახალი ტრანშის ავტომატური ლეიბლისთვის (I, II, III, IV, V, ...) — არსებული
+// ტრანშების ("I ტრანში", "II ტრანში"...) სტილის შესანარჩუნებლად.
+function toGeorgianOrdinal(n: number): string {
+  const romans: [number, string][] = [
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let num = n, out = "";
+  for (const [val, sym] of romans) {
+    while (num >= val) { out += sym; num -= val; }
+  }
+  return out || String(n);
+}
 
 export const useEconStore = create<StoreShape>((set, get) => ({
   state: defaultAppState,
@@ -44,6 +65,76 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   },
   updatePayment: (patch) => {
     set((s) => ({ state: { ...s.state, payment: { ...s.state.payment, ...patch } } }));
+    scheduleSave(get);
+  },
+
+  addTranche: (which) => {
+    set((s) => {
+      const key = which === "A" ? "scenarioA" : "scenarioB";
+      const sc = s.state.payment[key];
+      const n = sc.tranches.length + 1;
+      const tranches = [...sc.tranches, { label: `${toGeorgianOrdinal(n)} ტრანში`, pct: 0 }];
+      return { state: { ...s.state, payment: { ...s.state.payment, [key]: { ...sc, tranches } } } };
+    });
+    scheduleSave(get);
+  },
+  removeTranche: (which, index) => {
+    set((s) => {
+      const key = which === "A" ? "scenarioA" : "scenarioB";
+      const sc = s.state.payment[key];
+      const tranches = sc.tranches.filter((_, i) => i !== index);
+      // ამ ტრანშზე მიბმული ხარჯებიც ვშლით, დანარჩენების ინდექსებს ვინაცვლებთ
+      const expenses = sc.expenses
+        .filter((e) => e.afterTranche !== index)
+        .map((e) => (e.afterTranche > index ? { ...e, afterTranche: e.afterTranche - 1 } : e));
+      return { state: { ...s.state, payment: { ...s.state.payment, [key]: { ...sc, tranches, expenses } } } };
+    });
+    scheduleSave(get);
+  },
+  updateTranche: (which, index, patch) => {
+    set((s) => {
+      const key = which === "A" ? "scenarioA" : "scenarioB";
+      const sc = s.state.payment[key];
+      const tranches = sc.tranches.map((t, i) => (i === index ? { ...t, ...patch } : t));
+      return { state: { ...s.state, payment: { ...s.state.payment, [key]: { ...sc, tranches } } } };
+    });
+    scheduleSave(get);
+  },
+
+  addExpense: (which, afterTranche) => {
+    set((s) => {
+      const key = which === "A" ? "scenarioA" : "scenarioB";
+      const sc = s.state.payment[key];
+      const expenses = [...sc.expenses, { label: "ახალი გასავალი", amount: 0, afterTranche }];
+      return { state: { ...s.state, payment: { ...s.state.payment, [key]: { ...sc, expenses } } } };
+    });
+    scheduleSave(get);
+  },
+  removeExpense: (which, index) => {
+    set((s) => {
+      const key = which === "A" ? "scenarioA" : "scenarioB";
+      const sc = s.state.payment[key];
+      const expenses = sc.expenses.filter((_, i) => i !== index);
+      return { state: { ...s.state, payment: { ...s.state.payment, [key]: { ...sc, expenses } } } };
+    });
+    scheduleSave(get);
+  },
+  updateExpense: (which, index, patch) => {
+    set((s) => {
+      const key = which === "A" ? "scenarioA" : "scenarioB";
+      const sc = s.state.payment[key];
+      const expenses = sc.expenses.map((e, i) => (i === index ? { ...e, ...patch } : e));
+      return { state: { ...s.state, payment: { ...s.state.payment, [key]: { ...sc, expenses } } } };
+    });
+    scheduleSave(get);
+  },
+  applySuggestedExpenses: (which) => {
+    set((s) => {
+      const key = which === "A" ? "scenarioA" : "scenarioB";
+      const sc = s.state.payment[key];
+      const expenses = suggestPaymentExpenses(s.state, which);
+      return { state: { ...s.state, payment: { ...s.state.payment, [key]: { ...sc, expenses } } } };
+    });
     scheduleSave(get);
   },
   updateUnit: (id, patch) => {

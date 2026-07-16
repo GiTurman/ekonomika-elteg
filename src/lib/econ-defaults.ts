@@ -1,4 +1,4 @@
-import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold } from "./econ-types";
+import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold, PaymentScenario } from "./econ-types";
 
 const mkUnit = (id: string, floors = 19): Unit => ({
   id,
@@ -103,8 +103,26 @@ export const defaultAppState: AppState = {
   },
   payment: {
     procurementAdvancePct: 0.30,
-    scenarioA: { name: "სცენარი V1 (25/30/35/10)", tranche1: 0.25, tranche2: 0.30, tranche3: 0.35 },
-    scenarioB: { name: "სცენარი V2 (20/30/35/15)", tranche1: 0.20, tranche2: 0.30, tranche3: 0.35 },
+    scenarioA: {
+      name: "სცენარი V1 (25/30/35/10)",
+      tranches: [
+        { label: "I ტრანში", pct: 0.25 },
+        { label: "II ტრანში", pct: 0.30 },
+        { label: "III ტრანში", pct: 0.35 },
+        { label: "IV ტრანში (ნაშთი)", pct: 0.10 },
+      ],
+      expenses: [],
+    },
+    scenarioB: {
+      name: "სცენარი V2 (20/30/35/15)",
+      tranches: [
+        { label: "I ტრანში", pct: 0.20 },
+        { label: "II ტრანში", pct: 0.30 },
+        { label: "III ტრანში", pct: 0.35 },
+        { label: "IV ტრანში (ნაშთი)", pct: 0.15 },
+      ],
+      expenses: [],
+    },
   },
   tariffs: defaultTariffs,
   profitThresholds: defaultProfitThresholds,
@@ -147,6 +165,35 @@ const blankUnit = (id: string): Unit => ({
   warrantyPct: 0,
 });
 
+// ძველი შენახული სცენარები იყენებდნენ ფიქსირებულ tranche1/2/3 ველებს — ახალი
+// სქემა მოქნილი მასივია. ძველ ფორმატს ვცნობთ tranches ველის არარსებობით და
+// ვაკონვერტირებთ, რომ ძველი პროექტები არ დაზიანდეს.
+function normalizeScenario(loaded: any, fallback: PaymentScenario): PaymentScenario {
+  if (!loaded) return JSON.parse(JSON.stringify(fallback));
+  if (Array.isArray(loaded.tranches)) {
+    return {
+      name: loaded.name ?? fallback.name,
+      tranches: loaded.tranches,
+      expenses: Array.isArray(loaded.expenses) ? loaded.expenses : [],
+    };
+  }
+  // ძველი ფორმატი: tranche1/2/3 + ნაგულისხმევი IV (ნაშთი)
+  if (typeof loaded.tranche1 === "number") {
+    const t4 = 1 - loaded.tranche1 - loaded.tranche2 - loaded.tranche3;
+    return {
+      name: loaded.name ?? fallback.name,
+      tranches: [
+        { label: "I ტრანში", pct: loaded.tranche1 },
+        { label: "II ტრანში", pct: loaded.tranche2 },
+        { label: "III ტრანში", pct: loaded.tranche3 },
+        { label: "IV ტრანში (ნაშთი)", pct: t4 },
+      ],
+      expenses: [],
+    };
+  }
+  return JSON.parse(JSON.stringify(fallback));
+}
+
 // ძველი შენახული/არქივირებული მდგომარეობები შესაძლოა მოკლებული იყვნენ ახლახან
 // დამატებულ ველებს (category, tariffs, profitThresholds) — ამ ფუნქციით ნებისმიერი
 // ნაწილობრივი AppState ივსება ნაგულისხმევი მნიშვნელობებით, უსაფრთხოდ.
@@ -156,10 +203,15 @@ export function normalizeAppState(loaded: Partial<AppState>): AppState {
     ...u,
     category: u.category ?? "lift",
   }));
+  const loadedPayment: any = loaded.payment ?? {};
   return {
     project: { ...defaultAppState.project, ...loadedProject, units },
     finance: { ...defaultAppState.finance, ...(loaded.finance ?? {}) },
-    payment: { ...defaultAppState.payment, ...(loaded.payment ?? {}) },
+    payment: {
+      procurementAdvancePct: loadedPayment.procurementAdvancePct ?? defaultAppState.payment.procurementAdvancePct,
+      scenarioA: normalizeScenario(loadedPayment.scenarioA, defaultAppState.payment.scenarioA),
+      scenarioB: normalizeScenario(loadedPayment.scenarioB, defaultAppState.payment.scenarioB),
+    },
     tariffs: { ...defaultAppState.tariffs, ...(loaded.tariffs ?? {}) },
     profitThresholds: { ...defaultAppState.profitThresholds, ...(loaded.profitThresholds ?? {}) },
   };
@@ -193,8 +245,8 @@ export function blankAppState(): AppState {
     finance: { ...defaultAppState.finance, rateDate: new Date().toISOString().slice(0, 10) },
     payment: {
       procurementAdvancePct: defaultAppState.payment.procurementAdvancePct,
-      scenarioA: { ...defaultAppState.payment.scenarioA },
-      scenarioB: { ...defaultAppState.payment.scenarioB },
+      scenarioA: JSON.parse(JSON.stringify(defaultAppState.payment.scenarioA)),
+      scenarioB: JSON.parse(JSON.stringify(defaultAppState.payment.scenarioB)),
     },
     tariffs: JSON.parse(JSON.stringify(defaultAppState.tariffs)),
     profitThresholds: JSON.parse(JSON.stringify(defaultAppState.profitThresholds)),

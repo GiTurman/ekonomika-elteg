@@ -1,7 +1,7 @@
 // Calculation engine — mirrors the Excel template
 // "განფასება_შაბლონი_GT_v3.xlsx" (Fuji Hitech / KLEEMANN Economic Model)
 
-import type { AppState, Unit, FinancialAssumptions, PaymentScenario, TravelGroup, EquipmentCategory, ProfitThreshold } from "./econ-types";
+import type { AppState, Unit, FinancialAssumptions, TravelGroup, EquipmentCategory, ProfitThreshold } from "./econ-types";
 import { defaultProfitThresholds } from "./econ-defaults";
 
 export interface UnitEconomics {
@@ -87,8 +87,8 @@ export interface PaymentEvent {
 export interface PaymentReport {
   contractPrice: number;
   procurementAdvancePct: number;
-  scenario: PaymentScenario & { tranche4: number };
   tranches: { label: string; pct: number; amount: number }[];
+  pctSum: number; // ჯამური % — უნდა იყოს ≈1, თუმცა ხელით ივსება და შეიძლება არ ემთხვეოდეს
   events: PaymentEvent[];
   finalBalance: number;
 }
@@ -437,42 +437,23 @@ function buildPaymentReport(
   contractPrice: number,
   report: ProjectReport
 ): PaymentReport {
-  const f = state.finance;
   const p = state.payment;
   const sc = which === "A" ? p.scenarioA : p.scenarioB;
-  const t4 = 1 - sc.tranche1 - sc.tranche2 - sc.tranche3;
-  const scenario = { ...sc, tranche4: t4 };
 
-  const T1 = sc.tranche1 * contractPrice;
-  const T2 = sc.tranche2 * contractPrice;
-  const T3 = sc.tranche3 * contractPrice;
-  const T4 = t4 * contractPrice;
+  const tranches = sc.tranches.map((t) => ({ label: t.label, pct: t.pct, amount: t.pct * contractPrice }));
+  const pctSum = sc.tranches.reduce((s, t) => s + t.pct, 0);
 
-  const supplierBase = report.factoryTotal + report.bankCommTotal + report.terminalTotal + report.localTransportTotal;
-  const advance = -supplierBase * p.procurementAdvancePct;
-  const balance = -supplierBase * (1 - p.procurementAdvancePct);
-  const intTransport = -report.intTransportTotal;
-  const customsVat = -((supplierBase + report.intTransportTotal) * f.vatRate);
-  const installMob = -(report.mechPayroll + report.elecPayroll) * 0.6;
-  const installFinal = -(report.mechPayroll + report.elecPayroll) * 0.4;
-  const vatBudget = (T: number) => -T / (1 + f.vatRate) * f.vatRate;
-
-  const raw: [string, number][] = [
-    ["I ტრანშის მიღება", +T1],
-    ["მომწოდებლისთვის ავანსი", advance],
-    ["დღგ ბიუჯეტში — I ტრანშზე", vatBudget(T1)],
-    ["საერთაშორისო ტრანსპორტირება", intTransport],
-    ["II ტრანშის მიღება", +T2],
-    ["მომწოდებლისთვის ბალანსი", balance],
-    ["დღგ ბიუჯეტში — II ტრანშზე", vatBudget(T2)],
-    ["III ტრანშის მიღება", +T3],
-    ["საბაჟო დღგ იმპორტზე", customsVat],
-    ["დღგ ბიუჯეტში — III ტრანშზე", vatBudget(T3)],
-    ["მონტაჟი — I და II ფაზა", installMob],
-    ["IV ტრანშის მიღება", +T4],
-    ["დღგ ბიუჯეტში — IV ტრანშზე", vatBudget(T4)],
-    ["მონტაჟი — III და IV ფაზა", installFinal],
-  ];
+  // ქრონოლოგიური ნაკადი: თითოეული ტრანშის მიღების შემდეგ ჩნდება მასზე მიბმული
+  // გასავლის სტრიქონები (afterTranche), ამ თანმიმდევრობით — ტრანშის ინდექსი,
+  // შემდეგ იმ ინდექსზე მიბმული ხარჯები, დამატების თანმიმდევრობით.
+  const before = sc.expenses.filter((e) => e.afterTranche < 0);
+  const raw: [string, number][] = before.map((e) => [e.label, e.amount]);
+  tranches.forEach((t, i) => {
+    raw.push([t.label + " მიღება", t.amount]);
+    sc.expenses
+      .filter((e) => e.afterTranche === i)
+      .forEach((e) => raw.push([e.label, e.amount]));
+  });
 
   const events: PaymentEvent[] = [];
   let bal = 0;
@@ -484,14 +465,54 @@ function buildPaymentReport(
   return {
     contractPrice,
     procurementAdvancePct: p.procurementAdvancePct,
-    scenario,
-    tranches: [
-      { label: "I ტრანში", pct: sc.tranche1, amount: T1 },
-      { label: "II ტრანში", pct: sc.tranche2, amount: T2 },
-      { label: "III ტრანში", pct: sc.tranche3, amount: T3 },
-      { label: "IV ტრანში (ნაშთი)", pct: t4, amount: T4 },
-    ],
+    tranches,
+    pctSum,
     events,
     finalBalance: bal,
   };
+}
+
+// "ავტომატური შევსება" ღილაკისთვის — თანამედროვე პროექტის რეალურ ჯამებზე
+// დაფუძნებული საწყისი (suggested) გასავლების ნაკრები. მომხმარებელი შემდეგ
+// ამ თანხებს თავისუფლად ასწორებს/შლის/ამატებს — ეს მხოლოდ ერთჯერადი შევსებაა,
+// არა ცოცხალი ფორმულა.
+export function suggestPaymentExpenses(state: AppState, which: "A" | "B"): { label: string; amount: number; afterTranche: number }[] {
+  const eco = computeEconomics(state);
+  const f = state.finance;
+  const p = state.payment;
+  const sc = which === "A" ? p.scenarioA : p.scenarioB;
+  const contractPrice = eco.totals.finalPrice;
+  const report = eco.report;
+  const n = sc.tranches.length;
+  if (n === 0) return [];
+  const last = n - 1;
+  const iAdvance = 0;
+  const iTransport = 0;
+  const iBalance = Math.min(1, last);
+  const iCustoms = Math.min(2, last);
+  const iInstallMob = Math.min(2, last);
+  const iInstallFinal = last;
+
+  const supplierBase = report.factoryTotal + report.bankCommTotal + report.terminalTotal + report.localTransportTotal;
+  const advance = -supplierBase * p.procurementAdvancePct;
+  const balance = -supplierBase * (1 - p.procurementAdvancePct);
+  const intTransport = -report.intTransportTotal;
+  const customsVat = -((supplierBase + report.intTransportTotal) * f.vatRate);
+  const installMob = -(report.mechPayroll + report.elecPayroll) * 0.6;
+  const installFinal = -(report.mechPayroll + report.elecPayroll) * 0.4;
+
+  const out: { label: string; amount: number; afterTranche: number }[] = [
+    { label: "მომწოდებლისთვის ავანსი", amount: advance, afterTranche: iAdvance },
+    { label: "საერთაშორისო ტრანსპორტირება", amount: intTransport, afterTranche: iTransport },
+    { label: "მომწოდებლისთვის ბალანსი", amount: balance, afterTranche: iBalance },
+    { label: "საბაჟო დღგ იმპორტზე", amount: customsVat, afterTranche: iCustoms },
+    { label: "მონტაჟი — მობილიზაცია (60%)", amount: installMob, afterTranche: iInstallMob },
+    { label: "მონტაჟი — დასრულება (40%)", amount: installFinal, afterTranche: iInstallFinal },
+  ];
+  // დღგ ბიუჯეტში — თითოეულ ტრანშზე, ცალკე (ეს ნაწილი ყოველთვის სუფთად განზოგადდება N ტრანშზე)
+  sc.tranches.forEach((t, i) => {
+    const T = t.pct * contractPrice;
+    out.push({ label: `დღგ ბიუჯეტში — ${t.label}`, amount: -T / (1 + f.vatRate) * f.vatRate, afterTranche: i });
+  });
+  return out;
 }

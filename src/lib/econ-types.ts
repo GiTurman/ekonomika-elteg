@@ -104,12 +104,21 @@ export interface FinancialAssumptions {
   guaranteeAnnualPct: number; // yearly commission %
 }
 
+export interface PaymentTranche {
+  label: string;
+  pct: number; // fraction of contract price — ხელით ივსება
+}
+
+export interface PaymentExpenseItem {
+  label: string;
+  amount: number;        // USD, +/- (ჩვეულებრივ უარყოფითი — გასავალი); თავისუფლად კორექტირებადი
+  afterTranche: number;  // ამ ინდექსის ტრანშის მიღების შემდეგ ჩნდება ფულად ნაკადში (0-based); -1 = ყველა ტრანშამდე
+}
+
 export interface PaymentScenario {
   name: string;
-  tranche1: number; // fraction
-  tranche2: number;
-  tranche3: number;
-  // tranche4 = 1 - sum
+  tranches: PaymentTranche[];       // რაოდენობა ხელით რეგულირდება (დამატება/წაშლა)
+  expenses: PaymentExpenseItem[];   // თავისუფლად რედაქტირებადი გასავლების სია
 }
 
 export interface PaymentSchedule {
