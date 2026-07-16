@@ -41,12 +41,6 @@ export function PaymentScheduleSheet() {
         onAddExpense={(after) => addExpense("A", after)} onRemoveExpense={(i) => removeExpense("A", i)} onUpdateExpense={(i, patch) => updateExpense("A", i, patch)}
         onAutoFill={() => applySuggestedExpenses("A")}
       />
-      <ScenarioCard
-        which="B" title={p.scenarioB.name} scenario={p.scenarioB} report={eco.scenarioB} isFull={isFull}
-        onAddTranche={() => addTranche("B")} onRemoveTranche={(i) => removeTranche("B", i)} onUpdateTranche={(i, patch) => updateTranche("B", i, patch)}
-        onAddExpense={(after) => addExpense("B", after)} onRemoveExpense={(i) => removeExpense("B", i)} onUpdateExpense={(i, patch) => updateExpense("B", i, patch)}
-        onAutoFill={() => applySuggestedExpenses("B")}
-      />
     </div>
   );
 }

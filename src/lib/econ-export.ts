@@ -226,14 +226,12 @@ export function exportToXlsx(state: AppState) {
     return { trStart, trEnd, evStart, evEnd, finalRow };
   };
   const rangesA = pushScenario(state.payment.scenarioA.name, eco.scenarioA);
-  s4.push([]);
-  const rangesB = pushScenario(state.payment.scenarioB.name, eco.scenarioB);
 
   const ws4 = XLSX.utils.aoa_to_sheet(s4);
   setWidths(ws4, [30, 16, 16]);
   fmtCol(ws4, 1, priceRow4, priceRow4, FMT_USD);
   fmtCol(ws4, 1, advRow4, advRow4, FMT_PCT);
-  [rangesA, rangesB].forEach((r) => {
+  [rangesA].forEach((r) => {
     fmtCol(ws4, 1, r.trStart, r.trEnd, FMT_PCT);  // tranche %
     fmtCol(ws4, 2, r.trStart, r.trEnd, FMT_USD);  // tranche amount
     fmtCol(ws4, 1, r.evStart, r.finalRow, FMT_USD); // cashflow amount
