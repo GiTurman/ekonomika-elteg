@@ -12,8 +12,10 @@ import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser } from "luc
 import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, type ArchiveEntry } from "@/lib/archive";
 import { normalizeAppState } from "@/lib/econ-defaults";
 import { useEconStore } from "@/lib/econ-store";
+import { useAccessRole } from "@/components/AccessGate";
 
 export function ArchiveDialog() {
+  const { isFull } = useAccessRole();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ArchiveEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,7 +43,7 @@ export function ArchiveDialog() {
     setBusyId(id);
     try {
       const state = await loadArchiveEntry(id);
-      setState(() => normalizeAppState(state));
+      setState((cur) => ({ ...normalizeAppState(state), pageVisibility: cur.pageVisibility }));
       setOpen(false);
     } catch (e) {
       console.error("[archive] load failed", e);
@@ -90,7 +92,7 @@ export function ArchiveDialog() {
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between pr-6">
             <span>დასრულებული განფასებების არქივი</span>
-            {items.length > 0 && (
+            {isFull && items.length > 0 && (
               <Button size="sm" variant="outline" onClick={handleClearAll} disabled={clearing}>
                 {clearing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eraser className="h-4 w-4 mr-1" />}
                 არქივის გასუფთავება

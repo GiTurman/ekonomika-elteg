@@ -143,10 +143,18 @@ export interface ProfitThreshold {
   minMarginPct: number; // მინიმალური მოგების მარჟა, fraction (0..1)
 }
 
+// Finance-ს კონტროლი — რომელი, ჩვეულებრივ Finance-ისთვის დაცული, გვერდები
+// უჩანდეს Partner-საც. ცვლილება მყისიერია, კოდის რედაქტირება არ სჭირდება.
+export interface PageVisibility {
+  tariffs: boolean;   // "მონტაჟის ტარიფები"
+  analytics: boolean; // "ანალიტიკა"
+}
+
 export interface AppState {
   project: ProjectData;
   finance: FinancialAssumptions;
   payment: PaymentSchedule;
   tariffs: InstallTariffs;
   profitThresholds: Record<EquipmentCategory, ProfitThreshold>;
+  pageVisibility: PageVisibility;
 }

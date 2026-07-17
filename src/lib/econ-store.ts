@@ -17,6 +17,7 @@ interface StoreShape {
   removeUnit: (id: string) => void;
   setTariffRow: (section: keyof InstallTariffs, index: number, usdNet: number) => void;
   setProfitThreshold: (category: EquipmentCategory, patch: Partial<ProfitThreshold>) => void;
+  setPageVisibility: (patch: Partial<AppState["pageVisibility"]>) => void;
   addTranche: (which: "A" | "B") => void;
   removeTranche: (which: "A" | "B", index: number) => void;
   updateTranche: (which: "A" | "B", index: number, patch: Partial<PaymentTranche>) => void;
@@ -200,9 +201,13 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     }));
     scheduleSave(get);
   },
+  setPageVisibility: (patch) => {
+    set((s) => ({ state: { ...s.state, pageVisibility: { ...s.state.pageVisibility, ...patch } } }));
+    scheduleSave(get);
+  },
 
   reset: () => {
-    set({ state: blankAppState() });
+    set((s) => ({ state: { ...blankAppState(), pageVisibility: s.state.pageVisibility } }));
     scheduleSave(get);
   },
 
