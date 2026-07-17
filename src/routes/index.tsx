@@ -17,7 +17,7 @@ import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
 import { ArchiveDialog } from "@/components/ArchiveDialog";
 import { DataRequestDialog } from "@/components/DataRequestDialog";
-import { saveToArchive } from "@/lib/archive";
+import { saveToArchive, findArchiveByName, updateArchiveEntry } from "@/lib/archive";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -55,8 +55,21 @@ function Index() {
     setFinishing(true);
     setSavedMsg(null);
     try {
-      await saveToArchive(name, state);
-      setSavedMsg("შენახულია არქივში: " + name);
+      const existing = await findArchiveByName(name);
+      if (existing) {
+        const overwrite = confirm(
+          `არქივში უკვე არსებობს იგივე სახელის ჩანაწერი: "${name}". გადავაწერო არსებული?`
+        );
+        if (!overwrite) {
+          setFinishing(false);
+          return;
+        }
+        await updateArchiveEntry(existing.id, state);
+        setSavedMsg("გადაწერილია არქივში: " + name);
+      } else {
+        await saveToArchive(name, state);
+        setSavedMsg("შენახულია არქივში: " + name);
+      }
       const startNew = confirm("განფასება შენახულია არქივში. დავიწყოთ ახალი, ცარიელი განფასება?");
       if (startNew) {
         reset();

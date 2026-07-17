@@ -18,6 +18,29 @@ export async function saveToArchive(name: string, state: AppState): Promise<void
   if (error) throw error;
 }
 
+// პოულობს ზუსტად იმავე სახელის ბოლო არქივირებულ ჩანაწერს (თუ არსებობს) —
+// "შენახვა და დასრულება"-ს გამოსაყენებლად, რომ სახელის დამთხვევისას
+// გადაწერა შესთავაზოს ახალი ჩანაწერის შექმნის ნაცვლად.
+export async function findArchiveByName(name: string): Promise<ArchiveEntry | null> {
+  const { data, error } = await supabase
+    .from("app_backups")
+    .select("id, name, created_at, size_bytes")
+    .eq("name", name)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return (data && data[0]) ? (data[0] as ArchiveEntry) : null;
+}
+
+export async function updateArchiveEntry(id: string, state: AppState): Promise<void> {
+  const json = JSON.stringify(state);
+  const { error } = await supabase
+    .from("app_backups")
+    .update({ data: state as any, size_bytes: json.length })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function listArchive(): Promise<ArchiveEntry[]> {
   const { data, error } = await supabase
     .from("app_backups")
