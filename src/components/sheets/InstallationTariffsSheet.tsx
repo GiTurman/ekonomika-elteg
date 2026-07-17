@@ -1,8 +1,7 @@
 import { useEconStore } from "@/lib/econ-store";
-import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { NumberInput, PercentInput, fmtUsd, fmtPct, fmtNum, computedCls } from "./sheet-ui";
+import { NumberInput, PercentInput, fmtNum, computedCls } from "./sheet-ui";
 import { EQUIPMENT_CATEGORY_LABEL, type EquipmentCategory, type InstallTariffs } from "@/lib/econ-types";
 
 const SECTIONS: Array<{ key: keyof InstallTariffs; title: string }> = [
@@ -16,7 +15,6 @@ const CATEGORY_ORDER: EquipmentCategory[] = ["lift", "escalator", "travelator", 
 
 export function InstallationTariffsSheet() {
   const { state, setTariffRow, setProfitThreshold } = useEconStore();
-  const { isFull } = useAccessRole();
   const f = state.finance;
   const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
 
@@ -50,11 +48,7 @@ export function InstallationTariffsSheet() {
                     <TableRow key={r.label}>
                       <TableCell className="text-sm">{r.label}</TableCell>
                       <TableCell className="p-1 w-36">
-                        {isFull ? (
-                          <NumberInput value={r.usdNet} onChange={(v) => setTariffRow(sec.key, i, v)} />
-                        ) : (
-                          <div className={"text-right " + computedCls}>{fmtUsd(r.usdNet)}</div>
-                        )}
+                        <NumberInput value={r.usdNet} onChange={(v) => setTariffRow(sec.key, i, v)} />
                       </TableCell>
                       <TableCell className={"text-right " + computedCls}>$ {fmtNum(gross)}</TableCell>
                     </TableRow>
@@ -90,18 +84,10 @@ export function InstallationTariffsSheet() {
                     <TableRow key={cat}>
                       <TableCell className="text-sm font-medium">{EQUIPMENT_CATEGORY_LABEL[cat]}</TableCell>
                       <TableCell className="p-1 w-36">
-                        {isFull ? (
-                          <NumberInput value={th.minAmount} onChange={(v) => setProfitThreshold(cat, { minAmount: v })} />
-                        ) : (
-                          <div className={"text-right " + computedCls}>{fmtUsd(th.minAmount)}</div>
-                        )}
+                        <NumberInput value={th.minAmount} onChange={(v) => setProfitThreshold(cat, { minAmount: v })} />
                       </TableCell>
                       <TableCell className="p-1 w-36">
-                        {isFull ? (
-                          <PercentInput value={th.minMarginPct} onChange={(v) => setProfitThreshold(cat, { minMarginPct: v })} />
-                        ) : (
-                          <div className={"text-right " + computedCls}>{fmtPct(th.minMarginPct)}</div>
-                        )}
+                        <PercentInput value={th.minMarginPct} onChange={(v) => setProfitThreshold(cat, { minMarginPct: v })} />
                       </TableCell>
                     </TableRow>
                   );

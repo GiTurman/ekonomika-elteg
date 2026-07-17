@@ -13,9 +13,10 @@ import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, type A
 import { normalizeAppState } from "@/lib/econ-defaults";
 import { useEconStore } from "@/lib/econ-store";
 import { useAccessRole } from "@/components/AccessGate";
+import { logActivity } from "@/lib/activityLog";
 
 export function ArchiveDialog() {
-  const { isFull } = useAccessRole();
+  const { isFull, actorName, role } = useAccessRole();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ArchiveEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,9 +43,11 @@ export function ArchiveDialog() {
     if (!confirm("მიმდინარე ეკრანზე არსებული მონაცემები ჩანაცვლდება არქივიდან ამოღებული ვერსიით. გავაგრძელო?")) return;
     setBusyId(id);
     try {
+      const entryName = items.find((it) => it.id === id)?.name ?? id;
       const state = await loadArchiveEntry(id);
       setState((cur) => ({ ...normalizeAppState(state), pageVisibility: cur.pageVisibility }));
       setOpen(false);
+      logActivity(actorName, role, "არქივიდან პროექტის გახსნა", entryName);
     } catch (e) {
       console.error("[archive] load failed", e);
       alert("არქივის ჩანაწერის ჩატვირთვა ვერ მოხერხდა.");
@@ -57,8 +60,10 @@ export function ArchiveDialog() {
     if (!confirm("წავშალო არქივის ეს ჩანაწერი? ეს მოქმედება შეუქცევადია.")) return;
     setBusyId(id);
     try {
+      const entryName = items.find((it) => it.id === id)?.name ?? id;
       await deleteArchiveEntry(id);
       await refresh();
+      logActivity(actorName, role, "არქივის ჩანაწერის წაშლა", entryName);
     } catch (e) {
       console.error("[archive] delete failed", e);
     } finally {
@@ -69,10 +74,12 @@ export function ArchiveDialog() {
   const handleClearAll = async () => {
     if (items.length === 0) return;
     if (!confirm(`დარწმუნებული ხართ? წაიშლება არქივის ყველა ჩანაწერი (${items.length} ცალი). ეს მოქმედება შეუქცევადია.`)) return;
+    const count = items.length;
     setClearing(true);
     try {
       await clearArchive();
       await refresh();
+      logActivity(actorName, role, "არქივის სრული გასუფთავება", `${count} ჩანაწერი`);
     } catch (e) {
       console.error("[archive] clear failed", e);
       alert("არქივის გასუფთავება ვერ მოხერხდა.");

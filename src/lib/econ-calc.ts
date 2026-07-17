@@ -65,6 +65,7 @@ export interface ProjectReport {
   brokerTotal: number; // D66 — now derived from per-unit % applied at the final stage
   warrantyCost: number; // D67
   freeServiceCost: number; // D68
+  guaranteeAmountCost: number; // გარანტიის ჯამური თანხა (ისევე, როგორც freeServiceCost — ერთჯერადი პროექტის ჯამი)
   extrasTotal: number; // D69
   // Final
   priceNoVat: number; // D71
@@ -265,6 +266,8 @@ export function computeEconomics(state: AppState): FullEconomics {
   // ვანაწილებთ დანადგარებზე თანაბრად, რომ ჯამში ზუსტად პროექტის ჯამს გაუტოლდეს
   // (ისევე, როგორც მოგზაურობის ხარჯი perUnitUsd-ით ნაწილდება).
   const freeServicePerUnit = (f.monthlyServiceUsd * f.freeServiceMonths) / (units.length || 1);
+  // გარანტიის ჯამური თანხაც იმავე პრინციპით — ერთიანი ჯამი, თანაბრად განაწილებული.
+  const guaranteeAmountPerUnit = f.guaranteeAmountTotal / (units.length || 1);
 
   // ძველ (არქივირებულ) პროექტებს შესაძლოა არ ჰქონდეთ profitThresholds/category —
   // დაცვის მიზნით ნაგულისხმევებზე ვბრუნდებით, რომ გაანგარიშება არასდროს ავარდეს.
@@ -285,7 +288,8 @@ export function computeEconomics(state: AppState): FullEconomics {
       u.otherCost +
       u.grounding +
       u.factoryPrice * u.warrantyPct +
-      freeServicePerUnit;
+      freeServicePerUnit +
+      guaranteeAmountPerUnit;
     const J = H + I;
     const K = J * f.vatRate;
     const L = (((J + K) * f.guaranteePct) * f.guaranteeAnnualPct * f.guaranteeDays / 365) * (1 + f.vatRate);
@@ -370,6 +374,7 @@ export function computeEconomics(state: AppState): FullEconomics {
   const groundingTotal = units.reduce((s, u) => s + u.grounding, 0);
   const warrantyCost = units.reduce((s, u) => s + u.factoryPrice * u.warrantyPct, 0);
   const freeServiceCost = f.monthlyServiceUsd * f.freeServiceMonths;
+  const guaranteeAmountCost = f.guaranteeAmountTotal;
   // Broker commission no longer sits in the extras/cost stack — it's applied
   // multiplicatively at the very end (see rows above). Recomputed here from
   // each unit's own pre-broker final price (M) and % for the check row.
@@ -379,7 +384,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     const M = r.finalPrice / (1 + pct);
     return s + (r.finalPrice - M);
   }, 0);
-  const extrasTotal = contingency + fxRisk + otherTotal + groundingTotal + warrantyCost + freeServiceCost;
+  const extrasTotal = contingency + fxRisk + otherTotal + groundingTotal + warrantyCost + freeServiceCost + guaranteeAmountCost;
 
   const reportPriceNoVat = reportPriceNoExtras + extrasTotal;
   const reportVat = reportPriceNoVat * f.vatRate;
@@ -414,6 +419,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     brokerTotal,
     warrantyCost,
     freeServiceCost,
+    guaranteeAmountCost,
     extrasTotal,
     priceNoVat: reportPriceNoVat,
     vat: reportVat,

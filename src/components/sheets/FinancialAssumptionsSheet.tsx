@@ -18,12 +18,12 @@ export function FinancialAssumptionsSheet() {
   const refreshRates = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch("https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/");
+      const res = await fetch(`https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/?date=${f.rateDate}`);
       const data = await res.json();
       const list = data?.[0]?.currencies ?? [];
       const usd = list.find((c: any) => c.code === "USD");
       const eur = list.find((c: any) => c.code === "EUR");
-      const patch: any = { rateDate: new Date().toISOString().slice(0, 10) };
+      const patch: any = {}; // თარიღს არ ვცვლით — ვიღებთ კურსს ზუსტად იმ თარიღისთვის, რაც უკვე მითითებულია
       if (usd) patch.usdRate = Number(usd.rate);
       if (eur) patch.eurRate = Number(eur.rate);
       updateFinance(patch);
@@ -188,6 +188,12 @@ export function FinancialAssumptionsSheet() {
             <NumberInput value={f.monthlyServiceUsd} onChange={(v) => updateFinance({ monthlyServiceUsd: v })} /></label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">უფასო სერვისის ვადა (თვე)</span>
             <NumberInput value={f.freeServiceMonths} onChange={(v) => updateFinance({ freeServiceMonths: v })} /></label>
+          <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის თანხა, ჯამურად (USD)</span>
+            <NumberInput value={f.guaranteeAmountTotal} onChange={(v) => updateFinance({ guaranteeAmountTotal: v })} /></label>
+          <p className="md:col-span-2 text-xs text-muted-foreground">
+            „თვიური სერვისი" და „გარანტიის თანხა" ორივე შეყვანილია პროექტის ჯამურ თანხად და ავტომატურად თანაბრად
+            ნაწილდება ყველა დანადგარზე (ჯამში ზუსტად ამ თანხას უტოლდება).
+          </p>
         </CardContent>
       </Card>
 

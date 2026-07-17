@@ -1,12 +1,16 @@
 import { useEconStore } from "@/lib/econ-store";
+import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumberInput, PercentInput, TextInput, fmtUsd, computedCls } from "./sheet-ui";
 import { allocateProjectCosts } from "@/lib/econ-calc";
-import { EQUIPMENT_CATEGORY_LABEL, type EquipmentCategory } from "@/lib/econ-types";
+import { EQUIPMENT_CATEGORY_LABEL, PROJECT_STATUS_LABEL, type EquipmentCategory, type ProjectStatus } from "@/lib/econ-types";
 import { Plus, Trash2 } from "lucide-react";
+import { logActivity } from "@/lib/activityLog";
+
+const PROJECT_STATUS_ORDER: ProjectStatus[] = ["in_progress", "won", "lost", "stalled"];
 
 const UNIT_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string; kind: "text" | "num" }> = [
   { key: "id", label: "#", kind: "text" },
@@ -52,9 +56,13 @@ const UNIT_RATE_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label:
 
 export function ProjectDataSheet() {
   const { state, updateProject, updateUnit, addUnit, removeUnit } = useEconStore();
+  const { isFull, actorName, role } = useAccessRole();
   const p = state.project;
   const t = p.travel;
   const alloc = allocateProjectCosts(state);
+  // დაწყების თარიღს პარტნიორი ავსებს პირველად; ერთხელ შევსების შემდეგ
+  // მის შესწორებას მხოლოდ ფინანსები ახერხებს.
+  const canEditStartDate = isFull || !p.startDate;
 
   const setTravel = (patch: Partial<typeof t>) =>
     updateProject({ travel: { ...t, ...patch } });
@@ -63,6 +71,39 @@ export function ProjectDataSheet() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader><CardTitle>0. შიდა ინფო</CardTitle></CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2">
+          <label className="grid gap-1"><span className="text-xs text-muted-foreground">მომუშავე პირის სახელი და გვარი</span>
+          <TextInput value={p.responsiblePerson} onChange={(v) => updateProject({ responsiblePerson: v })} /></label>
+          <label className="grid gap-1"><span className="text-xs text-muted-foreground">საიდან მოვიდა პროექტი</span>
+          <TextInput value={p.leadSource} onChange={(v) => updateProject({ leadSource: v })} /></label>
+          <label className="grid gap-1">
+            <span className="text-xs text-muted-foreground">
+              პროექტზე მუშაობის დაწყების თარიღი{!canEditStartDate && " (კორექტირება — მხოლოდ ფინანსები)"}
+            </span>
+            {canEditStartDate ? (
+              <TextInput value={p.startDate} onChange={(v) => updateProject({ startDate: v })} placeholder="წწწწ-თთ-დდ" />
+            ) : (
+              <div className={"h-9 flex items-center px-3 rounded-md border bg-muted/30 " + computedCls}>{p.startDate}</div>
+            )}
+          </label>
+          <label className="grid gap-1"><span className="text-xs text-muted-foreground">პროექტის დახურვის თარიღი</span>
+          <TextInput value={p.closeDate} onChange={(v) => updateProject({ closeDate: v })} placeholder="წწწწ-თთ-დდ" /></label>
+          <label className="grid gap-1 md:col-span-2"><span className="text-xs text-muted-foreground">პროექტის სტატუსი</span>
+            <Select value={p.status} onValueChange={(v) => {
+              updateProject({ status: v as ProjectStatus });
+              logActivity(actorName, role, "პროექტის სტატუსის შეცვლა", `${p.projectName || "პროექტი"} → ${PROJECT_STATUS_LABEL[v as ProjectStatus]}`);
+            }}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PROJECT_STATUS_ORDER.map((s) => <SelectItem key={s} value={s}>{PROJECT_STATUS_LABEL[s]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </label>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader><CardTitle>1. ზოგადი ინფორმაცია</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
@@ -160,6 +201,19 @@ export function ProjectDataSheet() {
                   </TableCell>
                 </TableRow>
               ))}
+              <TableRow className="bg-muted/40 font-semibold">
+                <TableCell className="p-1">ჯამი</TableCell>
+                {UNIT_FINANCIAL_COLS.map((c) => (
+                  <TableCell key={c.key} className={"p-1 text-right " + computedCls}>
+                    {fmtUsd(p.units.reduce((s, u) => s + (Number(u[c.key]) || 0), 0))}
+                  </TableCell>
+                ))}
+                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.bank.get(u.id) ?? 0), 0))}</TableCell>
+                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.intTransport.get(u.id) ?? 0), 0))}</TableCell>
+                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.terminal.get(u.id) ?? 0), 0))}</TableCell>
+                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.localTransport.get(u.id) ?? 0), 0))}</TableCell>
+                <TableCell className="p-1" />
+              </TableRow>
             </TableBody>
           </Table>
           <p className="text-xs text-muted-foreground mt-2">

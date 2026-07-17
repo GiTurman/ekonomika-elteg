@@ -10,6 +10,7 @@
 
 import * as XLSX from "xlsx";
 import type { AppState } from "./econ-types";
+import { PROJECT_STATUS_LABEL } from "./econ-types";
 import { computeEconomics, allocateProjectCosts } from "./econ-calc";
 
 const FMT_USD = '"$"#,##0.00';
@@ -48,6 +49,13 @@ export function exportToXlsx(state: AppState) {
   // ---------- Sheet 1: Project data ----------
   const s1: any[][] = [];
   s1.push([`${p.projectName} — პროექტის მონაცემები`]);
+  s1.push([]);
+  s1.push(["0. შიდა ინფო"]);
+  s1.push(["მომუშავე პირი", p.responsiblePerson]);
+  s1.push(["საიდან მოვიდა პროექტი", p.leadSource]);
+  s1.push(["დაწყების თარიღი", p.startDate]);
+  s1.push(["დახურვის თარიღი", p.closeDate]);
+  s1.push(["სტატუსი", PROJECT_STATUS_LABEL[p.status]]);
   s1.push([]);
   s1.push(["1. ზოგადი ინფორმაცია"]);
   s1.push(["პროექტის დასახელება", p.projectName]);
@@ -118,6 +126,7 @@ export function exportToXlsx(state: AppState) {
   s2.push(["გარანტიის %", "დანადგარის მიხედვით"]);
   const monthlyServiceRow2 = s2.length; s2.push(["თვიური სერვისი USD", f.monthlyServiceUsd]);
   s2.push(["უფასო სერვისი, თვე", f.freeServiceMonths]);
+  const guaranteeAmountRow2 = s2.length; s2.push(["გარანტიის თანხა, ჯამურად USD", f.guaranteeAmountTotal]);
   s2.push([]);
   const guarPctRow2 = s2.length; s2.push(["საბანკო გარანტიის %", f.guaranteePct]);
   s2.push(["დღეები", f.guaranteeDays]);
@@ -141,6 +150,7 @@ export function exportToXlsx(state: AppState) {
   fmtCol(ws2, 1, perDiemRowStart2, perDiemRowEnd2, FMT_GEL);
   fmtCol(ws2, 1, totalsRowStart2, totalsRowEnd2, FMT_USD); // project-level purchase totals
   fmtCol(ws2, 1, monthlyServiceRow2, monthlyServiceRow2, FMT_USD);
+  fmtCol(ws2, 1, guaranteeAmountRow2, guaranteeAmountRow2, FMT_USD);
   fmtCol(ws2, 1, guarPctRow2, guarPctRow2, FMT_PCT);
   fmtCol(ws2, 1, guarAnnualRow2, guarAnnualRow2, FMT_PCT);
   fmtCol(ws2, 1, unitsRowStart2, unitsRowEnd2, FMT_USD);  // factory price

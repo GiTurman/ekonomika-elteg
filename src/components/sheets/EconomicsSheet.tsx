@@ -154,6 +154,7 @@ export function EconomicsSheet() {
             ["საშუამავლო საკომისიო", eco.report.brokerTotal],
             ["გარანტიის ხარჯი", eco.report.warrantyCost],
             ["უფასო სერვისი", eco.report.freeServiceCost],
+            ["გარანტიის თანხა (ჯამურად)", eco.report.guaranteeAmountCost],
             ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
           ]}/>
           {isFull ? (

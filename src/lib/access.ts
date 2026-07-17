@@ -24,3 +24,14 @@ export function storeRole(role: AccessRole): void {
 export function clearStoredRole(): void {
   window.localStorage.removeItem(STORAGE_KEY);
 }
+
+const NAME_KEY = "elteg-actor-name";
+
+export function getStoredName(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(NAME_KEY);
+}
+
+export function storeName(name: string): void {
+  window.localStorage.setItem(NAME_KEY, name);
+}

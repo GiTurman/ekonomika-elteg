@@ -19,6 +19,8 @@ import { useAccessRole } from "@/components/AccessGate";
 import { ArchiveDialog } from "@/components/ArchiveDialog";
 import { DataRequestDialog } from "@/components/DataRequestDialog";
 import { saveToArchive, findArchiveByName, updateArchiveEntry } from "@/lib/archive";
+import { logActivity } from "@/lib/activityLog";
+import { LogSheet } from "@/components/sheets/LogSheet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,7 +34,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { state, loaded, saving, load, reset, setPageVisibility } = useEconStore();
-  const { isFull, logout } = useAccessRole();
+  const { isFull, logout, actorName, role } = useAccessRole();
   const [finishing, setFinishing] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
@@ -50,10 +52,14 @@ function Index() {
   const salesMarginPct = eco.totals.finalPrice ? eco.report.markupTotal / eco.totals.finalPrice : 0;
   const headlinePrice = isFull ? eco.report.priceNoVat : eco.totals.finalPrice;
   const headlinePriceLabel = isFull ? "ფასი დღგ-ს გარეშე" : "საბოლოო ფასი (დღგ-ს ჩათვლით)";
+  const showInputTab = isFull || state.pageVisibility.input;
+  const showEconomicsTab = isFull || state.pageVisibility.economics;
+  const showPaymentTab = isFull || state.pageVisibility.payment;
   const showTariffsTab = isFull || state.pageVisibility.tariffs;
   const showAnalyticsTab = isFull || state.pageVisibility.analytics;
-  const visibleTabCount = 3 + (showTariffsTab ? 1 : 0) + (showAnalyticsTab ? 1 : 0);
-  const tabsGridColsClass = visibleTabCount >= 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : "md:grid-cols-3";
+  const visibleTabCount = [showInputTab, showEconomicsTab, showPaymentTab, showTariffsTab, showAnalyticsTab].filter(Boolean).length + (isFull ? 1 : 0);
+  const tabsGridColsClass = visibleTabCount >= 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+  const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : "analytics";
 
   const handleFinish = async () => {
     const name = (state.project.projectName || "პროექტი") + " — " + new Date().toLocaleDateString("ka-GE");
@@ -71,13 +77,16 @@ function Index() {
         }
         await updateArchiveEntry(existing.id, state);
         setSavedMsg("გადაწერილია არქივში: " + name);
+        logActivity(actorName, role, "პროექტის გადაწერა არქივში", name);
       } else {
         await saveToArchive(name, state);
         setSavedMsg("შენახულია არქივში: " + name);
+        logActivity(actorName, role, "პროექტის შენახვა არქივში", name);
       }
       const startNew = confirm("განფასება შენახულია არქივში. დავიწყოთ ახალი, ცარიელი განფასება?");
       if (startNew) {
         reset();
+        logActivity(actorName, role, "ახალი, ცარიელი პროექტის დაწყება");
       }
     } catch (e) {
       console.error("[archive] save failed", e);
@@ -126,17 +135,30 @@ function Index() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="input">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className={"grid h-auto grid-cols-2 " + tabsGridColsClass}>
-            <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>
-            <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>
-            <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>
+            {showInputTab && <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>}
+            {showEconomicsTab && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
+            {showPaymentTab && <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>}
             {showTariffsTab && <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>}
             {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
+            {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
           </TabsList>
           {isFull && (
             <div className="container mx-auto px-4 pt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Partner-საც უჩანდეს:</span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <Checkbox checked={state.pageVisibility.input} onCheckedChange={(v) => setPageVisibility({ input: !!v })} />
+                შესატანი მონაცემები
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <Checkbox checked={state.pageVisibility.economics} onCheckedChange={(v) => setPageVisibility({ economics: !!v })} />
+                ეკონომიკა
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <Checkbox checked={state.pageVisibility.payment} onCheckedChange={(v) => setPageVisibility({ payment: !!v })} />
+                გადახდის გრაფიკი
+              </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <Checkbox checked={state.pageVisibility.tariffs} onCheckedChange={(v) => setPageVisibility({ tariffs: !!v })} />
                 მონტაჟის ტარიფები
@@ -148,17 +170,20 @@ function Index() {
             </div>
           )}
           <div className="mt-4">
-            <TabsContent value="input" className="space-y-6">
-              <ProjectDataSheet />
-              <div className="border-t pt-6">
-                <h2 className="text-base font-semibold mb-4">ფინანსური დაშვებები</h2>
-                <FinancialAssumptionsSheet />
-              </div>
-            </TabsContent>
-            <TabsContent value="economics"><EconomicsSheet /></TabsContent>
-            <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>
+            {showInputTab && (
+              <TabsContent value="input" className="space-y-6">
+                <ProjectDataSheet />
+                <div className="border-t pt-6">
+                  <h2 className="text-base font-semibold mb-4">ფინანსური დაშვებები</h2>
+                  <FinancialAssumptionsSheet />
+                </div>
+              </TabsContent>
+            )}
+            {showEconomicsTab && <TabsContent value="economics"><EconomicsSheet /></TabsContent>}
+            {showPaymentTab && <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>}
             {showTariffsTab && <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>}
             {showAnalyticsTab && <TabsContent value="analytics"><AnalyticsSheet /></TabsContent>}
+            {isFull && <TabsContent value="log"><LogSheet /></TabsContent>}
           </div>
         </Tabs>
       </main>

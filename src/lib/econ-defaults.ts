@@ -62,6 +62,11 @@ export const defaultProfitThresholds: Record<EquipmentCategory, ProfitThreshold>
 
 export const defaultAppState: AppState = {
   project: {
+    responsiblePerson: "",
+    leadSource: "",
+    startDate: "",
+    closeDate: "",
+    status: "in_progress",
     projectName: "GTB დიდი დიღომი",
     location: "თბილისი",
     buildingType: "საცხოვრებელი კომპლექსი",
@@ -97,6 +102,7 @@ export const defaultAppState: AppState = {
     warrantyYears: 1,
     monthlyServiceUsd: 0,
     freeServiceMonths: 0,
+    guaranteeAmountTotal: 0,
     guaranteePct: 0,
     guaranteeDays: 0,
     guaranteeAnnualPct: 0,
@@ -126,7 +132,7 @@ export const defaultAppState: AppState = {
   },
   tariffs: defaultTariffs,
   profitThresholds: defaultProfitThresholds,
-  pageVisibility: { tariffs: false, analytics: false },
+  pageVisibility: { input: true, economics: true, payment: true, tariffs: false, analytics: false },
 };
 
 export const emptyUnit = mkUnit;
@@ -226,6 +232,11 @@ export function normalizeAppState(loaded: Partial<AppState>): AppState {
 export function blankAppState(): AppState {
   return {
     project: {
+      responsiblePerson: "",
+      leadSource: "",
+      startDate: "",
+      closeDate: "",
+      status: "in_progress",
       projectName: "",
       location: "",
       buildingType: "",

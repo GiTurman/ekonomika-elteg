@@ -57,7 +57,15 @@ export interface TravelGroup {
   houseRentTotal: number;                 // "house" რეჟიმის თვის ჯამური ღირებულება (₾)
 }
 
+export type ProjectStatus = "in_progress" | "won" | "lost" | "stalled";
+
 export interface ProjectData {
+  // 0. შიდა ინფო
+  responsiblePerson: string;   // მომუშავე პირის სახელი და გვარი
+  leadSource: string;          // საიდან მოვიდა პროექტი
+  startDate: string;           // მუშაობის დაწყების თარიღი — ავსებს Partner, კორექტირება მხოლოდ Finance-ს შეუძლია
+  closeDate: string;           // პროექტის დახურვის თარიღი
+  status: ProjectStatus;       // პროექტის სტატუსი
   projectName: string;
   location: string;
   buildingType: string;
@@ -98,6 +106,7 @@ export interface FinancialAssumptions {
   warrantyYears: number;
   monthlyServiceUsd: number;
   freeServiceMonths: number;
+  guaranteeAmountTotal: number; // გარანტიის ჯამური თანხა (USD) — ერთიანად შეყვანილი, თანაბრად ნაწილდება დანადგარებზე
   // Bank guarantee
   guaranteePct: number;       // % of full amount
   guaranteeDays: number;
@@ -127,6 +136,13 @@ export interface PaymentSchedule {
   scenarioB: PaymentScenario;
 }
 
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  in_progress: "პროცესში",
+  won: "მოგებული",
+  lost: "წაგებული",
+  stalled: "გაჩერებული",
+};
+
 export interface TariffRow {
   label: string;
   usdNet: number; // მხოლოდ დოლარი — კორექტირებადი
@@ -143,9 +159,14 @@ export interface ProfitThreshold {
   minMarginPct: number; // მინიმალური მოგების მარჟა, fraction (0..1)
 }
 
-// Finance-ს კონტროლი — რომელი, ჩვეულებრივ Finance-ისთვის დაცული, გვერდები
-// უჩანდეს Partner-საც. ცვლილება მყისიერია, კოდის რედაქტირება არ სჭირდება.
+// Finance-ს კონტროლი — რომელი გვერდები უჩანდეს Partner-საც. ცვლილება მყისიერია,
+// კოდის რედაქტირება არ სჭირდება. თუ გვერდი Partner-ისთვის ხილვადია, მას იმავე
+// რედაქტირების უფლებაც აქვს, რაც Finance-ს (გამონაკლისია გადახდის გრაფიკის
+// ტრანშები/გასავლები, რომლებიც ცალკე, ცალსახად Finance-ის კუთვნილებაა).
 export interface PageVisibility {
+  input: boolean;     // "შესატანი მონაცემები"
+  economics: boolean; // "ეკონომიკა"
+  payment: boolean;   // "გადახდის გრაფიკი"
   tariffs: boolean;   // "მონტაჟის ტარიფები"
   analytics: boolean; // "ანალიტიკა"
 }
