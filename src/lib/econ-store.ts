@@ -219,14 +219,14 @@ export const useEconStore = create<StoreShape>((set, get) => ({
         .eq("id", STATE_ID)
         .maybeSingle();
       if (error) throw error;
-      if (data?.data) {
-        set({ state: normalizeAppState(data.data as Partial<AppState>), loaded: true });
-      } else {
-        set({ loaded: true });
-      }
+      // ყოველ შესვლაზე ცარიელი, შეუვსებელი ფორმა იხსნება — არასდროს იტვირთება წინა
+      // (შესაძლოა სხვისი) დაუმთავრებელი ნამუშევარი. მხოლოდ Finance-ის გვერდების
+      // ხედვადობის პარამეტრი (pageVisibility) გლობალურ პარამეტრად ნარჩუნდება.
+      const savedVisibility = data?.data ? normalizeAppState(data.data as Partial<AppState>).pageVisibility : undefined;
+      set({ state: { ...blankAppState(), ...(savedVisibility ? { pageVisibility: savedVisibility } : {}) }, loaded: true });
     } catch (e) {
       console.error("[econ-store] load failed", e);
-      set({ loaded: true });
+      set({ state: blankAppState(), loaded: true });
     }
   },
 
