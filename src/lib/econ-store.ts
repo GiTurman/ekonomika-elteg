@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold, PaymentTranche, PaymentExpenseItem } from "./econ-types";
-import { defaultAppState, emptyUnit, blankAppState, normalizeAppState } from "./econ-defaults";
+import { defaultAppState, emptyUnit, blankAppState } from "./econ-defaults";
 import { suggestPaymentExpenses } from "./econ-calc";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -212,22 +212,10 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   },
 
   load: async () => {
-    try {
-      const { data, error } = await supabase
-        .from("app_state")
-        .select("data")
-        .eq("id", STATE_ID)
-        .maybeSingle();
-      if (error) throw error;
-      // ყოველ შესვლაზე ცარიელი, შეუვსებელი ფორმა იხსნება — არასდროს იტვირთება წინა
-      // (შესაძლოა სხვისი) დაუმთავრებელი ნამუშევარი. მხოლოდ Finance-ის გვერდების
-      // ხედვადობის პარამეტრი (pageVisibility) გლობალურ პარამეტრად ნარჩუნდება.
-      const savedVisibility = data?.data ? normalizeAppState(data.data as Partial<AppState>).pageVisibility : undefined;
-      set({ state: { ...blankAppState(), ...(savedVisibility ? { pageVisibility: savedVisibility } : {}) }, loaded: true });
-    } catch (e) {
-      console.error("[econ-store] load failed", e);
-      set({ state: blankAppState(), loaded: true });
-    }
+    // ყოველ შესვლაზე სრულიად ცარიელი, შეუვსებელი ფორმა იხსნება — არაფერი
+    // (მათ შორის გვერდების ხედვადობის პარამეტრიც) აღარ ნარჩუნდება წინა
+    // შესვლიდან. საერთო "ცოცხალი" მდგომარეობა Supabase-დან საერთოდ აღარ იტვირთება.
+    set({ state: blankAppState(), loaded: true });
   },
 
   save: async () => {
