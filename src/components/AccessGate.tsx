@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, type AppUser, type AccessRole, type UserPageVisibility } from "@/lib/access";
+import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, getUserById, type AppUser, type AccessRole, type UserPageVisibility } from "@/lib/access";
 
 interface AccessContextShape {
   userId: string;
@@ -23,8 +23,23 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setUser(getStoredUser());
+    const cached = getStoredUser();
+    setUser(cached);
     setReady(true);
+    if (cached) {
+      // ქეშირებული სესია მაშინვე გამოისახება (სწრაფი, მოციმციმების გარეშე),
+      // ფონში კი ბაზიდან ახლდება — თუ Finance-მ როლი/ხედვები/სახელი შეცვალა,
+      // ან მომხმარებელი წაშალა, ეს დაუყოვნებლივ აისახება ხელახლა შესვლის გარეშე.
+      getUserById(cached.id).then((fresh) => {
+        if (fresh) {
+          storeUser(fresh);
+          setUser(fresh);
+        } else {
+          clearStoredUser();
+          setUser(null);
+        }
+      });
+    }
   }, []);
 
   const logout = () => {

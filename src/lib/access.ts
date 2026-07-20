@@ -49,6 +49,18 @@ export async function checkAccessCode(code: string): Promise<AppUser | null> {
   return data ? rowToUser(data) : null;
 }
 
+// სესიის ქეშირებული მომხმარებლის ფონურად განახლებისთვის — რომ Finance-ის მიერ
+// შეცვლილი როლი/ხედვები/სახელი დაუყოვნებლივ ეცნობოს უკვე შესულ მომხმარებელს,
+// კოდის ხელახლა შეყვანის გარეშე.
+export async function getUserById(id: string): Promise<AppUser | null> {
+  const { data, error } = await supabase.from("app_users").select("*").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("[access] refresh failed", error);
+    return null;
+  }
+  return data ? rowToUser(data) : null;
+}
+
 export async function listUsers(): Promise<AppUser[]> {
   const { data, error } = await supabase.from("app_users").select("*").order("created_at", { ascending: true });
   if (error) throw error;
