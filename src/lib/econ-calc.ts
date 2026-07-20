@@ -267,7 +267,8 @@ export function computeEconomics(state: AppState): FullEconomics {
   // (ისევე, როგორც მოგზაურობის ხარჯი perUnitUsd-ით ნაწილდება).
   const freeServicePerUnit = (f.monthlyServiceUsd * f.freeServiceMonths) / (units.length || 1);
   // გარანტიის ჯამური თანხაც იმავე პრინციპით — ერთიანი ჯამი, თანაბრად განაწილებული.
-  const guaranteeAmountPerUnit = f.guaranteeAmountTotal / (units.length || 1);
+  // ?? 0 დაცვაა ძველი (არქივირებული) პროექტებისთვის, რომლებსაც ეს ველი ჯერ არ ჰქონდათ.
+  const guaranteeAmountPerUnit = (f.guaranteeAmountTotal ?? 0) / (units.length || 1);
 
   // ძველ (არქივირებულ) პროექტებს შესაძლოა არ ჰქონდეთ profitThresholds/category —
   // დაცვის მიზნით ნაგულისხმევებზე ვბრუნდებით, რომ გაანგარიშება არასდროს ავარდეს.
@@ -374,7 +375,7 @@ export function computeEconomics(state: AppState): FullEconomics {
   const groundingTotal = units.reduce((s, u) => s + u.grounding, 0);
   const warrantyCost = units.reduce((s, u) => s + u.factoryPrice * u.warrantyPct, 0);
   const freeServiceCost = f.monthlyServiceUsd * f.freeServiceMonths;
-  const guaranteeAmountCost = f.guaranteeAmountTotal;
+  const guaranteeAmountCost = f.guaranteeAmountTotal ?? 0;
   // Broker commission no longer sits in the extras/cost stack — it's applied
   // multiplicatively at the very end (see rows above). Recomputed here from
   // each unit's own pre-broker final price (M) and % for the check row.

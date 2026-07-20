@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listArchiveFull, type ArchiveEntryFull } from "@/lib/archive";
 import { computeEconomics } from "@/lib/econ-calc";
+import { normalizeAppState } from "@/lib/econ-defaults";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -128,7 +129,7 @@ export function AnalyticsSheet() {
     for (const entry of entries) {
       let eco;
       try {
-        eco = computeEconomics(entry.data);
+        eco = computeEconomics(normalizeAppState(entry.data));
       } catch (e) {
         console.error("[analytics] compute failed for", entry.id, e);
         continue;
