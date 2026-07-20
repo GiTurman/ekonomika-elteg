@@ -8,6 +8,7 @@ export interface UserPageVisibility {
   payment: boolean;
   tariffs: boolean;
   analytics: boolean;
+  comparison: boolean;
 }
 
 export interface AppUser {
@@ -30,6 +31,7 @@ function rowToUser(row: any): AppUser {
       payment: row.page_payment,
       tariffs: row.page_tariffs,
       analytics: row.page_analytics,
+      comparison: row.page_comparison,
     },
   };
 }
@@ -57,7 +59,7 @@ export async function createUser(name: string, code: string, role: AccessRole): 
   const { error } = await supabase.from("app_users").insert({
     name, code, role,
     page_input: true, page_economics: true, page_payment: true,
-    page_tariffs: false, page_analytics: false,
+    page_tariffs: false, page_analytics: false, page_comparison: true,
   });
   if (error) throw error;
 }
@@ -72,6 +74,7 @@ export async function updateUser(id: string, patch: Partial<{ name: string; code
   if (patch.payment !== undefined) row.page_payment = patch.payment;
   if (patch.tariffs !== undefined) row.page_tariffs = patch.tariffs;
   if (patch.analytics !== undefined) row.page_analytics = patch.analytics;
+  if (patch.comparison !== undefined) row.page_comparison = patch.comparison;
   const { error } = await supabase.from("app_users").update(row).eq("id", id);
   if (error) throw error;
 }

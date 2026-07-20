@@ -48,6 +48,7 @@ export type Database = {
           id: string
           name: string
           page_analytics: boolean
+          page_comparison: boolean
           page_economics: boolean
           page_input: boolean
           page_payment: boolean
@@ -60,6 +61,7 @@ export type Database = {
           id?: string
           name: string
           page_analytics?: boolean
+          page_comparison?: boolean
           page_economics?: boolean
           page_input?: boolean
           page_payment?: boolean
@@ -72,6 +74,7 @@ export type Database = {
           id?: string
           name?: string
           page_analytics?: boolean
+          page_comparison?: boolean
           page_economics?: boolean
           page_input?: boolean
           page_payment?: boolean

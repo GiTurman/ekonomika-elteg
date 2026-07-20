@@ -12,6 +12,7 @@ import { EconomicsSheet } from "@/components/sheets/EconomicsSheet";
 import { PaymentScheduleSheet } from "@/components/sheets/PaymentScheduleSheet";
 import { InstallationTariffsSheet } from "@/components/sheets/InstallationTariffsSheet";
 import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
+import { ComparisonSheet } from "@/components/sheets/ComparisonSheet";
 import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye } from "lucide-react";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
@@ -56,9 +57,10 @@ function Index() {
   const showPaymentTab = isFull || pageVisibility.payment;
   const showTariffsTab = isFull || pageVisibility.tariffs;
   const showAnalyticsTab = isFull || pageVisibility.analytics;
-  const visibleTabCount = [showInputTab, showEconomicsTab, showPaymentTab, showTariffsTab, showAnalyticsTab].filter(Boolean).length + (isFull ? 1 : 0);
-  const tabsGridColsClass = visibleTabCount >= 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
-  const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : "analytics";
+  const showComparisonTab = isFull || pageVisibility.comparison;
+  const visibleTabCount = [showInputTab, showEconomicsTab, showPaymentTab, showTariffsTab, showAnalyticsTab, showComparisonTab].filter(Boolean).length + (isFull ? 1 : 0);
+  const tabsGridColsClass = visibleTabCount >= 7 ? "md:grid-cols-7" : visibleTabCount === 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+  const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : showComparisonTab ? "comparison" : "analytics";
 
   const handleFinish = async () => {
     const name = (state.project.projectName || "პროექტი") + " — " + new Date().toLocaleDateString("ka-GE");
@@ -138,6 +140,7 @@ function Index() {
           <TabsList className={"grid h-auto grid-cols-2 " + tabsGridColsClass}>
             {showInputTab && <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>}
             {showEconomicsTab && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
+            {showComparisonTab && <TabsTrigger value="comparison">შედარება</TabsTrigger>}
             {showPaymentTab && <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>}
             {showTariffsTab && <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>}
             {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
@@ -159,6 +162,7 @@ function Index() {
               </TabsContent>
             )}
             {showEconomicsTab && <TabsContent value="economics"><EconomicsSheet /></TabsContent>}
+            {showComparisonTab && <TabsContent value="comparison"><ComparisonSheet /></TabsContent>}
             {showPaymentTab && <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>}
             {showTariffsTab && <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>}
             {showAnalyticsTab && <TabsContent value="analytics"><AnalyticsSheet /></TabsContent>}

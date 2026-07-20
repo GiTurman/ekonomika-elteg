@@ -12,9 +12,10 @@ import { Loader2, RefreshCw, Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 
 const ROLE_LABEL: Record<string, string> = { full: "ფინანსები", partial: "პარტნიორი" };
-const PAGE_COLS: Array<{ key: "input" | "economics" | "payment" | "tariffs" | "analytics"; label: string }> = [
+const PAGE_COLS: Array<{ key: "input" | "economics" | "payment" | "tariffs" | "analytics" | "comparison"; label: string }> = [
   { key: "input", label: "შესატანი" },
   { key: "economics", label: "ეკონომიკა" },
+  { key: "comparison", label: "შედარება" },
   { key: "payment", label: "გადახდები" },
   { key: "tariffs", label: "ტარიფები" },
   { key: "analytics", label: "ანალიტიკა" },
@@ -70,6 +71,7 @@ function UsersPanel() {
           payment: patch.payment ?? x.pageVisibility.payment,
           tariffs: patch.tariffs ?? x.pageVisibility.tariffs,
           analytics: patch.analytics ?? x.pageVisibility.analytics,
+          comparison: patch.comparison ?? x.pageVisibility.comparison,
         },
       } : x)));
       if (logNote) logActivity(actorName, myRole, logNote, u.name);
