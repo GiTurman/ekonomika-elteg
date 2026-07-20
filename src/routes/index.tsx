@@ -13,7 +13,6 @@ import { PaymentScheduleSheet } from "@/components/sheets/PaymentScheduleSheet";
 import { InstallationTariffsSheet } from "@/components/sheets/InstallationTariffsSheet";
 import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
 import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
 import { ArchiveDialog } from "@/components/ArchiveDialog";
@@ -33,8 +32,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { state, loaded, saving, load, reset, setPageVisibility } = useEconStore();
-  const { isFull, logout, actorName, role } = useAccessRole();
+  const { state, loaded, saving, load, reset } = useEconStore();
+  const { isFull, logout, actorName, role, pageVisibility } = useAccessRole();
   const [finishing, setFinishing] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
@@ -52,11 +51,11 @@ function Index() {
   const salesMarginPct = eco.totals.finalPrice ? eco.report.markupTotal / eco.totals.finalPrice : 0;
   const headlinePrice = isFull ? eco.report.priceNoVat : eco.totals.finalPrice;
   const headlinePriceLabel = isFull ? "ფასი დღგ-ს გარეშე" : "საბოლოო ფასი (დღგ-ს ჩათვლით)";
-  const showInputTab = isFull || state.pageVisibility.input;
-  const showEconomicsTab = isFull || state.pageVisibility.economics;
-  const showPaymentTab = isFull || state.pageVisibility.payment;
-  const showTariffsTab = isFull || state.pageVisibility.tariffs;
-  const showAnalyticsTab = isFull || state.pageVisibility.analytics;
+  const showInputTab = isFull || pageVisibility.input;
+  const showEconomicsTab = isFull || pageVisibility.economics;
+  const showPaymentTab = isFull || pageVisibility.payment;
+  const showTariffsTab = isFull || pageVisibility.tariffs;
+  const showAnalyticsTab = isFull || pageVisibility.analytics;
   const visibleTabCount = [showInputTab, showEconomicsTab, showPaymentTab, showTariffsTab, showAnalyticsTab].filter(Boolean).length + (isFull ? 1 : 0);
   const tabsGridColsClass = visibleTabCount >= 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
   const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : "analytics";
@@ -145,28 +144,8 @@ function Index() {
             {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
           </TabsList>
           {isFull && (
-            <div className="container mx-auto px-4 pt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Partner-საც უჩანდეს:</span>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <Checkbox checked={state.pageVisibility.input} onCheckedChange={(v) => setPageVisibility({ input: !!v })} />
-                შესატანი მონაცემები
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <Checkbox checked={state.pageVisibility.economics} onCheckedChange={(v) => setPageVisibility({ economics: !!v })} />
-                ეკონომიკა
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <Checkbox checked={state.pageVisibility.payment} onCheckedChange={(v) => setPageVisibility({ payment: !!v })} />
-                გადახდის გრაფიკი
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <Checkbox checked={state.pageVisibility.tariffs} onCheckedChange={(v) => setPageVisibility({ tariffs: !!v })} />
-                მონტაჟის ტარიფები
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <Checkbox checked={state.pageVisibility.analytics} onCheckedChange={(v) => setPageVisibility({ analytics: !!v })} />
-                ანალიტიკა
-              </label>
+            <div className="container mx-auto px-4 pt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Eye className="h-3.5 w-3.5" /> მომხმარებლების გვერდების ხედვები და კოდები იმართება „ლოგი" ტაბზე.
             </div>
           )}
           <div className="mt-4">

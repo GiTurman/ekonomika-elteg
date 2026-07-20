@@ -41,6 +41,45 @@ export type Database = {
         }
         Relationships: []
       }
+      app_users: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          page_analytics: boolean
+          page_economics: boolean
+          page_input: boolean
+          page_payment: boolean
+          page_tariffs: boolean
+          role: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          page_analytics?: boolean
+          page_economics?: boolean
+          page_input?: boolean
+          page_payment?: boolean
+          page_tariffs?: boolean
+          role: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          page_analytics?: boolean
+          page_economics?: boolean
+          page_input?: boolean
+          page_payment?: boolean
+          page_tariffs?: boolean
+          role?: string
+        }
+        Relationships: []
+      }
       app_backups: {
         Row: {
           created_at: string

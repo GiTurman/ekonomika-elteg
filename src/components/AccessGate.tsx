@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { checkAccessCode, getStoredRole, storeRole, clearStoredRole, getStoredName, storeName, type AccessRole } from "@/lib/access";
+import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, type AppUser, type AccessRole, type UserPageVisibility } from "@/lib/access";
 
 interface AccessContextShape {
+  userId: string;
   role: AccessRole;
   isFull: boolean;
   actorName: string;
+  pageVisibility: UserPageVisibility;
   logout: () => void;
 }
 
@@ -17,50 +19,50 @@ export function useAccessRole(): AccessContextShape {
 }
 
 export function AccessGate({ children }: { children: React.ReactNode }) {
-  const [role, setRole] = useState<AccessRole | null>(null);
-  const [actorName, setActorName] = useState<string | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setRole(getStoredRole());
-    setActorName(getStoredName());
+    setUser(getStoredUser());
     setReady(true);
   }, []);
 
   const logout = () => {
-    clearStoredRole();
-    setRole(null);
+    clearStoredUser();
+    setUser(null);
   };
 
   if (!ready) return null;
 
-  if (!role) {
-    return <CodeScreen onSuccess={setRole} />;
-  }
-
-  if (!actorName) {
-    return <NameScreen onSuccess={setActorName} />;
+  if (!user) {
+    return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); }} />;
   }
 
   return (
-    <AccessContext.Provider value={{ role, isFull: role === "full", actorName, logout }}>
+    <AccessContext.Provider value={{ userId: user.id, role: user.role, isFull: user.role === "full", actorName: user.name, pageVisibility: user.pageVisibility, logout }}>
       {children}
     </AccessContext.Provider>
   );
 }
 
-function CodeScreen({ onSuccess }: { onSuccess: (role: AccessRole) => void }) {
+function CodeScreen({ onSuccess }: { onSuccess: (user: AppUser) => void }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const r = checkAccessCode(code.trim());
-    if (r) {
-      storeRole(r);
-      onSuccess(r);
-    } else {
-      setError(true);
+    setChecking(true);
+    setError(false);
+    try {
+      const user = await checkAccessCode(code);
+      if (user) {
+        onSuccess(user);
+      } else {
+        setError(true);
+      }
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -69,7 +71,7 @@ function CodeScreen({ onSuccess }: { onSuccess: (role: AccessRole) => void }) {
       <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-6 shadow-sm">
         <div>
           <h1 className="text-lg font-semibold">ELTEG — განფასების სისტემა</h1>
-          <p className="mt-1 text-sm text-muted-foreground">გთხოვთ, შეიყვანოთ წვდომის კოდი</p>
+          <p className="mt-1 text-sm text-muted-foreground">გთხოვთ, შეიყვანოთ თქვენი პირადი წვდომის კოდი</p>
         </div>
         <input
           type="password"
@@ -82,48 +84,10 @@ function CodeScreen({ onSuccess }: { onSuccess: (role: AccessRole) => void }) {
         {error && <p className="text-sm text-destructive">არასწორი კოდი. სცადეთ ხელახლა.</p>}
         <button
           type="submit"
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          disabled={checking}
+          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
         >
-          შესვლა
-        </button>
-      </form>
-    </div>
-  );
-}
-
-// კოდის შემდეგ ერთჯერადად ვითხოვთ სახელს — გამოიყენება მხოლოდ ლოგისთვის
-// ("ვინ, როდის, რა იმუშავა"), ინახება ბრაუზერში ლოკალურად.
-function NameScreen({ onSuccess }: { onSuccess: (name: string) => void }) {
-  const [name, setName] = useState("");
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    storeName(trimmed);
-    onSuccess(trimmed);
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-6 shadow-sm">
-        <div>
-          <h1 className="text-lg font-semibold">სახელი და გვარი</h1>
-          <p className="mt-1 text-sm text-muted-foreground">გამოყენებული იქნება მოქმედებების ლოგში — ვინ, როდის, რა შეცვალა.</p>
-        </div>
-        <input
-          type="text"
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="მაგ. გიორგი თურმანიძე"
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-        />
-        <button
-          type="submit"
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          გაგრძელება
+          {checking ? "მოწმდება…" : "შესვლა"}
         </button>
       </form>
     </div>
