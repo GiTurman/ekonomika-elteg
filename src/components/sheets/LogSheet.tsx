@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { listActivityLog, type ActivityLogEntry } from "@/lib/activityLog";
 import { listUsers, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser, type AccessRole } from "@/lib/access";
+import { listFieldPermissions, updateFieldPermission, type FieldPermission } from "@/lib/fieldPermissions";
 import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,6 +20,96 @@ const PAGE_COLS: Array<{ key: "input" | "economics" | "payment" | "tariffs" | "a
   { key: "tariffs", label: "ტარიფები" },
   { key: "analytics", label: "ანალიტიკა" },
 ];
+
+const NON_FULL_ROLES: AccessRole[] = ["commercial", "technical", "accounting", "procurement", "administration"];
+
+function FieldPermissionsPanel() {
+  const { actorName, role: myRole, refreshFieldPermissions } = useAccessRole();
+  const [perms, setPerms] = useState<FieldPermission[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setPerms(await listFieldPermissions());
+    } catch (e) {
+      console.error("[permissions] load failed", e);
+      setError("უფლებების ჩატვირთვა ვერ მოხერხდა.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const toggleRole = async (perm: FieldPermission, role: AccessRole) => {
+    const has = perm.allowedRoles.includes(role);
+    const nextRoles = has ? perm.allowedRoles.filter((r) => r !== role) : [...perm.allowedRoles, role];
+    setPerms((prev) => prev.map((p) => (p.fieldKey === perm.fieldKey ? { ...p, allowedRoles: nextRoles } : p)));
+    try {
+      await updateFieldPermission(perm.fieldKey, nextRoles);
+      refreshFieldPermissions(); // მიმდინარე სესიაშიც დაუყოვნებლივ ამოქმედდეს
+      logActivity(actorName, myRole, "ველის უფლების ცვლილება", `${perm.label} → ${nextRoles.map((r) => (ROLE_LABEL as Record<string, string>)[r]).join(", ") || "არავინ"}`);
+    } catch (e) {
+      console.error("[permissions] update failed", e);
+      alert("განახლება ვერ მოხერხდა.");
+      refresh();
+    }
+  };
+
+  const sections = Array.from(new Set(perms.map((p) => p.section)));
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>ველების უფლებები — ვინ რას ავსებს „შესატანი მონაცემები" გვერდზე</CardTitle>
+        <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+          განახლება
+        </Button>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <p className="text-xs text-muted-foreground mb-3">
+          ფინანსებს ყოველთვის შეუძლია ყველა ველის რედაქტირება, checkbox-ების მიუხედავად. სხვა როლს ველის
+          რედაქტირება მხოლოდ მაშინ შეუძლია, თუ მონიშნულია მისთვის — წინააღმდეგ შემთხვევაში ხედავს, მაგრამ ვერ ცვლის.
+        </p>
+        {error && <p className="text-sm text-destructive mb-2">{error}</p>}
+        <Table>
+          <TableHeader>
+            <TableRow className="text-xs">
+              <TableHead>ველი</TableHead>
+              {NON_FULL_ROLES.map((r) => <TableHead key={r} className="text-center">{ROLE_LABEL[r]}</TableHead>)}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sections.map((section) => (
+              <Fragment key={section}>
+                <TableRow className="bg-muted/50">
+                  <TableCell colSpan={NON_FULL_ROLES.length + 1} className="font-semibold text-xs py-1">{section}</TableCell>
+                </TableRow>
+                {perms.filter((p) => p.section === section).map((perm) => (
+                  <TableRow key={perm.fieldKey}>
+                    <TableCell className="text-sm">{perm.label}</TableCell>
+                    {NON_FULL_ROLES.map((r) => (
+                      <TableCell key={r} className="text-center p-1">
+                        <Checkbox checked={perm.allowedRoles.includes(r)} onCheckedChange={() => toggleRole(perm, r)} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </Fragment>
+            ))}
+            {perms.length === 0 && !loading && (
+              <TableRow><TableCell colSpan={NON_FULL_ROLES.length + 1} className="text-center text-sm text-muted-foreground py-6">ველები არ არის რეგისტრირებული.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
 
 function UsersPanel() {
   const { actorName, role: myRole } = useAccessRole();
@@ -192,6 +283,7 @@ export function LogSheet() {
   return (
     <div className="space-y-4">
       <UsersPanel />
+      <FieldPermissionsPanel />
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">

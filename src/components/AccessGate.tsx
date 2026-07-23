@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, getUserById, type AppUser, type AccessRole, type UserPageVisibility } from "@/lib/access";
+import { listFieldPermissions, type FieldPermission } from "@/lib/fieldPermissions";
 
 interface AccessContextShape {
   userId: string;
@@ -8,6 +9,10 @@ interface AccessContextShape {
   actorName: string;
   pageVisibility: UserPageVisibility;
   logout: () => void;
+  // ველის დონის უფლება — თუ ეს კონკრეტული ველი ცნობილი არაა matrix-ში,
+  // ნაგულისხმევად რედაქტირებადია (რომ ახალმა ველებმა შემთხვევით არ დაბლოკოს).
+  canEditField: (fieldKey: string) => boolean;
+  refreshFieldPermissions: () => void;
 }
 
 const AccessContext = createContext<AccessContextShape | null>(null);
@@ -21,6 +26,11 @@ export function useAccessRole(): AccessContextShape {
 export function AccessGate({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [ready, setReady] = useState(false);
+  const [permissions, setPermissions] = useState<FieldPermission[]>([]);
+
+  const loadPermissions = () => {
+    listFieldPermissions().then(setPermissions).catch((e) => console.error("[permissions] load failed", e));
+  };
 
   useEffect(() => {
     const cached = getStoredUser();
@@ -39,6 +49,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
           setUser(null);
         }
       });
+      loadPermissions();
     }
   }, []);
 
@@ -50,11 +61,21 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   if (!ready) return null;
 
   if (!user) {
-    return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); }} />;
+    return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); loadPermissions(); }} />;
   }
 
+  const canEditField = (fieldKey: string): boolean => {
+    if (user.role === "full") return true; // ფინანსებს ყოველთვის შეუძლია ყველაფრის რედაქტირება
+    const perm = permissions.find((p) => p.fieldKey === fieldKey);
+    if (!perm) return true; // უცნობი/ჯერ არარეგისტრირებული ველი — ნაგულისხმევად ღიაა
+    return perm.allowedRoles.includes(user.role);
+  };
+
   return (
-    <AccessContext.Provider value={{ userId: user.id, role: user.role, isFull: user.role === "full", actorName: user.name, pageVisibility: user.pageVisibility, logout }}>
+    <AccessContext.Provider value={{
+      userId: user.id, role: user.role, isFull: user.role === "full", actorName: user.name,
+      pageVisibility: user.pageVisibility, logout, canEditField, refreshFieldPermissions: loadPermissions,
+    }}>
       {children}
     </AccessContext.Provider>
   );

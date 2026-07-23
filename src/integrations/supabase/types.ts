@@ -41,6 +41,27 @@ export type Database = {
         }
         Relationships: []
       }
+      field_permissions: {
+        Row: {
+          allowed_roles: string[]
+          field_key: string
+          label: string
+          section: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          field_key: string
+          label: string
+          section: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          field_key?: string
+          label?: string
+          section?: string
+        }
+        Relationships: []
+      }
       app_users: {
         Row: {
           code: string

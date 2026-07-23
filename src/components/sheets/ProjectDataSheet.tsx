@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { NumberInput, PercentInput, TextInput, fmtUsd, computedCls } from "./sheet-ui";
+import { NumberInput, PercentInput, TextInput, fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 import { allocateProjectCosts } from "@/lib/econ-calc";
 import { EQUIPMENT_CATEGORY_LABEL, PROJECT_STATUS_LABEL, type EquipmentCategory, type ProjectStatus } from "@/lib/econ-types";
 import { Plus, Trash2 } from "lucide-react";
@@ -57,7 +57,7 @@ const UNIT_RATE_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label:
 
 export function ProjectDataSheet() {
   const { state, updateProject, updateUnit, addUnit, removeUnit } = useEconStore();
-  const { isFull, actorName, role } = useAccessRole();
+  const { isFull, actorName, role, canEditField } = useAccessRole();
   const p = state.project;
   const t = p.travel;
   const alloc = allocateProjectCosts(state);
@@ -140,21 +140,28 @@ export function ProjectDataSheet() {
               {p.units.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="p-1 min-w-[140px]">
-                    <Select value={u.category} onValueChange={(v) => updateUnit(u.id, { category: v as EquipmentCategory })}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(EQUIPMENT_CATEGORY_LABEL) as EquipmentCategory[]).map((c) => (
-                          <SelectItem key={c} value={c}>{EQUIPMENT_CATEGORY_LABEL[c]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {canEditField("unit.category") ? (
+                      <Select value={u.category} onValueChange={(v) => updateUnit(u.id, { category: v as EquipmentCategory })}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(EQUIPMENT_CATEGORY_LABEL) as EquipmentCategory[]).map((c) => (
+                            <SelectItem key={c} value={c}>{EQUIPMENT_CATEGORY_LABEL[c]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className={"h-8 flex items-center text-sm " + computedCls}>{EQUIPMENT_CATEGORY_LABEL[u.category]}</div>
+                    )}
                   </TableCell>
                   {UNIT_COLS.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[92px]">
-                      {c.kind === "num"
-                        ? <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
-                        : <TextInput value={String(u[c.key] ?? "")} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
-                      }
+                      {canEditField("unit." + c.key) ? (
+                        c.kind === "num"
+                          ? <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                          : <TextInput value={String(u[c.key] ?? "")} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                      ) : (
+                        <div className={"h-8 flex items-center px-2 text-sm " + computedCls}>{String(u[c.key] ?? "")}</div>
+                      )}
                     </TableCell>
                   ))}
                   <TableCell className="p-1">
@@ -190,7 +197,11 @@ export function ProjectDataSheet() {
                   <TableCell className="p-1 font-semibold">{u.id}</TableCell>
                   {UNIT_FINANCIAL_COLS.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[110px]">
-                      <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                      {canEditField("unit." + c.key) ? (
+                        <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                      ) : (
+                        <div className={"text-right " + computedCls}>{fmtUsd(u[c.key] as number)}</div>
+                      )}
                     </TableCell>
                   ))}
                   <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.bank.get(u.id) ?? 0)}</TableCell>
@@ -198,7 +209,11 @@ export function ProjectDataSheet() {
                   <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.terminal.get(u.id) ?? 0)}</TableCell>
                   <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.localTransport.get(u.id) ?? 0)}</TableCell>
                   <TableCell className="p-1 min-w-[100px]">
-                    <PercentInput value={u.brokerCommissionPct} onChange={(v) => updateUnit(u.id, { brokerCommissionPct: v })} />
+                    {canEditField("unit.brokerCommissionPct") ? (
+                      <PercentInput value={u.brokerCommissionPct} onChange={(v) => updateUnit(u.id, { brokerCommissionPct: v })} />
+                    ) : (
+                      <div className={"text-right " + computedCls}>{fmtPct(u.brokerCommissionPct)}</div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -230,13 +245,25 @@ export function ProjectDataSheet() {
         <CardHeader><CardTitle>3.1 პროექტის ჯამური შესყიდვის ხარჯები ($) — ნაწილდება ქარხნული ფასის პროპორციულად</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-4">
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">საბანკო საკომისიო — ჯამი</span>
-            <NumberInput value={p.bankCommissionTotal} onChange={(v) => updateProject({ bankCommissionTotal: v })} /></label>
+            {canEditField("project.bankCommissionTotal") ? (
+              <NumberInput value={p.bankCommissionTotal} onChange={(v) => updateProject({ bankCommissionTotal: v })} />
+            ) : <div className={computedCls}>{fmtUsd(p.bankCommissionTotal)}</div>}
+          </label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">საერთაშ. ტრანსპ. — ჯამი</span>
-            <NumberInput value={p.intTransportTotal} onChange={(v) => updateProject({ intTransportTotal: v })} /></label>
+            {canEditField("project.intTransportTotal") ? (
+              <NumberInput value={p.intTransportTotal} onChange={(v) => updateProject({ intTransportTotal: v })} />
+            ) : <div className={computedCls}>{fmtUsd(p.intTransportTotal)}</div>}
+          </label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">ტერმინალი — ჯამი</span>
-            <NumberInput value={p.terminalTotal} onChange={(v) => updateProject({ terminalTotal: v })} /></label>
+            {canEditField("project.terminalTotal") ? (
+              <NumberInput value={p.terminalTotal} onChange={(v) => updateProject({ terminalTotal: v })} />
+            ) : <div className={computedCls}>{fmtUsd(p.terminalTotal)}</div>}
+          </label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">ადგ. ტრანსპ. — ჯამი</span>
-            <NumberInput value={p.localTransportTotal} onChange={(v) => updateProject({ localTransportTotal: v })} /></label>
+            {canEditField("project.localTransportTotal") ? (
+              <NumberInput value={p.localTransportTotal} onChange={(v) => updateProject({ localTransportTotal: v })} />
+            ) : <div className={computedCls}>{fmtUsd(p.localTransportTotal)}</div>}
+          </label>
         </CardContent>
       </Card>
 
@@ -256,10 +283,15 @@ export function ProjectDataSheet() {
                   <TableCell className="p-1 font-semibold">{u.id}</TableCell>
                   {UNIT_RATE_COLS.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[110px]">
-                      {c.kind === "pct"
-                        ? <PercentInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
-                        : <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
-                      }
+                      {canEditField("unit." + c.key) ? (
+                        c.kind === "pct"
+                          ? <PercentInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                          : <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                      ) : (
+                        <div className={"text-right " + computedCls}>
+                          {c.kind === "pct" ? fmtPct(u[c.key] as number) : (u[c.key] as number)}
+                        </div>
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -287,26 +319,44 @@ export function ProjectDataSheet() {
               {([["მექანიკოსები", "mechanics"], ["ელექტრიკოსები", "electricians"], ["ადმინისტრაცია", "admin"]] as const).map(([label, key]) => (
                 <TableRow key={key}>
                   <TableCell>{label}</TableCell>
-                  <TableCell><NumberInput value={t[key].headcount} onChange={(v) => setGroup(key, { headcount: v })} /></TableCell>
-                  <TableCell><NumberInput value={t[key].days} onChange={(v) => setGroup(key, { days: v })} /></TableCell>
-                  <TableCell><NumberInput value={t[key].trips} onChange={(v) => setGroup(key, { trips: v })} /></TableCell>
                   <TableCell>
-                    <Select
-                      value={t[key].accommodationMode}
-                      onValueChange={(v) => setGroup(key, { accommodationMode: v as "house" | "hotel" })}
-                    >
-                      <SelectTrigger className="h-8 w-[160px] text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="house">სახლი ქირით</SelectItem>
-                        <SelectItem value="hotel">სასტუმრო</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {canEditField("travel.headcount") ? (
+                      <NumberInput value={t[key].headcount} onChange={(v) => setGroup(key, { headcount: v })} />
+                    ) : <div className={computedCls}>{t[key].headcount}</div>}
+                  </TableCell>
+                  <TableCell>
+                    {canEditField("travel.days") ? (
+                      <NumberInput value={t[key].days} onChange={(v) => setGroup(key, { days: v })} />
+                    ) : <div className={computedCls}>{t[key].days}</div>}
+                  </TableCell>
+                  <TableCell>
+                    {canEditField("travel.trips") ? (
+                      <NumberInput value={t[key].trips} onChange={(v) => setGroup(key, { trips: v })} />
+                    ) : <div className={computedCls}>{t[key].trips}</div>}
+                  </TableCell>
+                  <TableCell>
+                    {canEditField("travel.accommodation") ? (
+                      <Select
+                        value={t[key].accommodationMode}
+                        onValueChange={(v) => setGroup(key, { accommodationMode: v as "house" | "hotel" })}
+                      >
+                        <SelectTrigger className="h-8 w-[160px] text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="house">სახლი ქირით</SelectItem>
+                          <SelectItem value="hotel">სასტუმრო</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className={computedCls}>{t[key].accommodationMode === "house" ? "სახლი ქირით" : "სასტუმრო"}</div>
+                    )}
                   </TableCell>
                   <TableCell>
                     {t[key].accommodationMode === "house"
-                      ? <NumberInput value={t[key].houseRentTotal} onChange={(v) => setGroup(key, { houseRentTotal: v })} />
+                      ? (canEditField("travel.houseRent") ? (
+                          <NumberInput value={t[key].houseRentTotal} onChange={(v) => setGroup(key, { houseRentTotal: v })} />
+                        ) : <div className={computedCls}>{fmtUsd(t[key].houseRentTotal)}</div>)
                       : <span className="text-xs text-muted-foreground">დღიური ტარიფი — «ფინანსური დაშვებები»-ში</span>
                     }
                   </TableCell>
@@ -317,9 +367,15 @@ export function ProjectDataSheet() {
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">მანძილი ოფისიდან ობიექტამდე, კმ (ერთი მიმართულებით)</span>
-            <NumberInput value={t.distanceKm} onChange={(v) => setTravel({ distanceKm: v })} /></label>
+              {canEditField("travel.distanceFuel") ? (
+                <NumberInput value={t.distanceKm} onChange={(v) => setTravel({ distanceKm: v })} />
+              ) : <div className={computedCls}>{t.distanceKm}</div>}
+            </label>
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">ავტომობილის საწვავის ხარჯი, ლ/100კმ</span>
-            <NumberInput value={t.fuelConsumption} onChange={(v) => setTravel({ fuelConsumption: v })} /></label>
+              {canEditField("travel.distanceFuel") ? (
+                <NumberInput value={t.fuelConsumption} onChange={(v) => setTravel({ fuelConsumption: v })} />
+              ) : <div className={computedCls}>{t.fuelConsumption}</div>}
+            </label>
             <label className="grid gap-1 md:col-span-2"><span className="text-xs text-muted-foreground">სამუშაო დღეები კვირაში</span>
             <TextInput value={t.workDays} onChange={(v) => setTravel({ workDays: v })} /></label>
           </div>
