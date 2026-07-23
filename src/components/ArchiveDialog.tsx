@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser } from "lucide-react";
+import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser, Copy } from "lucide-react";
 import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, type ArchiveEntry } from "@/lib/archive";
 import { normalizeAppState } from "@/lib/econ-defaults";
 import { useEconStore } from "@/lib/econ-store";
@@ -51,6 +51,34 @@ export function ArchiveDialog() {
     } catch (e) {
       console.error("[archive] load failed", e);
       alert("არქივის ჩანაწერის ჩატვირთვა ვერ მოხერხდა.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // ერთი პროექტის რამდენიმე ვარიანტისთვის — სრულად აკოპირებს არჩეულ არქივის
+  // ჩანაწერს სამუშაო ეკრანზე, სახელს სთავაზობს "— ვარიანტი 2" და ა.შ., და
+  // "დასრულება და შენახვისას" ცალკე ჩანაწერად ინახება. ორიგინალს არ ეხება.
+  const handleDuplicateVariant = async (id: string) => {
+    if (!confirm("მიმდინარე ეკრანზე არსებული მონაცემები ჩანაცვლდება ამ პროექტის ასლით — ახალი ვარიანტისთვის. გავაგრძელო?")) return;
+    setBusyId(id);
+    try {
+      const raw = await loadArchiveEntry(id);
+      const normalized = normalizeAppState(raw);
+      const baseName = normalized.project.projectName.replace(/\s*—\s*ვარიანტი\s*\d+\s*$/, "").trim();
+      const suggested = `${baseName} — ვარიანტი 2`;
+      const newName = prompt("ახალი ვარიანტის დასახელება (საჭიროებისამებრ შეასწორე ნომერი):", suggested);
+      if (!newName || !newName.trim()) { setBusyId(null); return; }
+      setState((cur) => ({
+        ...normalized,
+        project: { ...normalized.project, projectName: newName.trim() },
+        pageVisibility: cur.pageVisibility,
+      }));
+      setOpen(false);
+      logActivity(actorName, role, "პროექტის დუბლირება ახალ ვარიანტად", `${baseName} → ${newName.trim()}`);
+    } catch (e) {
+      console.error("[archive] duplicate failed", e);
+      alert("დუბლირება ვერ მოხერხდა.");
     } finally {
       setBusyId(null);
     }
@@ -139,6 +167,15 @@ export function ArchiveDialog() {
                         title="გახსნა"
                       >
                         <FolderOpen className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={busyId === it.id}
+                        onClick={() => handleDuplicateVariant(it.id)}
+                        title="დუბლირება ახალ ვარიანტად"
+                      >
+                        <Copy className="h-4 w-4" />
                       </Button>
                       <Button
                         size="icon"
