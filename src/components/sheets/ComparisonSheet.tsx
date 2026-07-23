@@ -47,6 +47,7 @@ const SECTIONS: Array<{ title: string; rows: RowDef[] }> = [
       { label: "ელექტრომონტაჟი", fmt: "usd", get: (e) => e.report.elecPayroll, betterWhen: "min" },
       { label: "მივლინების ხარჯი", fmt: "usd", get: (e) => e.report.travelTotal, betterWhen: "min" },
       { label: "მასალები", fmt: "usd", get: (e) => e.report.materialsTotal, betterWhen: "min" },
+      { label: "ხარაჩო", fmt: "usd", get: (e) => e.report.scaffoldingTotal, betterWhen: "min" },
       { label: "ჯამი — მონტაჟის თვითღირებულება", fmt: "usd", get: (e) => e.report.installTotal, bold: true, betterWhen: "min" },
     ],
   },

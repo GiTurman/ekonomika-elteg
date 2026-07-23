@@ -137,6 +137,7 @@ export function EconomicsSheet() {
             ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll],
             ["მივლინების ხარჯი (სრული)", eco.report.travelTotal],
             ["მასალები", eco.report.materialsTotal],
+            ["ხარაჩო", eco.report.scaffoldingTotal],
             ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal, true],
           ]}/>
           <ReportBlock title="ფასნამატი" rows={[

@@ -38,6 +38,7 @@ const UNIT_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: stri
 const UNIT_FINANCIAL_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string }> = [
   { key: "factoryPrice", label: "ქარხნული ფასი ($)" },
   { key: "materials", label: "მასალები ($)" },
+  { key: "scaffolding", label: "ხარაჩო ($)" },
   { key: "otherCost", label: "სხვა ხარჯი ($)" },
   { key: "grounding", label: "დამიწება/ზედამხედვ. ($)" },
 ];

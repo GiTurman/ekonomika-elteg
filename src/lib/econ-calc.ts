@@ -50,6 +50,7 @@ export interface ProjectReport {
   elecPayroll: number; // D51
   travelTotal: number; // D52
   materialsTotal: number; // D53
+  scaffoldingTotal: number; // ხარაჩო, ჯამურად
   installTotal: number; // D54
   costTotal: number; // D55
   // Markup
@@ -236,7 +237,8 @@ function unitInstallCost(u: Unit, f: FinancialAssumptions) {
   const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
   return u.floors * u.mechRateGel * grossFactor
     + u.floors * u.elecRateGel * grossFactor
-    + u.materials;
+    + u.materials
+    + (u.scaffolding ?? 0);
 }
 
 function unitPurchaseCost(u: Unit, allocated: UnitAllocations) {
@@ -356,7 +358,8 @@ export function computeEconomics(state: AppState): FullEconomics {
   const elecPayroll = units.reduce((s, u) => s + u.floors * u.elecRateGel * grossFactor, 0);
   const reportTravelTotal = travel.totalUsd;
   const materialsTotal = units.reduce((s, u) => s + u.materials, 0);
-  const installTotal = mechPayroll + elecPayroll + reportTravelTotal + materialsTotal;
+  const scaffoldingTotal = units.reduce((s, u) => s + (u.scaffolding ?? 0), 0);
+  const installTotal = mechPayroll + elecPayroll + reportTravelTotal + materialsTotal + scaffoldingTotal;
   const costTotal = purchaseTotal + installTotal;
 
   const equipmentMarkup = units.reduce((s, u) => s + purchaseCostOf(u) * u.equipmentMarkupPct, 0);
@@ -407,6 +410,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     elecPayroll,
     travelTotal: reportTravelTotal,
     materialsTotal,
+    scaffoldingTotal,
     installTotal,
     costTotal,
     equipmentMarkup,

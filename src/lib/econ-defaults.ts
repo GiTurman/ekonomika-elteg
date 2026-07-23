@@ -21,6 +21,7 @@ const mkUnit = (id: string, floors = 19): Unit => ({
   installWeeks: 9,
   factoryPrice: 18180,
   materials: 100,
+  scaffolding: 0,
   otherCost: 0,
   grounding: 180,
   brokerCommissionPct: 0,
@@ -160,6 +161,7 @@ const blankUnit = (id: string): Unit => ({
   installWeeks: 0,
   factoryPrice: 0,
   materials: 0,
+  scaffolding: 0,
   otherCost: 0,
   grounding: 0,
   brokerCommissionPct: 0,
@@ -209,6 +211,7 @@ export function normalizeAppState(loaded: Partial<AppState>): AppState {
   const units = (loadedProject.units ?? defaultAppState.project.units).map((u: Unit) => ({
     ...u,
     category: u.category ?? "lift",
+    scaffolding: u.scaffolding ?? 0,
   }));
   const loadedPayment: any = loaded.payment ?? {};
   return {

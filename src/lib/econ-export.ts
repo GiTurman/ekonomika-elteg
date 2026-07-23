@@ -133,18 +133,18 @@ export function exportToXlsx(state: AppState) {
   const guarAnnualRow2 = s2.length; s2.push(["წლიური საკომ. %", f.guaranteeAnnualPct]);
   s2.push([]);
   s2.push(["დანადგარების ხარჯები (USD)"]);
-  s2.push(["#", "ქარხნული", "საბანკო (გადანაწ.)", "საერთ.ტრანსპ.(გადანაწ.)", "ტერმინალი(გადანაწ.)", "ადგ.ტრანსპ.(გადანაწ.)", "მასალები", "სხვა", "დამიწება", "საშუამავლო %", "მონტ.₾/სართ", "ელ.მონტ.₾/სართ", "დანადგ.ფასნამატი%", "მონტ.ფასნამატი%", "გაუთვ.%", "FXრისკი%", "გარანტია%"]);
+  s2.push(["#", "ქარხნული", "საბანკო (გადანაწ.)", "საერთ.ტრანსპ.(გადანაწ.)", "ტერმინალი(გადანაწ.)", "ადგ.ტრანსპ.(გადანაწ.)", "მასალები", "ხარაჩო", "სხვა", "დამიწება", "საშუამავლო %", "მონტ.₾/სართ", "ელ.მონტ.₾/სართ", "დანადგ.ფასნამატი%", "მონტ.ფასნამატი%", "გაუთვ.%", "FXრისკი%", "გარანტია%"]);
   const unitsRowStart2 = s2.length;
   p.units.forEach((u) => s2.push([
     u.id, u.factoryPrice,
     alloc.bank.get(u.id) ?? 0, alloc.intTransport.get(u.id) ?? 0, alloc.terminal.get(u.id) ?? 0, alloc.localTransport.get(u.id) ?? 0,
-    u.materials, u.otherCost, u.grounding, u.brokerCommissionPct,
+    u.materials, u.scaffolding, u.otherCost, u.grounding, u.brokerCommissionPct,
     u.mechRateGel, u.elecRateGel, u.equipmentMarkupPct, u.installMarkupPct, u.contingencyPct, u.fxRiskPct, u.warrantyPct,
   ]));
   const unitsRowEnd2 = s2.length - 1;
 
   const ws2 = XLSX.utils.aoa_to_sheet(s2);
-  setWidths(ws2, [40, 14, 16, 18, 16, 16, 12, 10, 12, 14, 12, 14, 16, 16, 12, 12, 12]);
+  setWidths(ws2, [40, 14, 16, 18, 16, 16, 12, 12, 10, 12, 14, 12, 14, 16, 16, 12, 12, 12]);
   fmtCol(ws2, 1, rateRowStart2, rateRowEnd2, FMT_RATE); // USD/EUR → GEL
   fmtCol(ws2, 1, pctRowStart2, pctRowEnd2, FMT_PCT);     // VAT / income tax / pension
   fmtCol(ws2, 1, perDiemRowStart2, perDiemRowEnd2, FMT_GEL);
@@ -154,12 +154,12 @@ export function exportToXlsx(state: AppState) {
   fmtCol(ws2, 1, guarPctRow2, guarPctRow2, FMT_PCT);
   fmtCol(ws2, 1, guarAnnualRow2, guarAnnualRow2, FMT_PCT);
   fmtCol(ws2, 1, unitsRowStart2, unitsRowEnd2, FMT_USD);  // factory price
-  for (let c = 2; c <= 5; c++) fmtCol(ws2, c, unitsRowStart2, unitsRowEnd2, FMT_USD);  // allocated purchase costs
-  for (let c = 6; c <= 8; c++) fmtCol(ws2, c, unitsRowStart2, unitsRowEnd2, FMT_USD);  // materials/other/grounding
-  fmtCol(ws2, 9, unitsRowStart2, unitsRowEnd2, FMT_PCT);  // broker commission %
-  fmtCol(ws2, 10, unitsRowStart2, unitsRowEnd2, FMT_GEL); // mech ₾/floor
-  fmtCol(ws2, 11, unitsRowStart2, unitsRowEnd2, FMT_GEL); // elec ₾/floor
-  for (let c = 12; c <= 16; c++) fmtCol(ws2, c, unitsRowStart2, unitsRowEnd2, FMT_PCT); // markup/contingency/fx/warranty %
+  for (let c = 2; c <= 6; c++) fmtCol(ws2, c, unitsRowStart2, unitsRowEnd2, FMT_USD);  // allocated purchase costs, materials, scaffolding
+  for (let c = 7; c <= 9; c++) fmtCol(ws2, c, unitsRowStart2, unitsRowEnd2, FMT_USD);  // other/grounding
+  fmtCol(ws2, 10, unitsRowStart2, unitsRowEnd2, FMT_PCT);  // broker commission %
+  fmtCol(ws2, 11, unitsRowStart2, unitsRowEnd2, FMT_GEL); // mech ₾/floor
+  fmtCol(ws2, 12, unitsRowStart2, unitsRowEnd2, FMT_GEL); // elec ₾/floor
+  for (let c = 13; c <= 17; c++) fmtCol(ws2, c, unitsRowStart2, unitsRowEnd2, FMT_PCT); // markup/contingency/fx/warranty %
   freezeHeader(ws2, 1);
   XLSX.utils.book_append_sheet(wb, ws2, "ფინანსური დაშვებები");
 

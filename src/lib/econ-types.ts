@@ -33,6 +33,7 @@ export interface Unit {
   // Financial (per-unit direct costs, USD)
   factoryPrice: number;      // ქარხნული ფასი
   materials: number;         // მასალები
+  scaffolding: number;       // ხარაჩო
   otherCost: number;         // სხვა ხარჯი
   grounding: number;         // დამიწება/ზედამხედვ.
   brokerCommissionPct: number; // საშუამავლო საკომისიო, % — ემატება საბოლოო ფასს (დღგ+გარანტიის შემდეგ)
