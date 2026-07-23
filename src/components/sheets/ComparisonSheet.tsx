@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Fragment } from "react";
 import { listArchiveFull, type ArchiveEntryFull } from "@/lib/archive";
 import { computeEconomics } from "@/lib/econ-calc";
 import { normalizeAppState } from "@/lib/econ-defaults";
@@ -13,32 +13,92 @@ import { fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 
 const MAX_SELECTED = 3;
 
-interface Row {
+interface RowDef {
   label: string;
   fmt: "usd" | "pct" | "num";
   get: (eco: ReturnType<typeof computeEconomics>) => number;
+  bold?: boolean;
+  betterWhen?: "min" | "max"; // best-value highlight direction; omit to skip highlighting
 }
 
-const ROWS: Row[] = [
-  { label: "დანადგარების რაოდენობა", fmt: "num", get: (e) => e.units.length },
-  { label: "სართულების ჯამი", fmt: "num", get: (e) => e.units.reduce((s, u) => s + u.floors, 0) },
-  { label: "შესყიდვის თვითღირებულება", fmt: "usd", get: (e) => e.totals.purchaseCost },
-  { label: "მონტაჟის თვითღირებულება", fmt: "usd", get: (e) => e.totals.installCost },
-  { label: "სულ თვითღირებულება", fmt: "usd", get: (e) => e.totals.totalCost },
-  { label: "ფასნამატი", fmt: "usd", get: (e) => e.totals.markup },
-  { label: "დამატებითი ხარჯები", fmt: "usd", get: (e) => e.totals.extras },
-  { label: "ფასი დღგ-ს გარეშე", fmt: "usd", get: (e) => e.report.priceNoVat },
-  { label: "დღგ", fmt: "usd", get: (e) => e.report.vat },
-  { label: "საბოლოო ფასი (დღგ-ს ჩათვლით)", fmt: "usd", get: (e) => e.totals.finalPrice },
-  { label: "ჯამური მარჟა %", fmt: "pct", get: (e) => e.report.totalMarginPct },
-  { label: "საშ. ფასი დანადგარზე (დღგ-ს გარეშე)", fmt: "usd", get: (e) => e.units.length ? e.report.priceNoVat / e.units.length : 0 },
-  { label: "საშ. ფასი სართულზე (დღგ-ს გარეშე)", fmt: "usd", get: (e) => {
-    const floors = e.units.reduce((s, u) => s + u.floors, 0);
-    return floors ? e.report.priceNoVat / floors : 0;
-  } },
+const SECTIONS: Array<{ title: string; rows: RowDef[] }> = [
+  {
+    title: "პროექტის მოცულობა",
+    rows: [
+      { label: "დანადგარების რაოდენობა", fmt: "num", get: (e) => e.units.length },
+      { label: "სართულების ჯამი", fmt: "num", get: (e) => e.units.reduce((s, u) => s + u.floors, 0) },
+    ],
+  },
+  {
+    title: "1. შესყიდვის ხარჯები",
+    rows: [
+      { label: "ქარხნული ფასი, ჯამი", fmt: "usd", get: (e) => e.report.factoryTotal, betterWhen: "min" },
+      { label: "საბანკო საკომისიო", fmt: "usd", get: (e) => e.report.bankCommTotal, betterWhen: "min" },
+      { label: "საერთაშორისო ტრანსპორტირება", fmt: "usd", get: (e) => e.report.intTransportTotal, betterWhen: "min" },
+      { label: "ტერმინალის მომსახურება", fmt: "usd", get: (e) => e.report.terminalTotal, betterWhen: "min" },
+      { label: "ადგილზე ტრანსპორტირება", fmt: "usd", get: (e) => e.report.localTransportTotal, betterWhen: "min" },
+      { label: "ჯამი — შესყიდვის თვითღირებულება", fmt: "usd", get: (e) => e.report.purchaseTotal, bold: true, betterWhen: "min" },
+    ],
+  },
+  {
+    title: "2. მონტაჟის ხარჯები",
+    rows: [
+      { label: "მონტაჟის ანაზღაურება", fmt: "usd", get: (e) => e.report.mechPayroll, betterWhen: "min" },
+      { label: "ელექტრომონტაჟი", fmt: "usd", get: (e) => e.report.elecPayroll, betterWhen: "min" },
+      { label: "მივლინების ხარჯი", fmt: "usd", get: (e) => e.report.travelTotal, betterWhen: "min" },
+      { label: "მასალები", fmt: "usd", get: (e) => e.report.materialsTotal, betterWhen: "min" },
+      { label: "ჯამი — მონტაჟის თვითღირებულება", fmt: "usd", get: (e) => e.report.installTotal, bold: true, betterWhen: "min" },
+    ],
+  },
+  {
+    title: "3. ფასნამატი",
+    rows: [
+      { label: "სულ თვითღირებულება", fmt: "usd", get: (e) => e.report.costTotal, bold: true, betterWhen: "min" },
+      { label: "დანადგარის ფასნამატი", fmt: "usd", get: (e) => e.report.equipmentMarkup },
+      { label: "მონტაჟის ფასნამატი", fmt: "usd", get: (e) => e.report.installMarkup },
+      { label: "სულ ფასნამატი", fmt: "usd", get: (e) => e.report.markupTotal, bold: true, betterWhen: "max" },
+      { label: "ფასი დამატებითი ხარჯების გარეშე", fmt: "usd", get: (e) => e.report.priceNoExtras, bold: true },
+    ],
+  },
+  {
+    title: "4. დამატებითი ხარჯები",
+    rows: [
+      { label: "გაუთვალისწინებელი ხარჯი", fmt: "usd", get: (e) => e.report.contingency },
+      { label: "საბანკო სავალუტო რისკი", fmt: "usd", get: (e) => e.report.fxRisk },
+      { label: "სხვა ხარჯები", fmt: "usd", get: (e) => e.report.otherTotal },
+      { label: "დამიწება/ზედამხედველობა", fmt: "usd", get: (e) => e.report.groundingTotal },
+      { label: "საშუამავლო საკომისიო", fmt: "usd", get: (e) => e.report.brokerTotal },
+      { label: "გარანტიის ხარჯი (%-ზე დაფუძნებული)", fmt: "usd", get: (e) => e.report.warrantyCost },
+      { label: "უფასო სერვისი", fmt: "usd", get: (e) => e.report.freeServiceCost },
+      { label: "გარანტიის თანხა, ჯამურად", fmt: "usd", get: (e) => e.report.guaranteeAmountCost },
+      { label: "ჯამი — დამატებითი ხარჯები", fmt: "usd", get: (e) => e.report.extrasTotal, bold: true, betterWhen: "min" },
+    ],
+  },
+  {
+    title: "5. საბოლოო ფასი",
+    rows: [
+      { label: "ფასი დღგ-ს გარეშე", fmt: "usd", get: (e) => e.report.priceNoVat, bold: true, betterWhen: "min" },
+      { label: "დღგ", fmt: "usd", get: (e) => e.report.vat },
+      { label: "ფასი დღგ-ით (გარანტიის გარეშე)", fmt: "usd", get: (e) => e.report.priceWithVat },
+      { label: "საბანკო გარანტიის ბაზა", fmt: "usd", get: (e) => e.report.guaranteeBase },
+      { label: "საბანკო გარანტიის საკომისიო", fmt: "usd", get: (e) => e.report.guaranteeFee },
+      { label: "საბოლოო კონტრაქტის ფასი (დღგ-ს ჩათვლით)", fmt: "usd", get: (e) => e.report.finalContractPrice, bold: true, betterWhen: "min" },
+      { label: "ჯამური მარჟა %", fmt: "pct", get: (e) => e.report.totalMarginPct, bold: true, betterWhen: "max" },
+    ],
+  },
+  {
+    title: "საშუალო მაჩვენებლები",
+    rows: [
+      { label: "საშ. ფასი დანადგარზე (დღგ-ს გარეშე)", fmt: "usd", get: (e) => e.units.length ? e.report.priceNoVat / e.units.length : 0, betterWhen: "min" },
+      { label: "საშ. ფასი სართულზე (დღგ-ს გარეშე)", fmt: "usd", get: (e) => {
+        const floors = e.units.reduce((s, u) => s + u.floors, 0);
+        return floors ? e.report.priceNoVat / floors : 0;
+      }, betterWhen: "min" },
+    ],
+  },
 ];
 
-function fmtRow(v: number, fmt: Row["fmt"]) {
+function fmtRow(v: number, fmt: RowDef["fmt"]) {
   if (fmt === "usd") return fmtUsd(v);
   if (fmt === "pct") return fmtPct(v);
   return String(Math.round(v));
@@ -68,7 +128,7 @@ export function ComparisonSheet() {
   const toggle = (id: string) => {
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= MAX_SELECTED) return prev; // 2-3 პროექტამდე შედარება
+      if (prev.length >= MAX_SELECTED) return prev;
       return [...prev, id];
     });
   };
@@ -93,7 +153,7 @@ export function ComparisonSheet() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          აირჩიე 2-3 დასრულებული პროექტი არქივიდან — მათი ეკონომიკა გვერდიგვერდ შედარდება.
+          აირჩიე 2-3 დასრულებული პროექტი არქივიდან — მათი ეკონომიკის ყველა მუხლი, საწყისი ხარჯებიდან საბოლოო ფასამდე, გვერდიგვერდ შედარდება.
         </p>
         <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
@@ -146,7 +206,7 @@ export function ComparisonSheet() {
         <p className="py-8 text-center text-sm text-muted-foreground">აირჩიე მინიმუმ 2 პროექტი შედარებისთვის.</p>
       ) : (
         <Card>
-          <CardHeader><CardTitle>ეკონომიკის შედარება</CardTitle></CardHeader>
+          <CardHeader><CardTitle>ეკონომიკის სრული შედარება</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -156,23 +216,34 @@ export function ComparisonSheet() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ROWS.map((row) => {
-                  const values = computed.map(({ eco }) => row.get(eco));
-                  const best = row.fmt === "pct" ? Math.max(...values) : (row.label.includes("თვითღირებულება") || row.label.includes("ფასი") ? Math.min(...values) : null);
-                  return (
-                    <TableRow key={row.label}>
-                      <TableCell className="font-medium">{row.label}</TableCell>
-                      {computed.map(({ entry }, i) => (
-                        <TableCell
-                          key={entry.id}
-                          className={"text-right " + computedCls + (best !== null && values[i] === best && values.some((v, j) => j !== i && v !== values[i]) ? " text-emerald-600 font-semibold" : "")}
-                        >
-                          {fmtRow(values[i], row.fmt)}
-                        </TableCell>
-                      ))}
+                {SECTIONS.map((section) => (
+                  <Fragment key={section.title}>
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={computed.length + 1} className="font-semibold text-xs py-1.5">{section.title}</TableCell>
                     </TableRow>
-                  );
-                })}
+                    {section.rows.map((row) => {
+                      const values = computed.map(({ eco }) => row.get(eco));
+                      const best = row.betterWhen === "max" ? Math.max(...values) : row.betterWhen === "min" ? Math.min(...values) : null;
+                      const allEqual = values.every((v) => v === values[0]);
+                      return (
+                        <TableRow key={section.title + row.label} className={row.bold ? "bg-muted/20" : ""}>
+                          <TableCell className={row.bold ? "font-semibold" : ""}>{row.label}</TableCell>
+                          {computed.map(({ entry }, i) => (
+                            <TableCell
+                              key={entry.id}
+                              className={
+                                "text-right " + computedCls + (row.bold ? " font-semibold" : "") +
+                                (best !== null && !allEqual && values[i] === best ? " text-emerald-600" : "")
+                              }
+                            >
+                              {fmtRow(values[i], row.fmt)}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      );
+                    })}
+                  </Fragment>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
