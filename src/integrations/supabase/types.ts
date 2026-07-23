@@ -148,6 +148,7 @@ export type Database = {
           created_at: string
           data: Json
           id: string
+          include_in_analytics: boolean
           name: string
           size_bytes: number
         }
@@ -155,6 +156,7 @@ export type Database = {
           created_at?: string
           data: Json
           id?: string
+          include_in_analytics?: boolean
           name: string
           size_bytes?: number
         }
@@ -162,6 +164,7 @@ export type Database = {
           created_at?: string
           data?: Json
           id?: string
+          include_in_analytics?: boolean
           name?: string
           size_bytes?: number
         }

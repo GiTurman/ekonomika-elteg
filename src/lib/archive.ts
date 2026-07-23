@@ -6,6 +6,7 @@ export interface ArchiveEntry {
   name: string;
   created_at: string;
   size_bytes: number;
+  include_in_analytics: boolean;
 }
 
 export async function saveToArchive(name: string, state: AppState): Promise<void> {
@@ -24,7 +25,7 @@ export async function saveToArchive(name: string, state: AppState): Promise<void
 export async function findArchiveByName(name: string): Promise<ArchiveEntry | null> {
   const { data, error } = await supabase
     .from("app_backups")
-    .select("id, name, created_at, size_bytes")
+    .select("id, name, created_at, size_bytes, include_in_analytics")
     .eq("name", name)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -44,7 +45,7 @@ export async function updateArchiveEntry(id: string, state: AppState): Promise<v
 export async function listArchive(): Promise<ArchiveEntry[]> {
   const { data, error } = await supabase
     .from("app_backups")
-    .select("id, name, created_at, size_bytes")
+    .select("id, name, created_at, size_bytes, include_in_analytics")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as ArchiveEntry[];
@@ -74,6 +75,12 @@ export async function clearArchive(): Promise<void> {
   if (error) throw error;
 }
 
+// "ანალიტიკაში ჩართვის" checkbox — მხოლოდ ფინანსების ხელმისაწვდომობით.
+export async function setIncludeInAnalytics(id: string, include: boolean): Promise<void> {
+  const { error } = await supabase.from("app_backups").update({ include_in_analytics: include }).eq("id", id);
+  if (error) throw error;
+}
+
 export interface ArchiveEntryFull extends ArchiveEntry {
   data: AppState;
 }
@@ -82,7 +89,7 @@ export interface ArchiveEntryFull extends ArchiveEntry {
 export async function listArchiveFull(): Promise<ArchiveEntryFull[]> {
   const { data, error } = await supabase
     .from("app_backups")
-    .select("id, name, created_at, size_bytes, data")
+    .select("id, name, created_at, size_bytes, include_in_analytics, data")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as ArchiveEntryFull[];

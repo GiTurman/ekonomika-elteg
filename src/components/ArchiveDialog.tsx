@@ -9,7 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser, Copy } from "lucide-react";
-import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, type ArchiveEntry } from "@/lib/archive";
+import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, setIncludeInAnalytics, type ArchiveEntry } from "@/lib/archive";
+import { Checkbox } from "@/components/ui/checkbox";
 import { normalizeAppState } from "@/lib/econ-defaults";
 import { useEconStore } from "@/lib/econ-store";
 import { useAccessRole } from "@/components/AccessGate";
@@ -84,6 +85,19 @@ export function ArchiveDialog() {
     }
   };
 
+  const handleToggleAnalytics = async (it: ArchiveEntry) => {
+    const next = !it.include_in_analytics;
+    setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, include_in_analytics: next } : x)));
+    try {
+      await setIncludeInAnalytics(it.id, next);
+      logActivity(actorName, role, "ანალიტიკაში ჩართვის შეცვლა", `${it.name} → ${next ? "ჩართული" : "გამორთული"}`);
+    } catch (e) {
+      console.error("[archive] analytics toggle failed", e);
+      alert("განახლება ვერ მოხერხდა.");
+      refresh();
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("წავშალო არქივის ეს ჩანაწერი? ეს მოქმედება შეუქცევადია.")) return;
     setBusyId(id);
@@ -148,6 +162,7 @@ export function ArchiveDialog() {
                 <TableRow>
                   <TableHead>დასახელება</TableHead>
                   <TableHead>თარიღი</TableHead>
+                  {isFull && <TableHead className="text-center">ანალიტიკაში</TableHead>}
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -158,6 +173,11 @@ export function ArchiveDialog() {
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(it.created_at).toLocaleString("ka-GE")}
                     </TableCell>
+                    {isFull && (
+                      <TableCell className="text-center">
+                        <Checkbox checked={it.include_in_analytics} onCheckedChange={() => handleToggleAnalytics(it)} />
+                      </TableCell>
+                    )}
                     <TableCell className="flex justify-end gap-1">
                       <Button
                         size="icon"

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listArchiveFull, type ArchiveEntryFull } from "@/lib/archive";
 import { computeEconomics } from "@/lib/econ-calc";
 import { normalizeAppState } from "@/lib/econ-defaults";
+import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,8 @@ interface UnitRecord {
   markup: number;
   priceNoVat: number;
   finalPrice: number; // გასაყიდი ფასი, დღგ-ს ჩათვლით
-  marginPct: number;
+  marginPct: number;      // "სუფთა" მარჟა, დღგ-ს გარეშე ბაზაზე — მხოლოდ ფინანსებისთვის
+  grossMarginPct: number; // მარჟა დღგ-ჩართული ბაზით (ყოველთვის ნაკლები) — ფინანსების გარდა ყველასთვის
 }
 
 type GroupBy = "project" | "unit" | "project_brand" | "brand_kind" | "brand" | "floor_project_brand";
@@ -99,6 +101,7 @@ function MultiSelect({ label, options, selected, onChange }: {
 }
 
 export function AnalyticsSheet() {
+  const { isFull } = useAccessRole();
   const [entries, setEntries] = useState<ArchiveEntryFull[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +130,7 @@ export function AnalyticsSheet() {
   const allUnits: UnitRecord[] = useMemo(() => {
     const out: UnitRecord[] = [];
     for (const entry of entries) {
+      if (!entry.include_in_analytics) continue; // "ანალიტიკაში ჩართვა" checkbox — არქივის დიალოგში
       let eco;
       try {
         eco = computeEconomics(normalizeAppState(entry.data));
@@ -150,6 +154,7 @@ export function AnalyticsSheet() {
           priceNoVat: row.priceNoVat,
           finalPrice: row.finalPrice,
           marginPct: row.marginPct,
+          grossMarginPct: row.finalPrice ? row.markup / row.finalPrice : 0,
         });
       });
     }
@@ -202,15 +207,15 @@ export function AnalyticsSheet() {
       cur.purchase += u.purchaseCost;
       cur.install += u.installCost;
       cur.markup += u.markup;
-      cur.costNet += u.priceNoVat;
+      cur.costNet += isFull ? u.priceNoVat : u.finalPrice;
       cur.finalPriceSum += u.finalPrice;
-      cur.marginSum += u.marginPct;
+      cur.marginSum += isFull ? u.marginPct : u.grossMarginPct;
       map.set(key, cur);
     }
     return Array.from(map.entries())
       .map(([key, v]) => ({ key, ...v, avgMarginPct: v.count ? v.marginSum / v.count : 0 }))
       .sort((a, b) => b.costNet - a.costNet);
-  }, [filtered, groupBy]);
+  }, [filtered, groupBy, isFull]);
 
   // ბრენდების მომგებიანობა — ყოველთვის ჩანს, მიმდინარე ფილტრების გათვალისწინებით,
   // დამოუკიდებელი მთავარი "დაჯგუფება" არჩევანისგან
@@ -218,10 +223,12 @@ export function AnalyticsSheet() {
     const map = new Map<string, { count: number; costNet: number; markup: number; marginWeightSum: number }>();
     for (const u of filtered) {
       const cur = map.get(u.brand) ?? { count: 0, costNet: 0, markup: 0, marginWeightSum: 0 };
+      const value = isFull ? u.priceNoVat : u.finalPrice;
+      const margin = isFull ? u.marginPct : u.grossMarginPct;
       cur.count += 1;
-      cur.costNet += u.priceNoVat;
+      cur.costNet += value;
       cur.markup += u.markup;
-      cur.marginWeightSum += u.marginPct * u.priceNoVat;
+      cur.marginWeightSum += margin * value;
       map.set(u.brand, cur);
     }
     return Array.from(map.entries())
@@ -233,24 +240,27 @@ export function AnalyticsSheet() {
         marginPct: v.costNet ? v.marginWeightSum / v.costNet : 0,
       }))
       .sort((a, b) => b.marginPct - a.marginPct);
-  }, [filtered]);
+  }, [filtered, isFull]);
 
   const totals = useMemo(() => {
     const units = filtered.length;
     const floors = filtered.reduce((s, u) => s + u.floors, 0);
-    const costNet = filtered.reduce((s, u) => s + u.priceNoVat, 0);
+    const costNet = filtered.reduce((s, u) => s + (isFull ? u.priceNoVat : u.finalPrice), 0);
     const finalPriceSum = filtered.reduce((s, u) => s + u.finalPrice, 0);
     const markupSum = filtered.reduce((s, u) => s + u.markup, 0);
-    const marginWeighted = costNet ? filtered.reduce((s, u) => s + u.marginPct * u.priceNoVat, 0) / costNet : 0;
+    const marginWeighted = costNet
+      ? filtered.reduce((s, u) => s + (isFull ? u.marginPct : u.grossMarginPct) * (isFull ? u.priceNoVat : u.finalPrice), 0) / costNet
+      : 0;
     const projects = new Set(filtered.map((u) => u.projectName)).size;
     return { units, floors, costNet, finalPriceSum, markupSum, marginWeighted, projects };
-  }, [filtered]);
+  }, [filtered, isFull]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          დაშბორდი აგებულია არქივში შენახული ყველა დასრულებული პროექტის მონაცემებზე (დღგ-ს გარეშე, სუფთა ფინანსური ხედვა). მხოლოდ ფინანსების წვდომას უჩანს.
+          დაშბორდი აგებულია არქივში შენახული, ანალიტიკაში ჩართული პროექტების მონაცემებზე.
+          {isFull ? " ხედვა: სუფთა ფინანსური (დღგ-ს გარეშე)." : " ხედვა: დღგ-ს ჩათვლით."}
         </p>
         <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
@@ -324,12 +334,12 @@ export function AnalyticsSheet() {
           </Card>
 
           {/* KPIs reflect current filter */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+          <div className={"grid grid-cols-2 gap-2 " + (isFull ? "md:grid-cols-6" : "md:grid-cols-5")}>
             <Kpi label="პროექტები" value={String(totals.projects)} />
             <Kpi label="დანადგარები" value={String(totals.units)} />
             <Kpi label="ჯამური სართული" value={String(totals.floors)} />
-            <Kpi label="ჯამური ღირებულება (დღგ-ს გარეშე)" value={fmtUsd(totals.costNet)} />
-            <Kpi label="გასაყიდი ფასი (დღგ-ს ჩათვლით)" value={fmtUsd(totals.finalPriceSum)} />
+            <Kpi label={isFull ? "ჯამური ღირებულება (დღგ-ს გარეშე)" : "ჯამური ღირებულება (დღგ-ს ჩათვლით)"} value={fmtUsd(totals.costNet)} />
+            {isFull && <Kpi label="გასაყიდი ფასი (დღგ-ს ჩათვლით)" value={fmtUsd(totals.finalPriceSum)} />}
             <Kpi label="საშუალო მარჟა (შეწონილი)" value={fmtPct(totals.marginWeighted)} />
           </div>
 
@@ -400,8 +410,8 @@ export function AnalyticsSheet() {
                       <TableHead className="text-right">სართ. ჯამი</TableHead>
                       <TableHead className="text-right">შესყ.+მონტ. თვითღ.</TableHead>
                       <TableHead className="text-right">ჯამური ფასნამატი</TableHead>
-                      <TableHead className="text-right">ღირებულება (დღგ-ს გარეშე)</TableHead>
-                      <TableHead className="text-right">გასაყიდი ფასი (დღგ-ს ჩათვლით)</TableHead>
+                      <TableHead className="text-right">{isFull ? "ღირებულება (დღგ-ს გარეშე)" : "ღირებულება (დღგ-ს ჩათვლით)"}</TableHead>
+                      {isFull && <TableHead className="text-right">გასაყიდი ფასი (დღგ-ს ჩათვლით)</TableHead>}
                       <TableHead className="text-right">საშ. მარჟა %</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -414,7 +424,7 @@ export function AnalyticsSheet() {
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.purchase + r.install)}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.markup)}</TableCell>
                         <TableCell className={"text-right " + computedCls}>{fmtUsd(r.costNet)}</TableCell>
-                        <TableCell className={"text-right " + computedCls}>{fmtUsd(r.finalPriceSum)}</TableCell>
+                        {isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(r.finalPriceSum)}</TableCell>}
                         <TableCell className="text-right">
                           <span className="inline-flex items-center gap-1.5">
                             <span className="inline-block h-2 w-2 rounded-full" style={{ background: marginColor(r.avgMarginPct) }} />
