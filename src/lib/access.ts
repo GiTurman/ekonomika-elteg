@@ -12,21 +12,11 @@ export const ROLE_LABEL: Record<AccessRole, string> = {
   partial: "პარტნიორი", // ძველი როლის სახელი — ახალ მომხმარებლებს აღარ ენიჭება, უკვე არსებულებისთვის შენარჩუნებულია
 };
 
-export interface UserPageVisibility {
-  input: boolean;
-  economics: boolean;
-  payment: boolean;
-  tariffs: boolean;
-  analytics: boolean;
-  comparison: boolean;
-}
-
 export interface AppUser {
   id: string;
   name: string;
   code: string;
   role: AccessRole;
-  pageVisibility: UserPageVisibility;
 }
 
 function rowToUser(row: any): AppUser {
@@ -35,19 +25,12 @@ function rowToUser(row: any): AppUser {
     name: row.name,
     code: row.code,
     role: (row.role in ROLE_LABEL ? row.role : "partial") as AccessRole,
-    pageVisibility: {
-      input: row.page_input,
-      economics: row.page_economics,
-      payment: row.page_payment,
-      tariffs: row.page_tariffs,
-      analytics: row.page_analytics,
-      comparison: row.page_comparison,
-    },
   };
 }
 
-// კოდით ავთენტიფიკაცია — მომხმარებელი (სახელი, როლი, ხედვები) ბაზიდან მოდის,
-// აღარ არის ორი ჰარდკოდილი საერთო კოდი.
+// კოდით ავთენტიფიკაცია — მომხმარებელი (სახელი, როლი) ბაზიდან მოდის, აღარ არის
+// ორი ჰარდკოდილი საერთო კოდი. გვერდის/ველის ხედვები როლის მიხედვით მართავს
+// page_permissions/field_permissions ცხრილები — არა ცალკეული მომხმარებელი.
 export async function checkAccessCode(code: string): Promise<AppUser | null> {
   const trimmed = code.trim();
   if (!trimmed) return null;
@@ -60,7 +43,7 @@ export async function checkAccessCode(code: string): Promise<AppUser | null> {
 }
 
 // სესიის ქეშირებული მომხმარებლის ფონურად განახლებისთვის — რომ Finance-ის მიერ
-// შეცვლილი როლი/ხედვები/სახელი დაუყოვნებლივ ეცნობოს უკვე შესულ მომხმარებელს,
+// შეცვლილი როლი/სახელი დაუყოვნებლივ ეცნობოს უკვე შესულ მომხმარებელს,
 // კოდის ხელახლა შეყვანის გარეშე.
 export async function getUserById(id: string): Promise<AppUser | null> {
   const { data, error } = await supabase.from("app_users").select("*").eq("id", id).maybeSingle();
@@ -78,25 +61,15 @@ export async function listUsers(): Promise<AppUser[]> {
 }
 
 export async function createUser(name: string, code: string, role: AccessRole): Promise<void> {
-  const { error } = await supabase.from("app_users").insert({
-    name, code, role,
-    page_input: true, page_economics: true, page_payment: true,
-    page_tariffs: false, page_analytics: false, page_comparison: true,
-  });
+  const { error } = await supabase.from("app_users").insert({ name, code, role });
   if (error) throw error;
 }
 
-export async function updateUser(id: string, patch: Partial<{ name: string; code: string; role: AccessRole } & UserPageVisibility>): Promise<void> {
+export async function updateUser(id: string, patch: Partial<{ name: string; code: string; role: AccessRole }>): Promise<void> {
   const row: any = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.code !== undefined) row.code = patch.code;
   if (patch.role !== undefined) row.role = patch.role;
-  if (patch.input !== undefined) row.page_input = patch.input;
-  if (patch.economics !== undefined) row.page_economics = patch.economics;
-  if (patch.payment !== undefined) row.page_payment = patch.payment;
-  if (patch.tariffs !== undefined) row.page_tariffs = patch.tariffs;
-  if (patch.analytics !== undefined) row.page_analytics = patch.analytics;
-  if (patch.comparison !== undefined) row.page_comparison = patch.comparison;
   const { error } = await supabase.from("app_users").update(row).eq("id", id);
   if (error) throw error;
 }

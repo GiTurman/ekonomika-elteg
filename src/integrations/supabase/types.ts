@@ -41,6 +41,24 @@ export type Database = {
         }
         Relationships: []
       }
+      page_permissions: {
+        Row: {
+          allowed_roles: string[]
+          label: string
+          page_key: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          label: string
+          page_key: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          label?: string
+          page_key?: string
+        }
+        Relationships: []
+      }
       field_permissions: {
         Row: {
           allowed_roles: string[]

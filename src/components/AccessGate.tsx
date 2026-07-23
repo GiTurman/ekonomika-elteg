@@ -1,18 +1,22 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, getUserById, type AppUser, type AccessRole, type UserPageVisibility } from "@/lib/access";
+import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, getUserById, type AppUser, type AccessRole } from "@/lib/access";
 import { listFieldPermissions, type FieldPermission } from "@/lib/fieldPermissions";
+import { listPagePermissions, type PagePermission } from "@/lib/pagePermissions";
 
 interface AccessContextShape {
   userId: string;
   role: AccessRole;
   isFull: boolean;
   actorName: string;
-  pageVisibility: UserPageVisibility;
   logout: () => void;
   // ველის დონის უფლება — თუ ეს კონკრეტული ველი ცნობილი არაა matrix-ში,
   // ნაგულისხმევად რედაქტირებადია (რომ ახალმა ველებმა შემთხვევით არ დაბლოკოს).
   canEditField: (fieldKey: string) => boolean;
   refreshFieldPermissions: () => void;
+  // გვერდის ხედვადობა — როლის მიხედვით (არა ცალკეული მომხმარებლის). თუ გვერდი
+  // ცნობილი არაა matrix-ში, ნაგულისხმევად ხილვადია.
+  canViewPage: (pageKey: string) => boolean;
+  refreshPagePermissions: () => void;
 }
 
 const AccessContext = createContext<AccessContextShape | null>(null);
@@ -26,10 +30,14 @@ export function useAccessRole(): AccessContextShape {
 export function AccessGate({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [ready, setReady] = useState(false);
-  const [permissions, setPermissions] = useState<FieldPermission[]>([]);
+  const [fieldPerms, setFieldPerms] = useState<FieldPermission[]>([]);
+  const [pagePerms, setPagePerms] = useState<PagePermission[]>([]);
 
-  const loadPermissions = () => {
-    listFieldPermissions().then(setPermissions).catch((e) => console.error("[permissions] load failed", e));
+  const loadFieldPermissions = () => {
+    listFieldPermissions().then(setFieldPerms).catch((e) => console.error("[permissions] field load failed", e));
+  };
+  const loadPagePermissions = () => {
+    listPagePermissions().then(setPagePerms).catch((e) => console.error("[permissions] page load failed", e));
   };
 
   useEffect(() => {
@@ -38,7 +46,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     setReady(true);
     if (cached) {
       // ქეშირებული სესია მაშინვე გამოისახება (სწრაფი, მოციმციმების გარეშე),
-      // ფონში კი ბაზიდან ახლდება — თუ Finance-მ როლი/ხედვები/სახელი შეცვალა,
+      // ფონში კი ბაზიდან ახლდება — თუ Finance-მ როლი/სახელი შეცვალა,
       // ან მომხმარებელი წაშალა, ეს დაუყოვნებლივ აისახება ხელახლა შესვლის გარეშე.
       getUserById(cached.id).then((fresh) => {
         if (fresh) {
@@ -49,7 +57,8 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
           setUser(null);
         }
       });
-      loadPermissions();
+      loadFieldPermissions();
+      loadPagePermissions();
     }
   }, []);
 
@@ -61,20 +70,28 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   if (!ready) return null;
 
   if (!user) {
-    return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); loadPermissions(); }} />;
+    return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); loadFieldPermissions(); loadPagePermissions(); }} />;
   }
 
   const canEditField = (fieldKey: string): boolean => {
     if (user.role === "full") return true; // ფინანსებს ყოველთვის შეუძლია ყველაფრის რედაქტირება
-    const perm = permissions.find((p) => p.fieldKey === fieldKey);
+    const perm = fieldPerms.find((p) => p.fieldKey === fieldKey);
     if (!perm) return true; // უცნობი/ჯერ არარეგისტრირებული ველი — ნაგულისხმევად ღიაა
+    return perm.allowedRoles.includes(user.role);
+  };
+
+  const canViewPage = (pageKey: string): boolean => {
+    if (user.role === "full") return true; // ფინანსები ყოველთვის ხედავს ყველა გვერდს
+    const perm = pagePerms.find((p) => p.pageKey === pageKey);
+    if (!perm) return true; // უცნობი/ჯერ არარეგისტრირებული გვერდი — ნაგულისხმევად ხილვადია
     return perm.allowedRoles.includes(user.role);
   };
 
   return (
     <AccessContext.Provider value={{
       userId: user.id, role: user.role, isFull: user.role === "full", actorName: user.name,
-      pageVisibility: user.pageVisibility, logout, canEditField, refreshFieldPermissions: loadPermissions,
+      logout, canEditField, refreshFieldPermissions: loadFieldPermissions,
+      canViewPage, refreshPagePermissions: loadPagePermissions,
     }}>
       {children}
     </AccessContext.Provider>

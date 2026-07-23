@@ -2,6 +2,7 @@ import { useEffect, useState, Fragment } from "react";
 import { listActivityLog, type ActivityLogEntry } from "@/lib/activityLog";
 import { listUsers, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser, type AccessRole } from "@/lib/access";
 import { listFieldPermissions, updateFieldPermission, type FieldPermission } from "@/lib/fieldPermissions";
+import { listPagePermissions, updatePagePermission, type PagePermission } from "@/lib/pagePermissions";
 import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,16 +13,86 @@ import { TextInput } from "./sheet-ui";
 import { Loader2, RefreshCw, Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 
-const PAGE_COLS: Array<{ key: "input" | "economics" | "payment" | "tariffs" | "analytics" | "comparison"; label: string }> = [
-  { key: "input", label: "შესატანი" },
-  { key: "economics", label: "ეკონომიკა" },
-  { key: "comparison", label: "შედარება" },
-  { key: "payment", label: "გადახდები" },
-  { key: "tariffs", label: "ტარიფები" },
-  { key: "analytics", label: "ანალიტიკა" },
-];
-
 const NON_FULL_ROLES: AccessRole[] = ["commercial", "technical", "accounting", "procurement", "administration"];
+
+function PagePermissionsPanel() {
+  const { actorName, role: myRole, refreshPagePermissions } = useAccessRole();
+  const [perms, setPerms] = useState<PagePermission[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setPerms(await listPagePermissions());
+    } catch (e) {
+      console.error("[permissions] page load failed", e);
+      setError("გვერდების ხედვადობის ჩატვირთვა ვერ მოხერხდა.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const toggleRole = async (perm: PagePermission, role: AccessRole) => {
+    const has = perm.allowedRoles.includes(role);
+    const nextRoles = has ? perm.allowedRoles.filter((r) => r !== role) : [...perm.allowedRoles, role];
+    setPerms((prev) => prev.map((p) => (p.pageKey === perm.pageKey ? { ...p, allowedRoles: nextRoles } : p)));
+    try {
+      await updatePagePermission(perm.pageKey, nextRoles);
+      refreshPagePermissions(); // მიმდინარე სესიაშიც დაუყოვნებლივ ამოქმედდეს
+      logActivity(actorName, myRole, "გვერდის ხედვადობის ცვლილება", `${perm.label} → ${nextRoles.map((r) => (ROLE_LABEL as Record<string, string>)[r]).join(", ") || "არავინ"}`);
+    } catch (e) {
+      console.error("[permissions] page update failed", e);
+      alert("განახლება ვერ მოხერხდა.");
+      refresh();
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>გვერდების ხედვადობა — როლის მიხედვით</CardTitle>
+        <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+          განახლება
+        </Button>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <p className="text-xs text-muted-foreground mb-3">
+          ფინანსებს ყოველთვის შეუძლია ყველა გვერდის ნახვა, checkbox-ების მიუხედავად. ეს ცხრილი როლის დონეზეა —
+          ერთხელ დააყენებ და ამ როლის ყველა მომხმარებელს ეხება ერთდროულად, ცალკეული მომხმარებლის მორგება აღარ სჭირდება.
+        </p>
+        {error && <p className="text-sm text-destructive mb-2">{error}</p>}
+        <Table>
+          <TableHeader>
+            <TableRow className="text-xs">
+              <TableHead>გვერდი</TableHead>
+              {NON_FULL_ROLES.map((r) => <TableHead key={r} className="text-center">{ROLE_LABEL[r]}</TableHead>)}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {perms.map((perm) => (
+              <TableRow key={perm.pageKey}>
+                <TableCell className="text-sm font-medium">{perm.label}</TableCell>
+                {NON_FULL_ROLES.map((r) => (
+                  <TableCell key={r} className="text-center p-1">
+                    <Checkbox checked={perm.allowedRoles.includes(r)} onCheckedChange={() => toggleRole(perm, r)} />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+            {perms.length === 0 && !loading && (
+              <TableRow><TableCell colSpan={NON_FULL_ROLES.length + 1} className="text-center text-sm text-muted-foreground py-6">გვერდები არ არის რეგისტრირებული.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
 
 function FieldPermissionsPanel() {
   const { actorName, role: myRole, refreshFieldPermissions } = useAccessRole();
@@ -155,14 +226,6 @@ function UsersPanel() {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.code !== undefined ? { code: patch.code } : {}),
         ...(patch.role !== undefined ? { role: patch.role } : {}),
-        pageVisibility: {
-          input: patch.input ?? x.pageVisibility.input,
-          economics: patch.economics ?? x.pageVisibility.economics,
-          payment: patch.payment ?? x.pageVisibility.payment,
-          tariffs: patch.tariffs ?? x.pageVisibility.tariffs,
-          analytics: patch.analytics ?? x.pageVisibility.analytics,
-          comparison: patch.comparison ?? x.pageVisibility.comparison,
-        },
       } : x)));
       if (logNote) logActivity(actorName, myRole, logNote, u.name);
     } catch (e) {
@@ -187,7 +250,7 @@ function UsersPanel() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>მომხმარებლები, კოდები და გვერდების ხედვები</CardTitle>
+        <CardTitle>მომხმარებლები და კოდები</CardTitle>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
@@ -198,8 +261,8 @@ function UsersPanel() {
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <p className="text-xs text-muted-foreground mb-3">
-          კოდის შეცვლა და მომხმარებლების მართვა — მხოლოდ ფინანსების ხელმისაწვდომობაშია. „ფინანსები" როლის
-          მომხმარებელი ყოველთვის ხედავს ყველა გვერდს, მიუხედავად checkbox-ების მდგომარეობისა.
+          კოდის შეცვლა და მომხმარებლების მართვა — მხოლოდ ფინანსების ხელმისაწვდომობაშია. გვერდების/ველების
+          ხედვადობა და რედაქტირების უფლებები ცალკე იმართება, როლის მიხედვით (იხ. ქვემოთ).
         </p>
         {error && <p className="text-sm text-destructive mb-2">{error}</p>}
         <Table>
@@ -208,7 +271,6 @@ function UsersPanel() {
               <TableHead>სახელი</TableHead>
               <TableHead>კოდი</TableHead>
               <TableHead>როლი</TableHead>
-              {PAGE_COLS.map((c) => <TableHead key={c.key} className="text-center">{c.label}</TableHead>)}
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -234,15 +296,6 @@ function UsersPanel() {
                     </SelectContent>
                   </Select>
                 </TableCell>
-                {PAGE_COLS.map((c) => (
-                  <TableCell key={c.key} className="text-center p-1">
-                    <Checkbox
-                      checked={u.pageVisibility[c.key]}
-                      disabled={u.role === "full"}
-                      onCheckedChange={(v) => handleUpdate(u, { [c.key]: !!v } as any)}
-                    />
-                  </TableCell>
-                ))}
                 <TableCell className="p-1">
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(u)}>
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -251,7 +304,7 @@ function UsersPanel() {
               </TableRow>
             ))}
             {users.length === 0 && !loading && (
-              <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">მომხმარებელი არ არის.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">მომხმარებელი არ არის.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -283,13 +336,14 @@ export function LogSheet() {
   return (
     <div className="space-y-4">
       <UsersPanel />
+      <PagePermissionsPanel />
       <FieldPermissionsPanel />
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           ვინ, როდის, რა მოქმედება შეასრულა. ჩვეულებრივი ველების რედაქტირება (ავტომატური შენახვა) აქ არ ილოგება —
           მხოლოდ მნიშვნელოვანი მოქმედებები (დასრულება/შენახვა, ახალი პროექტი, არქივის გახსნა/წაშლა, სტატუსის
-          ცვლილება, მომხმარებლების მართვა).
+          ცვლილება, მომხმარებლების/უფლებების მართვა).
         </p>
         <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
