@@ -10,7 +10,7 @@ import { useState } from "react";
 
 export function FinancialAssumptionsSheet() {
   const { state, updateFinance } = useEconStore();
-  const { canEditField } = useAccessRole();
+  const { canEditField, canSeeField } = useAccessRole();
   const f = state.finance;
   const units = state.project.units;
   const travel = computeTravel(state);
@@ -74,33 +74,41 @@ export function FinancialAssumptionsSheet() {
         <CardHeader><CardTitle>3. მივლინების განაკვეთები (ლარში)</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">კვების ხარჯი დღეში, ერთ კაცზე</span>
-              {canEditField("finance.mealPerDay") ? (
-                <NumberInput value={f.mealPerDay} onChange={(v) => updateFinance({ mealPerDay: v })} />
-              ) : <div className={computedCls}>{fmtGel(f.mealPerDay)}</div>}
-            </label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საწვავის ფასი, 1 ლ (დღგ-ით)</span>
-              {canEditField("finance.fuelPricePerL") ? (
-                <NumberInput value={f.fuelPricePerL} onChange={(v) => updateFinance({ fuelPricePerL: v })} />
-              ) : <div className={computedCls}>{fmtGel(f.fuelPricePerL)}</div>}
-            </label>
+            {canSeeField("finance.mealPerDay") && (
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">კვების ხარჯი დღეში, ერთ კაცზე</span>
+                {canEditField("finance.mealPerDay") ? (
+                  <NumberInput value={f.mealPerDay} onChange={(v) => updateFinance({ mealPerDay: v })} />
+                ) : <div className={computedCls}>{fmtGel(f.mealPerDay)}</div>}
+              </label>
+            )}
+            {canSeeField("finance.fuelPricePerL") && (
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">საწვავის ფასი, 1 ლ (დღგ-ით)</span>
+                {canEditField("finance.fuelPricePerL") ? (
+                  <NumberInput value={f.fuelPricePerL} onChange={(v) => updateFinance({ fuelPricePerL: v })} />
+                ) : <div className={computedCls}>{fmtGel(f.fuelPricePerL)}</div>}
+              </label>
+            )}
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">საწვავი ₾/კმ</span>
               <div className={computedCls}>{travel.fuelPerKm.toFixed(4)}</div></label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — მექანიკოსები (₾/დღე)</span>
-              {canEditField("finance.hotelRates") ? (
-                <NumberInput value={f.hotelMechanics} onChange={(v) => updateFinance({ hotelMechanics: v })} />
-              ) : <div className={computedCls}>{fmtGel(f.hotelMechanics)}</div>}
-            </label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — ელექტრიკოსები (₾/დღე)</span>
-              {canEditField("finance.hotelRates") ? (
-                <NumberInput value={f.hotelElectricians} onChange={(v) => updateFinance({ hotelElectricians: v })} />
-              ) : <div className={computedCls}>{fmtGel(f.hotelElectricians)}</div>}
-            </label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — ადმინისტრაცია (₾/დღე)</span>
-              {canEditField("finance.hotelRates") ? (
-                <NumberInput value={f.hotelAdmin} onChange={(v) => updateFinance({ hotelAdmin: v })} />
-              ) : <div className={computedCls}>{fmtGel(f.hotelAdmin)}</div>}
-            </label>
+            {canSeeField("finance.hotelRates") && (
+              <>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — მექანიკოსები (₾/დღე)</span>
+                  {canEditField("finance.hotelRates") ? (
+                    <NumberInput value={f.hotelMechanics} onChange={(v) => updateFinance({ hotelMechanics: v })} />
+                  ) : <div className={computedCls}>{fmtGel(f.hotelMechanics)}</div>}
+                </label>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — ელექტრიკოსები (₾/დღე)</span>
+                  {canEditField("finance.hotelRates") ? (
+                    <NumberInput value={f.hotelElectricians} onChange={(v) => updateFinance({ hotelElectricians: v })} />
+                  ) : <div className={computedCls}>{fmtGel(f.hotelElectricians)}</div>}
+                </label>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">სასტუმროს დღიური ტარიფი — ადმინისტრაცია (₾/დღე)</span>
+                  {canEditField("finance.hotelRates") ? (
+                    <NumberInput value={f.hotelAdmin} onChange={(v) => updateFinance({ hotelAdmin: v })} />
+                  ) : <div className={computedCls}>{fmtGel(f.hotelAdmin)}</div>}
+                </label>
+              </>
+            )}
             <p className="md:col-span-3 text-xs text-muted-foreground">
               გამოიყენება მხოლოდ იმ ჯგუფებისთვის, რომლებსაც «პროექტის მონაცემები» ფურცელზე „საცხოვრებელი" = სასტუმრო
               აქვთ არჩეული (ჯამი = ტარიფი × დღეები). „სახლი ქირით" რეჟიმისთვის ჯამური თანხა შეიყვანება უშუალოდ იქვე.
@@ -201,21 +209,25 @@ export function FinancialAssumptionsSheet() {
             <NumberInput value={f.warrantyYears} onChange={(v) => updateFinance({ warrantyYears: v })} /></label>
           <div className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის % (ქარხნული ფასიდან)</span>
             <span className="text-xs text-muted-foreground">დანადგარის მიხედვით — «პროექტის მონაცემები» (3.2)</span></div>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">თვიური სერვისი (USD)</span>
-            {canEditField("finance.serviceGuarantee") ? (
-              <NumberInput value={f.monthlyServiceUsd} onChange={(v) => updateFinance({ monthlyServiceUsd: v })} />
-            ) : <div className={computedCls}>{fmtUsd(f.monthlyServiceUsd)}</div>}
-          </label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">უფასო სერვისის ვადა (თვე)</span>
-            {canEditField("finance.serviceGuarantee") ? (
-              <NumberInput value={f.freeServiceMonths} onChange={(v) => updateFinance({ freeServiceMonths: v })} />
-            ) : <div className={computedCls}>{f.freeServiceMonths}</div>}
-          </label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის თანხა, ჯამურად (USD)</span>
-            {canEditField("finance.serviceGuarantee") ? (
-              <NumberInput value={f.guaranteeAmountTotal} onChange={(v) => updateFinance({ guaranteeAmountTotal: v })} />
-            ) : <div className={computedCls}>{fmtUsd(f.guaranteeAmountTotal)}</div>}
-          </label>
+          {canSeeField("finance.serviceGuarantee") && (
+            <>
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">თვიური სერვისი (USD)</span>
+                {canEditField("finance.serviceGuarantee") ? (
+                  <NumberInput value={f.monthlyServiceUsd} onChange={(v) => updateFinance({ monthlyServiceUsd: v })} />
+                ) : <div className={computedCls}>{fmtUsd(f.monthlyServiceUsd)}</div>}
+              </label>
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">უფასო სერვისის ვადა (თვე)</span>
+                {canEditField("finance.serviceGuarantee") ? (
+                  <NumberInput value={f.freeServiceMonths} onChange={(v) => updateFinance({ freeServiceMonths: v })} />
+                ) : <div className={computedCls}>{f.freeServiceMonths}</div>}
+              </label>
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის თანხა, ჯამურად (USD)</span>
+                {canEditField("finance.serviceGuarantee") ? (
+                  <NumberInput value={f.guaranteeAmountTotal} onChange={(v) => updateFinance({ guaranteeAmountTotal: v })} />
+                ) : <div className={computedCls}>{fmtUsd(f.guaranteeAmountTotal)}</div>}
+              </label>
+            </>
+          )}
           <p className="md:col-span-2 text-xs text-muted-foreground">
             „თვიური სერვისი" და „გარანტიის თანხა" ორივე შეყვანილია პროექტის ჯამურ თანხად და ავტომატურად თანაბრად
             ნაწილდება ყველა დანადგარზე (ჯამში ზუსტად ამ თანხას უტოლდება).
@@ -226,21 +238,25 @@ export function FinancialAssumptionsSheet() {
       <Card>
         <CardHeader><CardTitle>7. საბანკო გარანტია</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის %, სრული თანხიდან</span>
-            {canEditField("finance.bankGuarantee") ? (
-              <PercentInput value={f.guaranteePct} onChange={(v) => updateFinance({ guaranteePct: v })} />
-            ) : <div className={computedCls}>{fmtPct(f.guaranteePct)}</div>}
-          </label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">მოქმედების ვადა, დღე</span>
-            {canEditField("finance.bankGuarantee") ? (
-              <NumberInput value={f.guaranteeDays} onChange={(v) => updateFinance({ guaranteeDays: v })} />
-            ) : <div className={computedCls}>{f.guaranteeDays}</div>}
-          </label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">წლიური საკომისიო %</span>
-            {canEditField("finance.bankGuarantee") ? (
-              <PercentInput value={f.guaranteeAnnualPct} onChange={(v) => updateFinance({ guaranteeAnnualPct: v })} />
-            ) : <div className={computedCls}>{fmtPct(f.guaranteeAnnualPct)}</div>}
-          </label>
+          {canSeeField("finance.bankGuarantee") && (
+            <>
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის %, სრული თანხიდან</span>
+                {canEditField("finance.bankGuarantee") ? (
+                  <PercentInput value={f.guaranteePct} onChange={(v) => updateFinance({ guaranteePct: v })} />
+                ) : <div className={computedCls}>{fmtPct(f.guaranteePct)}</div>}
+              </label>
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">მოქმედების ვადა, დღე</span>
+                {canEditField("finance.bankGuarantee") ? (
+                  <NumberInput value={f.guaranteeDays} onChange={(v) => updateFinance({ guaranteeDays: v })} />
+                ) : <div className={computedCls}>{f.guaranteeDays}</div>}
+              </label>
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">წლიური საკომისიო %</span>
+                {canEditField("finance.bankGuarantee") ? (
+                  <PercentInput value={f.guaranteeAnnualPct} onChange={(v) => updateFinance({ guaranteeAnnualPct: v })} />
+                ) : <div className={computedCls}>{fmtPct(f.guaranteeAnnualPct)}</div>}
+              </label>
+            </>
+          )}
           <p className="md:col-span-3 text-xs text-muted-foreground">Act/365: საკომისიო = თანხა × წლიური % × (დღე/365)</p>
         </CardContent>
       </Card>

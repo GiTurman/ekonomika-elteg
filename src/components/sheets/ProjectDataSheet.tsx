@@ -57,13 +57,28 @@ const UNIT_RATE_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label:
 
 export function ProjectDataSheet() {
   const { state, updateProject, updateUnit, addUnit, removeUnit } = useEconStore();
-  const { isFull, actorName, role, canEditField } = useAccessRole();
+  const { isFull, actorName, role, canEditField, canSeeField } = useAccessRole();
   const p = state.project;
   const t = p.travel;
   const alloc = allocateProjectCosts(state);
   // დაწყების თარიღს პარტნიორი ავსებს პირველად; ერთხელ შევსების შემდეგ
   // მის შესწორებას მხოლოდ ფინანსები ახერხებს.
   const canEditStartDate = isFull || !p.startDate;
+  const visibleUnitCols = UNIT_COLS.filter((c) => canSeeField("unit." + c.key));
+  const visibleFinCols = UNIT_FINANCIAL_COLS.filter((c) => canSeeField("unit." + c.key));
+  const visibleRateCols = UNIT_RATE_COLS.filter((c) => canSeeField("unit." + c.key));
+  const seeCategory = canSeeField("unit.category");
+  const seeBank = canSeeField("project.bankCommissionTotal");
+  const seeIntTransport = canSeeField("project.intTransportTotal");
+  const seeTerminal = canSeeField("project.terminalTotal");
+  const seeLocalTransport = canSeeField("project.localTransportTotal");
+  const seeBroker = canSeeField("unit.brokerCommissionPct");
+  const seeHeadcount = canSeeField("travel.headcount");
+  const seeDays = canSeeField("travel.days");
+  const seeTrips = canSeeField("travel.trips");
+  const seeAccommodation = canSeeField("travel.accommodation");
+  const seeHouseRent = canSeeField("travel.houseRent");
+  const seeDistanceFuel = canSeeField("travel.distanceFuel");
 
   const setTravel = (patch: Partial<typeof t>) =>
     updateProject({ travel: { ...t, ...patch } });
@@ -131,29 +146,31 @@ export function ProjectDataSheet() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="whitespace-nowrap text-xs">კატეგორია</TableHead>
-                {UNIT_COLS.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
+                {seeCategory && <TableHead className="whitespace-nowrap text-xs">კატეგორია</TableHead>}
+                {visibleUnitCols.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
                 <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {p.units.map((u) => (
                 <TableRow key={u.id}>
-                  <TableCell className="p-1 min-w-[140px]">
-                    {canEditField("unit.category") ? (
-                      <Select value={u.category} onValueChange={(v) => updateUnit(u.id, { category: v as EquipmentCategory })}>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(EQUIPMENT_CATEGORY_LABEL) as EquipmentCategory[]).map((c) => (
-                            <SelectItem key={c} value={c}>{EQUIPMENT_CATEGORY_LABEL[c]}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className={"h-8 flex items-center text-sm " + computedCls}>{EQUIPMENT_CATEGORY_LABEL[u.category]}</div>
-                    )}
-                  </TableCell>
-                  {UNIT_COLS.map((c) => (
+                  {seeCategory && (
+                    <TableCell className="p-1 min-w-[140px]">
+                      {canEditField("unit.category") ? (
+                        <Select value={u.category} onValueChange={(v) => updateUnit(u.id, { category: v as EquipmentCategory })}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(Object.keys(EQUIPMENT_CATEGORY_LABEL) as EquipmentCategory[]).map((c) => (
+                              <SelectItem key={c} value={c}>{EQUIPMENT_CATEGORY_LABEL[c]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className={"h-8 flex items-center text-sm " + computedCls}>{EQUIPMENT_CATEGORY_LABEL[u.category]}</div>
+                      )}
+                    </TableCell>
+                  )}
+                  {visibleUnitCols.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[92px]">
                       {canEditField("unit." + c.key) ? (
                         c.kind === "num"
@@ -183,19 +200,19 @@ export function ProjectDataSheet() {
             <TableHeader>
               <TableRow>
                 <TableHead className="whitespace-nowrap text-xs">#</TableHead>
-                {UNIT_FINANCIAL_COLS.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
-                <TableHead className="whitespace-nowrap text-xs">საბანკო საკომ. ($, გადანაწ.)</TableHead>
-                <TableHead className="whitespace-nowrap text-xs">საერთაშ. ტრანსპ. ($, გადანაწ.)</TableHead>
-                <TableHead className="whitespace-nowrap text-xs">ტერმინალი ($, გადანაწ.)</TableHead>
-                <TableHead className="whitespace-nowrap text-xs">ადგ. ტრანსპ. ($, გადანაწ.)</TableHead>
-                <TableHead className="whitespace-nowrap text-xs">საშუამავლო საკ. (%)</TableHead>
+                {visibleFinCols.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
+                {seeBank && <TableHead className="whitespace-nowrap text-xs">საბანკო საკომ. ($, გადანაწ.)</TableHead>}
+                {seeIntTransport && <TableHead className="whitespace-nowrap text-xs">საერთაშ. ტრანსპ. ($, გადანაწ.)</TableHead>}
+                {seeTerminal && <TableHead className="whitespace-nowrap text-xs">ტერმინალი ($, გადანაწ.)</TableHead>}
+                {seeLocalTransport && <TableHead className="whitespace-nowrap text-xs">ადგ. ტრანსპ. ($, გადანაწ.)</TableHead>}
+                {seeBroker && <TableHead className="whitespace-nowrap text-xs">საშუამავლო საკ. (%)</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {p.units.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="p-1 font-semibold">{u.id}</TableCell>
-                  {UNIT_FINANCIAL_COLS.map((c) => (
+                  {visibleFinCols.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[110px]">
                       {canEditField("unit." + c.key) ? (
                         <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
@@ -204,31 +221,33 @@ export function ProjectDataSheet() {
                       )}
                     </TableCell>
                   ))}
-                  <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.bank.get(u.id) ?? 0)}</TableCell>
-                  <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.intTransport.get(u.id) ?? 0)}</TableCell>
-                  <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.terminal.get(u.id) ?? 0)}</TableCell>
-                  <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.localTransport.get(u.id) ?? 0)}</TableCell>
-                  <TableCell className="p-1 min-w-[100px]">
-                    {canEditField("unit.brokerCommissionPct") ? (
-                      <PercentInput value={u.brokerCommissionPct} onChange={(v) => updateUnit(u.id, { brokerCommissionPct: v })} />
-                    ) : (
-                      <div className={"text-right " + computedCls}>{fmtPct(u.brokerCommissionPct)}</div>
-                    )}
-                  </TableCell>
+                  {seeBank && <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.bank.get(u.id) ?? 0)}</TableCell>}
+                  {seeIntTransport && <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.intTransport.get(u.id) ?? 0)}</TableCell>}
+                  {seeTerminal && <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.terminal.get(u.id) ?? 0)}</TableCell>}
+                  {seeLocalTransport && <TableCell className={"p-1 min-w-[110px] text-right " + computedCls}>{fmtUsd(alloc.localTransport.get(u.id) ?? 0)}</TableCell>}
+                  {seeBroker && (
+                    <TableCell className="p-1 min-w-[100px]">
+                      {canEditField("unit.brokerCommissionPct") ? (
+                        <PercentInput value={u.brokerCommissionPct} onChange={(v) => updateUnit(u.id, { brokerCommissionPct: v })} />
+                      ) : (
+                        <div className={"text-right " + computedCls}>{fmtPct(u.brokerCommissionPct)}</div>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               <TableRow className="bg-muted/40 font-semibold">
                 <TableCell className="p-1">ჯამი</TableCell>
-                {UNIT_FINANCIAL_COLS.map((c) => (
+                {visibleFinCols.map((c) => (
                   <TableCell key={c.key} className={"p-1 text-right " + computedCls}>
                     {fmtUsd(p.units.reduce((s, u) => s + (Number(u[c.key]) || 0), 0))}
                   </TableCell>
                 ))}
-                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.bank.get(u.id) ?? 0), 0))}</TableCell>
-                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.intTransport.get(u.id) ?? 0), 0))}</TableCell>
-                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.terminal.get(u.id) ?? 0), 0))}</TableCell>
-                <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.localTransport.get(u.id) ?? 0), 0))}</TableCell>
-                <TableCell className="p-1" />
+                {seeBank && <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.bank.get(u.id) ?? 0), 0))}</TableCell>}
+                {seeIntTransport && <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.intTransport.get(u.id) ?? 0), 0))}</TableCell>}
+                {seeTerminal && <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.terminal.get(u.id) ?? 0), 0))}</TableCell>}
+                {seeLocalTransport && <TableCell className={"p-1 text-right " + computedCls}>{fmtUsd(p.units.reduce((s, u) => s + (alloc.localTransport.get(u.id) ?? 0), 0))}</TableCell>}
+                {seeBroker && <TableCell className="p-1" />}
               </TableRow>
             </TableBody>
           </Table>
@@ -244,26 +263,34 @@ export function ProjectDataSheet() {
       <Card>
         <CardHeader><CardTitle>3.1 პროექტის ჯამური შესყიდვის ხარჯები ($) — ნაწილდება ქარხნული ფასის პროპორციულად</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-4">
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">საბანკო საკომისიო — ჯამი</span>
-            {canEditField("project.bankCommissionTotal") ? (
-              <NumberInput value={p.bankCommissionTotal} onChange={(v) => updateProject({ bankCommissionTotal: v })} />
-            ) : <div className={computedCls}>{fmtUsd(p.bankCommissionTotal)}</div>}
-          </label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">საერთაშ. ტრანსპ. — ჯამი</span>
-            {canEditField("project.intTransportTotal") ? (
-              <NumberInput value={p.intTransportTotal} onChange={(v) => updateProject({ intTransportTotal: v })} />
-            ) : <div className={computedCls}>{fmtUsd(p.intTransportTotal)}</div>}
-          </label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">ტერმინალი — ჯამი</span>
-            {canEditField("project.terminalTotal") ? (
-              <NumberInput value={p.terminalTotal} onChange={(v) => updateProject({ terminalTotal: v })} />
-            ) : <div className={computedCls}>{fmtUsd(p.terminalTotal)}</div>}
-          </label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">ადგ. ტრანსპ. — ჯამი</span>
-            {canEditField("project.localTransportTotal") ? (
-              <NumberInput value={p.localTransportTotal} onChange={(v) => updateProject({ localTransportTotal: v })} />
-            ) : <div className={computedCls}>{fmtUsd(p.localTransportTotal)}</div>}
-          </label>
+          {seeBank && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საბანკო საკომისიო — ჯამი</span>
+              {canEditField("project.bankCommissionTotal") ? (
+                <NumberInput value={p.bankCommissionTotal} onChange={(v) => updateProject({ bankCommissionTotal: v })} />
+              ) : <div className={computedCls}>{fmtUsd(p.bankCommissionTotal)}</div>}
+            </label>
+          )}
+          {seeIntTransport && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საერთაშ. ტრანსპ. — ჯამი</span>
+              {canEditField("project.intTransportTotal") ? (
+                <NumberInput value={p.intTransportTotal} onChange={(v) => updateProject({ intTransportTotal: v })} />
+              ) : <div className={computedCls}>{fmtUsd(p.intTransportTotal)}</div>}
+            </label>
+          )}
+          {seeTerminal && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">ტერმინალი — ჯამი</span>
+              {canEditField("project.terminalTotal") ? (
+                <NumberInput value={p.terminalTotal} onChange={(v) => updateProject({ terminalTotal: v })} />
+              ) : <div className={computedCls}>{fmtUsd(p.terminalTotal)}</div>}
+            </label>
+          )}
+          {seeLocalTransport && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">ადგ. ტრანსპ. — ჯამი</span>
+              {canEditField("project.localTransportTotal") ? (
+                <NumberInput value={p.localTransportTotal} onChange={(v) => updateProject({ localTransportTotal: v })} />
+              ) : <div className={computedCls}>{fmtUsd(p.localTransportTotal)}</div>}
+            </label>
+          )}
         </CardContent>
       </Card>
 
@@ -274,14 +301,14 @@ export function ProjectDataSheet() {
             <TableHeader>
               <TableRow>
                 <TableHead className="whitespace-nowrap text-xs">#</TableHead>
-                {UNIT_RATE_COLS.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
+                {visibleRateCols.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
               {p.units.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="p-1 font-semibold">{u.id}</TableCell>
-                  {UNIT_RATE_COLS.map((c) => (
+                  {visibleRateCols.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[110px]">
                       {canEditField("unit." + c.key) ? (
                         c.kind === "pct"
@@ -308,74 +335,88 @@ export function ProjectDataSheet() {
             <TableHeader>
               <TableRow>
                 <TableHead>ჯგუფი</TableHead>
-                <TableHead>რაოდენობა (კაცი)</TableHead>
-                <TableHead>მივლინების დღეები</TableHead>
-                <TableHead>ჩასვლების რაოდენობა</TableHead>
-                <TableHead>საცხოვრებელი</TableHead>
-                <TableHead>სახლის ქირა, ჯამურად (₾) / სთ. ტარიფი</TableHead>
+                {seeHeadcount && <TableHead>რაოდენობა (კაცი)</TableHead>}
+                {seeDays && <TableHead>მივლინების დღეები</TableHead>}
+                {seeTrips && <TableHead>ჩასვლების რაოდენობა</TableHead>}
+                {seeAccommodation && <TableHead>საცხოვრებელი</TableHead>}
+                {seeHouseRent && <TableHead>სახლის ქირა, ჯამურად (₾) / სთ. ტარიფი</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {([["მექანიკოსები", "mechanics"], ["ელექტრიკოსები", "electricians"], ["ადმინისტრაცია", "admin"]] as const).map(([label, key]) => (
                 <TableRow key={key}>
                   <TableCell>{label}</TableCell>
-                  <TableCell>
-                    {canEditField("travel.headcount") ? (
-                      <NumberInput value={t[key].headcount} onChange={(v) => setGroup(key, { headcount: v })} />
-                    ) : <div className={computedCls}>{t[key].headcount}</div>}
-                  </TableCell>
-                  <TableCell>
-                    {canEditField("travel.days") ? (
-                      <NumberInput value={t[key].days} onChange={(v) => setGroup(key, { days: v })} />
-                    ) : <div className={computedCls}>{t[key].days}</div>}
-                  </TableCell>
-                  <TableCell>
-                    {canEditField("travel.trips") ? (
-                      <NumberInput value={t[key].trips} onChange={(v) => setGroup(key, { trips: v })} />
-                    ) : <div className={computedCls}>{t[key].trips}</div>}
-                  </TableCell>
-                  <TableCell>
-                    {canEditField("travel.accommodation") ? (
-                      <Select
-                        value={t[key].accommodationMode}
-                        onValueChange={(v) => setGroup(key, { accommodationMode: v as "house" | "hotel" })}
-                      >
-                        <SelectTrigger className="h-8 w-[160px] text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="house">სახლი ქირით</SelectItem>
-                          <SelectItem value="hotel">სასტუმრო</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className={computedCls}>{t[key].accommodationMode === "house" ? "სახლი ქირით" : "სასტუმრო"}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {t[key].accommodationMode === "house"
-                      ? (canEditField("travel.houseRent") ? (
-                          <NumberInput value={t[key].houseRentTotal} onChange={(v) => setGroup(key, { houseRentTotal: v })} />
-                        ) : <div className={computedCls}>{fmtUsd(t[key].houseRentTotal)}</div>)
-                      : <span className="text-xs text-muted-foreground">დღიური ტარიფი — «ფინანსური დაშვებები»-ში</span>
-                    }
-                  </TableCell>
+                  {seeHeadcount && (
+                    <TableCell>
+                      {canEditField("travel.headcount") ? (
+                        <NumberInput value={t[key].headcount} onChange={(v) => setGroup(key, { headcount: v })} />
+                      ) : <div className={computedCls}>{t[key].headcount}</div>}
+                    </TableCell>
+                  )}
+                  {seeDays && (
+                    <TableCell>
+                      {canEditField("travel.days") ? (
+                        <NumberInput value={t[key].days} onChange={(v) => setGroup(key, { days: v })} />
+                      ) : <div className={computedCls}>{t[key].days}</div>}
+                    </TableCell>
+                  )}
+                  {seeTrips && (
+                    <TableCell>
+                      {canEditField("travel.trips") ? (
+                        <NumberInput value={t[key].trips} onChange={(v) => setGroup(key, { trips: v })} />
+                      ) : <div className={computedCls}>{t[key].trips}</div>}
+                    </TableCell>
+                  )}
+                  {seeAccommodation && (
+                    <TableCell>
+                      {canEditField("travel.accommodation") ? (
+                        <Select
+                          value={t[key].accommodationMode}
+                          onValueChange={(v) => setGroup(key, { accommodationMode: v as "house" | "hotel" })}
+                        >
+                          <SelectTrigger className="h-8 w-[160px] text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="house">სახლი ქირით</SelectItem>
+                            <SelectItem value="hotel">სასტუმრო</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className={computedCls}>{t[key].accommodationMode === "house" ? "სახლი ქირით" : "სასტუმრო"}</div>
+                      )}
+                    </TableCell>
+                  )}
+                  {seeHouseRent && (
+                    <TableCell>
+                      {t[key].accommodationMode === "house"
+                        ? (canEditField("travel.houseRent") ? (
+                            <NumberInput value={t[key].houseRentTotal} onChange={(v) => setGroup(key, { houseRentTotal: v })} />
+                          ) : <div className={computedCls}>{fmtUsd(t[key].houseRentTotal)}</div>)
+                        : <span className="text-xs text-muted-foreground">დღიური ტარიფი — «ფინანსური დაშვებები»-ში</span>
+                      }
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">მანძილი ოფისიდან ობიექტამდე, კმ (ერთი მიმართულებით)</span>
-              {canEditField("travel.distanceFuel") ? (
-                <NumberInput value={t.distanceKm} onChange={(v) => setTravel({ distanceKm: v })} />
-              ) : <div className={computedCls}>{t.distanceKm}</div>}
-            </label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">ავტომობილის საწვავის ხარჯი, ლ/100კმ</span>
-              {canEditField("travel.distanceFuel") ? (
-                <NumberInput value={t.fuelConsumption} onChange={(v) => setTravel({ fuelConsumption: v })} />
-              ) : <div className={computedCls}>{t.fuelConsumption}</div>}
-            </label>
+            {seeDistanceFuel && (
+              <>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">მანძილი ოფისიდან ობიექტამდე, კმ (ერთი მიმართულებით)</span>
+                  {canEditField("travel.distanceFuel") ? (
+                    <NumberInput value={t.distanceKm} onChange={(v) => setTravel({ distanceKm: v })} />
+                  ) : <div className={computedCls}>{t.distanceKm}</div>}
+                </label>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">ავტომობილის საწვავის ხარჯი, ლ/100კმ</span>
+                  {canEditField("travel.distanceFuel") ? (
+                    <NumberInput value={t.fuelConsumption} onChange={(v) => setTravel({ fuelConsumption: v })} />
+                  ) : <div className={computedCls}>{t.fuelConsumption}</div>}
+                </label>
+              </>
+            )}
             <label className="grid gap-1 md:col-span-2"><span className="text-xs text-muted-foreground">სამუშაო დღეები კვირაში</span>
             <TextInput value={t.workDays} onChange={(v) => setTravel({ workDays: v })} /></label>
           </div>

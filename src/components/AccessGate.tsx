@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, getUserById, type AppUser, type AccessRole } from "@/lib/access";
 import { listFieldPermissions, type FieldPermission } from "@/lib/fieldPermissions";
+import { listFieldVisibility, type FieldVisibility } from "@/lib/fieldVisibility";
 import { listPagePermissions, type PagePermission } from "@/lib/pagePermissions";
 
 interface AccessContextShape {
@@ -13,6 +14,10 @@ interface AccessContextShape {
   // ნაგულისხმევად რედაქტირებადია (რომ ახალმა ველებმა შემთხვევით არ დაბლოკოს).
   canEditField: (fieldKey: string) => boolean;
   refreshFieldPermissions: () => void;
+  // ველის ხედვადობა — თუ ეს ცრუა, ველი საერთოდ არ ჩანს (არც readonly).
+  // ცნობილი არაა matrix-ში → ნაგულისხმევად ხილვადია.
+  canSeeField: (fieldKey: string) => boolean;
+  refreshFieldVisibility: () => void;
   // გვერდის ხედვადობა — როლის მიხედვით (არა ცალკეული მომხმარებლის). თუ გვერდი
   // ცნობილი არაა matrix-ში, ნაგულისხმევად ხილვადია.
   canViewPage: (pageKey: string) => boolean;
@@ -31,10 +36,14 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [ready, setReady] = useState(false);
   const [fieldPerms, setFieldPerms] = useState<FieldPermission[]>([]);
+  const [fieldVis, setFieldVis] = useState<FieldVisibility[]>([]);
   const [pagePerms, setPagePerms] = useState<PagePermission[]>([]);
 
   const loadFieldPermissions = () => {
     listFieldPermissions().then(setFieldPerms).catch((e) => console.error("[permissions] field load failed", e));
+  };
+  const loadFieldVisibility = () => {
+    listFieldVisibility().then(setFieldVis).catch((e) => console.error("[permissions] field visibility load failed", e));
   };
   const loadPagePermissions = () => {
     listPagePermissions().then(setPagePerms).catch((e) => console.error("[permissions] page load failed", e));
@@ -58,6 +67,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
         }
       });
       loadFieldPermissions();
+      loadFieldVisibility();
       loadPagePermissions();
     }
   }, []);
@@ -70,7 +80,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   if (!ready) return null;
 
   if (!user) {
-    return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); loadFieldPermissions(); loadPagePermissions(); }} />;
+    return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); loadFieldPermissions(); loadFieldVisibility(); loadPagePermissions(); }} />;
   }
 
   const canEditField = (fieldKey: string): boolean => {
@@ -78,6 +88,13 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     const perm = fieldPerms.find((p) => p.fieldKey === fieldKey);
     if (!perm) return true; // უცნობი/ჯერ არარეგისტრირებული ველი — ნაგულისხმევად ღიაა
     return perm.allowedRoles.includes(user.role);
+  };
+
+  const canSeeField = (fieldKey: string): boolean => {
+    if (user.role === "full") return true; // ფინანსები ყოველთვის ხედავს ყველაფერს
+    const vis = fieldVis.find((v) => v.fieldKey === fieldKey);
+    if (!vis) return true; // უცნობი/ჯერ არარეგისტრირებული ველი — ნაგულისხმევად ხილვადია
+    return vis.allowedRoles.includes(user.role);
   };
 
   const canViewPage = (pageKey: string): boolean => {
@@ -91,6 +108,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     <AccessContext.Provider value={{
       userId: user.id, role: user.role, isFull: user.role === "full", actorName: user.name,
       logout, canEditField, refreshFieldPermissions: loadFieldPermissions,
+      canSeeField, refreshFieldVisibility: loadFieldVisibility,
       canViewPage, refreshPagePermissions: loadPagePermissions,
     }}>
       {children}

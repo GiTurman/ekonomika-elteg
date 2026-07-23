@@ -2,6 +2,7 @@ import { useEffect, useState, Fragment } from "react";
 import { listActivityLog, type ActivityLogEntry } from "@/lib/activityLog";
 import { listUsers, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser, type AccessRole } from "@/lib/access";
 import { listFieldPermissions, updateFieldPermission, type FieldPermission } from "@/lib/fieldPermissions";
+import { listFieldVisibility, updateFieldVisibility, type FieldVisibility } from "@/lib/fieldVisibility";
 import { listPagePermissions, updatePagePermission, type PagePermission } from "@/lib/pagePermissions";
 import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,6 +87,95 @@ function PagePermissionsPanel() {
             ))}
             {perms.length === 0 && !loading && (
               <TableRow><TableCell colSpan={NON_FULL_ROLES.length + 1} className="text-center text-sm text-muted-foreground py-6">გვერდები არ არის რეგისტრირებული.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FieldVisibilityPanel() {
+  const { actorName, role: myRole, refreshFieldVisibility } = useAccessRole();
+  const [perms, setPerms] = useState<FieldVisibility[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setPerms(await listFieldVisibility());
+    } catch (e) {
+      console.error("[visibility] load failed", e);
+      setError("ხედვადობის ჩატვირთვა ვერ მოხერხდა.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const toggleRole = async (perm: FieldVisibility, role: AccessRole) => {
+    const has = perm.allowedRoles.includes(role);
+    const nextRoles = has ? perm.allowedRoles.filter((r) => r !== role) : [...perm.allowedRoles, role];
+    setPerms((prev) => prev.map((p) => (p.fieldKey === perm.fieldKey ? { ...p, allowedRoles: nextRoles } : p)));
+    try {
+      await updateFieldVisibility(perm.fieldKey, nextRoles);
+      refreshFieldVisibility(); // მიმდინარე სესიაშიც დაუყოვნებლივ ამოქმედდეს
+      logActivity(actorName, myRole, "ველის ხედვადობის ცვლილება", `${perm.label} → ${nextRoles.map((r) => (ROLE_LABEL as Record<string, string>)[r]).join(", ") || "არავინ"}`);
+    } catch (e) {
+      console.error("[visibility] update failed", e);
+      alert("განახლება ვერ მოხერხდა.");
+      refresh();
+    }
+  };
+
+  const sections = Array.from(new Set(perms.map((p) => p.section)));
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>ველების ხედვადობა — ვინ რას ხედავს „შესატანი მონაცემები" გვერდზე</CardTitle>
+        <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+          განახლება
+        </Button>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <p className="text-xs text-muted-foreground mb-3">
+          ფინანსებს ყოველთვის შეუძლია ყველა ველის ნახვა, checkbox-ების მიუხედავად. თუ როლს ველისთვის მონიშნული
+          არა აქვს, ის ველი მისთვის საერთოდ არ ჩანს (არც readonly ხედით) — ეს განსხვავდება ზემოთ „ველების
+          უფლებები"-სგან, რომელიც მხოლოდ რედაქტირებას მართავს, ხედვას კი არა.
+        </p>
+        {error && <p className="text-sm text-destructive mb-2">{error}</p>}
+        <Table>
+          <TableHeader>
+            <TableRow className="text-xs">
+              <TableHead>ველი</TableHead>
+              {NON_FULL_ROLES.map((r) => <TableHead key={r} className="text-center">{ROLE_LABEL[r]}</TableHead>)}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sections.map((section) => (
+              <Fragment key={section}>
+                <TableRow className="bg-muted/50">
+                  <TableCell colSpan={NON_FULL_ROLES.length + 1} className="font-semibold text-xs py-1">{section}</TableCell>
+                </TableRow>
+                {perms.filter((p) => p.section === section).map((perm) => (
+                  <TableRow key={perm.fieldKey}>
+                    <TableCell className="text-sm">{perm.label}</TableCell>
+                    {NON_FULL_ROLES.map((r) => (
+                      <TableCell key={r} className="text-center p-1">
+                        <Checkbox checked={perm.allowedRoles.includes(r)} onCheckedChange={() => toggleRole(perm, r)} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </Fragment>
+            ))}
+            {perms.length === 0 && !loading && (
+              <TableRow><TableCell colSpan={NON_FULL_ROLES.length + 1} className="text-center text-sm text-muted-foreground py-6">ველები არ არის რეგისტრირებული.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -337,6 +427,7 @@ export function LogSheet() {
     <div className="space-y-4">
       <UsersPanel />
       <PagePermissionsPanel />
+      <FieldVisibilityPanel />
       <FieldPermissionsPanel />
 
       <div className="flex items-center justify-between">
