@@ -1,6 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type AccessRole = "full" | "partial";
+export type AccessRole = "full" | "commercial" | "technical" | "accounting" | "procurement" | "administration" | "partial";
+
+export const ROLE_LABEL: Record<AccessRole, string> = {
+  full: "ფინანსები",
+  commercial: "კომერცია",
+  technical: "ტექნიკური",
+  accounting: "ბუღალტერია",
+  procurement: "შესყიდვები",
+  administration: "ადმინისტრაცია",
+  partial: "პარტნიორი", // ძველი როლის სახელი — ახალ მომხმარებლებს აღარ ენიჭება, უკვე არსებულებისთვის შენარჩუნებულია
+};
 
 export interface UserPageVisibility {
   input: boolean;
@@ -24,7 +34,7 @@ function rowToUser(row: any): AppUser {
     id: row.id,
     name: row.name,
     code: row.code,
-    role: row.role === "full" ? "full" : "partial",
+    role: (row.role in ROLE_LABEL ? row.role : "partial") as AccessRole,
     pageVisibility: {
       input: row.page_input,
       economics: row.page_economics,

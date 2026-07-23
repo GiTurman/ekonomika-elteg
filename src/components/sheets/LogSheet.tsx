@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listActivityLog, type ActivityLogEntry } from "@/lib/activityLog";
-import { listUsers, createUser, updateUser, deleteUser, type AppUser, type AccessRole } from "@/lib/access";
+import { listUsers, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser, type AccessRole } from "@/lib/access";
 import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,7 +11,6 @@ import { TextInput } from "./sheet-ui";
 import { Loader2, RefreshCw, Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 
-const ROLE_LABEL: Record<string, string> = { full: "ფინანსები", partial: "პარტნიორი" };
 const PAGE_COLS: Array<{ key: "input" | "economics" | "payment" | "tariffs" | "analytics" | "comparison"; label: string }> = [
   { key: "input", label: "შესატანი" },
   { key: "economics", label: "ეკონომიკა" },
@@ -136,7 +135,11 @@ function UsersPanel() {
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="full">ფინანსები</SelectItem>
-                      <SelectItem value="partial">პარტნიორი</SelectItem>
+                      <SelectItem value="commercial">კომერცია</SelectItem>
+                      <SelectItem value="technical">ტექნიკური</SelectItem>
+                      <SelectItem value="accounting">ბუღალტერია</SelectItem>
+                      <SelectItem value="procurement">შესყიდვები</SelectItem>
+                      <SelectItem value="administration">ადმინისტრაცია</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>
@@ -229,7 +232,7 @@ export function LogSheet() {
                   <TableRow key={e.id}>
                     <TableCell className="text-xs whitespace-nowrap">{new Date(e.created_at).toLocaleString("ka-GE")}</TableCell>
                     <TableCell className="font-medium">{e.actor_name}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{ROLE_LABEL[e.role] ?? e.role}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{(ROLE_LABEL as Record<string, string>)[e.role] ?? e.role}</TableCell>
                     <TableCell>{e.action}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{e.details}</TableCell>
                   </TableRow>

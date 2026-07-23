@@ -206,28 +206,60 @@ export function ComparisonSheet() {
       ) : computed.length < 2 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">აირჩიე მინიმუმ 2 პროექტი შედარებისთვის.</p>
       ) : (
-        <Card>
-          <CardHeader><CardTitle>ეკონომიკის სრული შედარება</CardTitle></CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="text-xs">
-                  <TableHead>მაჩვენებელი</TableHead>
-                  {computed.map(({ entry }) => <TableHead key={entry.id} className="text-right">{entry.name}</TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {SECTIONS.map((section) => (
-                  <Fragment key={section.title}>
-                    <TableRow className="bg-muted/50">
-                      <TableCell colSpan={computed.length + 1} className="font-semibold text-xs py-1.5">{section.title}</TableCell>
-                    </TableRow>
-                    {section.rows.map((row) => {
-                      const values = computed.map(({ eco }) => row.get(eco));
-                      const best = row.betterWhen === "max" ? Math.max(...values) : row.betterWhen === "min" ? Math.min(...values) : null;
-                      const allEqual = values.every((v) => v === values[0]);
-                      return (
-                        <TableRow key={section.title + row.label} className={row.bold ? "bg-muted/20" : ""}>
+        <>
+          <Card>
+            <CardHeader><CardTitle>დანადგარები</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs">
+                    {computed.map(({ entry }) => <TableHead key={entry.id}>{entry.name}</TableHead>)}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    {computed.map(({ entry }) => (
+                      <TableCell key={entry.id} className="align-top">
+                        <div className="space-y-1">
+                          {entry.data.project.units.map((u, i) => (
+                            <div key={i} className="text-xs">
+                              <span className="font-medium">{u.id || "?"}</span>
+                              {" — "}
+                              <span className={computedCls}>{u.brand || "—"}</span>
+                              {u.country ? <span className="text-muted-foreground"> ({u.country})</span> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>ეკონომიკის სრული შედარება</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs">
+                    <TableHead>მაჩვენებელი</TableHead>
+                    {computed.map(({ entry }) => <TableHead key={entry.id} className="text-right">{entry.name}</TableHead>)}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {SECTIONS.map((section) => (
+                    <Fragment key={section.title}>
+                      <TableRow className="bg-muted/50">
+                        <TableCell colSpan={computed.length + 1} className="font-semibold text-xs py-1.5">{section.title}</TableCell>
+                      </TableRow>
+                      {section.rows.map((row) => {
+                        const values = computed.map(({ eco }) => row.get(eco));
+                        const best = row.betterWhen === "max" ? Math.max(...values) : row.betterWhen === "min" ? Math.min(...values) : null;
+                        const allEqual = values.every((v) => v === values[0]);
+                        return (
+                          <TableRow key={section.title + row.label} className={row.bold ? "bg-muted/20" : ""}>
                           <TableCell className={row.bold ? "font-semibold" : ""}>{row.label}</TableCell>
                           {computed.map(({ entry }, i) => (
                             <TableCell
@@ -244,11 +276,12 @@ export function ComparisonSheet() {
                       );
                     })}
                   </Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );
