@@ -58,17 +58,19 @@ export function FinancialAssumptionsSheet() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>2. საგადასახადო პარამეტრები</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">დღგ-ის განაკვეთი</span>
-            <PercentInput value={f.vatRate} onChange={(v) => updateFinance({ vatRate: v })} /></label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">საშემოსავლო</span>
-            <PercentInput value={f.incomeTaxRate} onChange={(v) => updateFinance({ incomeTaxRate: v })} /></label>
-          <label className="grid gap-1"><span className="text-xs text-muted-foreground">საპენსიო</span>
-            <PercentInput value={f.pensionRate} onChange={(v) => updateFinance({ pensionRate: v })} /></label>
-        </CardContent>
-      </Card>
+      {canSeeField("finance.taxRates") && (
+        <Card>
+          <CardHeader><CardTitle>2. საგადასახადო პარამეტრები</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">დღგ-ის განაკვეთი</span>
+              <PercentInput value={f.vatRate} onChange={(v) => updateFinance({ vatRate: v })} /></label>
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საშემოსავლო</span>
+              <PercentInput value={f.incomeTaxRate} onChange={(v) => updateFinance({ incomeTaxRate: v })} /></label>
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საპენსიო</span>
+              <PercentInput value={f.pensionRate} onChange={(v) => updateFinance({ pensionRate: v })} /></label>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle>3. მივლინების განაკვეთები (ლარში)</CardTitle></CardHeader>
@@ -152,55 +154,57 @@ export function FinancialAssumptionsSheet() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>4. დანადგარების პირდაპირი ხარჯები (USD) — მიმოხილვა</CardTitle></CardHeader>
-        <CardContent className="overflow-x-auto">
-          <p className="text-xs text-muted-foreground mb-2">
-            რედაქტირებადია «პროექტის მონაცემები» ფურცელზე (3, 3.1). აქ მხოლოდ საინფორმაციო ჯამია.
-          </p>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>#</TableHead>
-                <TableHead>ქარხნული</TableHead>
-                <TableHead>საბანკო საკომ.</TableHead>
-                <TableHead>საერთაშ. ტრანსპ.</TableHead>
-                <TableHead>ტერმინალი</TableHead>
-                <TableHead>ადგ. ტრანსპ.</TableHead>
-                <TableHead>მასალები</TableHead>
-                <TableHead>სხვა</TableHead>
-                <TableHead>დამიწება/ზედამხ.</TableHead>
-                <TableHead>საშუამავლო %</TableHead>
-                <TableHead>ჯამი (საშუამავლოს გარეშე)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {units.map((u) => {
-                const bank = alloc.bank.get(u.id) ?? 0;
-                const intT = alloc.intTransport.get(u.id) ?? 0;
-                const term = alloc.terminal.get(u.id) ?? 0;
-                const local = alloc.localTransport.get(u.id) ?? 0;
-                const sum = u.factoryPrice + bank + intT + term + local + u.materials + u.otherCost + u.grounding;
-                return (
-                  <TableRow key={u.id}>
-                    <TableCell className={linkedCls}>{u.id}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.factoryPrice)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(bank)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(intT)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(term)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(local)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.materials)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.otherCost)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(u.grounding)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtPct(u.brokerCommissionPct)}</TableCell>
-                    <TableCell className={"text-right " + computedCls}>{fmtUsd(sum)}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {canSeeField("finance.directCostsOverview") && (
+        <Card>
+          <CardHeader><CardTitle>4. დანადგარების პირდაპირი ხარჯები (USD) — მიმოხილვა</CardTitle></CardHeader>
+          <CardContent className="overflow-x-auto">
+            <p className="text-xs text-muted-foreground mb-2">
+              რედაქტირებადია «პროექტის მონაცემები» ფურცელზე (3, 3.1). აქ მხოლოდ საინფორმაციო ჯამია.
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>ქარხნული</TableHead>
+                  <TableHead>საბანკო საკომ.</TableHead>
+                  <TableHead>საერთაშ. ტრანსპ.</TableHead>
+                  <TableHead>ტერმინალი</TableHead>
+                  <TableHead>ადგ. ტრანსპ.</TableHead>
+                  <TableHead>მასალები</TableHead>
+                  <TableHead>სხვა</TableHead>
+                  <TableHead>დამიწება/ზედამხ.</TableHead>
+                  <TableHead>საშუამავლო %</TableHead>
+                  <TableHead>ჯამი (საშუამავლოს გარეშე)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {units.map((u) => {
+                  const bank = alloc.bank.get(u.id) ?? 0;
+                  const intT = alloc.intTransport.get(u.id) ?? 0;
+                  const term = alloc.terminal.get(u.id) ?? 0;
+                  const local = alloc.localTransport.get(u.id) ?? 0;
+                  const sum = u.factoryPrice + bank + intT + term + local + u.materials + u.otherCost + u.grounding;
+                  return (
+                    <TableRow key={u.id}>
+                      <TableCell className={linkedCls}>{u.id}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(u.factoryPrice)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(bank)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(intT)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(term)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(local)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(u.materials)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(u.otherCost)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(u.grounding)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtPct(u.brokerCommissionPct)}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(sum)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle>6. გარანტია და მომსახურება</CardTitle></CardHeader>
