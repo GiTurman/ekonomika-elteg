@@ -9,17 +9,33 @@ import {
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser, Copy } from "lucide-react";
-import { deleteArchiveEntry, clearArchive, listArchive, loadArchiveEntry, setIncludeInAnalytics, type ArchiveEntry } from "@/lib/archive";
+import { deleteArchiveEntry, clearArchive, listArchiveFull, loadArchiveEntry, setIncludeInAnalytics, type ArchiveEntryFull } from "@/lib/archive";
 import { Checkbox } from "@/components/ui/checkbox";
 import { normalizeAppState } from "@/lib/econ-defaults";
+import { EQUIPMENT_CATEGORY_LABEL } from "@/lib/econ-types";
 import { useEconStore } from "@/lib/econ-store";
 import { useAccessRole } from "@/components/AccessGate";
 import { logActivity } from "@/lib/activityLog";
 
+// პროექტის დანადგარებიდან — უნიკალური ბრენდები, ტიპები, ქვეყნები, არქივის
+// სიაში მოკლე მიმოხილვისთვის (დასახელების ქვეშ, პატარა ტექსტად).
+function summarizeUnits(entry: ArchiveEntryFull): string {
+  const units = entry.data?.project?.units ?? [];
+  if (units.length === 0) return "";
+  const brands = Array.from(new Set(units.map((u) => u.brand?.trim()).filter(Boolean)));
+  const kinds = Array.from(new Set(units.map((u) => EQUIPMENT_CATEGORY_LABEL[u.category] ?? u.category).filter(Boolean)));
+  const countries = Array.from(new Set(units.map((u) => u.country?.trim()).filter(Boolean)));
+  const parts: string[] = [];
+  if (brands.length) parts.push(`ბრენდი: ${brands.join(", ")}`);
+  if (kinds.length) parts.push(`ტიპი: ${kinds.join(", ")}`);
+  if (countries.length) parts.push(`ქვეყანა: ${countries.join(", ")}`);
+  return parts.join(" · ");
+}
+
 export function ArchiveDialog() {
   const { isFull, actorName, role } = useAccessRole();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<ArchiveEntry[]>([]);
+  const [items, setItems] = useState<ArchiveEntryFull[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -28,7 +44,7 @@ export function ArchiveDialog() {
   const refresh = async () => {
     setLoading(true);
     try {
-      setItems(await listArchive());
+      setItems(await listArchiveFull());
     } catch (e) {
       console.error("[archive] list failed", e);
     } finally {
@@ -85,7 +101,7 @@ export function ArchiveDialog() {
     }
   };
 
-  const handleToggleAnalytics = async (it: ArchiveEntry) => {
+  const handleToggleAnalytics = async (it: ArchiveEntryFull) => {
     const next = !it.include_in_analytics;
     setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, include_in_analytics: next } : x)));
     try {
@@ -167,9 +183,14 @@ export function ArchiveDialog() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((it) => (
+                {items.map((it) => {
+                  const summary = summarizeUnits(it);
+                  return (
                   <TableRow key={it.id}>
-                    <TableCell className="font-medium">{it.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div>{it.name}</div>
+                      {summary && <div className="text-xs text-muted-foreground font-normal mt-0.5">{summary}</div>}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(it.created_at).toLocaleString("ka-GE")}
                     </TableCell>
@@ -208,7 +229,8 @@ export function ArchiveDialog() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
