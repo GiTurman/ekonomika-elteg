@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold, PaymentTranche, PaymentExpenseItem } from "./econ-types";
-import { defaultAppState, emptyUnit, blankAppState } from "./econ-defaults";
+import { defaultAppState, emptyUnit, blankAppState, normalizeAppState } from "./econ-defaults";
 import { suggestPaymentExpenses } from "./econ-calc";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,6 +8,7 @@ interface StoreShape {
   state: AppState;
   loaded: boolean;
   saving: boolean;
+  currentUserId: string | null;
   setState: (updater: (s: AppState) => AppState) => void;
   updateProject: (patch: Partial<AppState["project"]>) => void;
   updateFinance: (patch: Partial<AppState["finance"]>) => void;
@@ -25,13 +26,42 @@ interface StoreShape {
   removeExpense: (which: "A" | "B", index: number) => void;
   updateExpense: (which: "A" | "B", index: number, patch: Partial<PaymentExpenseItem>) => void;
   applySuggestedExpenses: (which: "A" | "B") => void;
-  load: () => Promise<void>;
+  load: (userId: string) => Promise<void>;
   save: () => Promise<void>;
   reset: () => void;
 }
 
 const STATE_ID = "singleton";
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ბრაუზერში ლოკალურად შენახული "დაუმთავრებელი ნამუშევარი" — მომხმარებლის
+// ID-ზეა მიბმული, რომ refresh-ისას არაფერი არ იკარგებოდეს, მაგრამ სხვა
+// მომხმარებელმა (განსხვავებული კოდით) არასდროს ნახოს ვინმეს დაუმთავრებელი
+// მუშაობა. ინახება ცალკე Supabase-ის საერთო "ცოცხალი" მდგომარეობისგან.
+function draftKey(userId: string) {
+  return `elteg-draft-${userId}`;
+}
+function loadDraft(userId: string): AppState | null {
+  try {
+    const raw = window.localStorage.getItem(draftKey(userId));
+    return raw ? normalizeAppState(JSON.parse(raw)) : null;
+  } catch (e) {
+    console.error("[econ-store] draft load failed", e);
+    return null;
+  }
+}
+function saveDraft(userId: string | null, state: AppState) {
+  if (!userId) return;
+  try {
+    window.localStorage.setItem(draftKey(userId), JSON.stringify(state));
+  } catch (e) {
+    console.error("[econ-store] draft save failed", e);
+  }
+}
+function clearDraft(userId: string | null) {
+  if (!userId) return;
+  window.localStorage.removeItem(draftKey(userId));
+}
 
 // ახალი ტრანშის ავტომატური ლეიბლისთვის (I, II, III, IV, V, ...) — არსებული
 // ტრანშების ("I ტრანში", "II ტრანში"...) სტილის შესანარჩუნებლად.
@@ -50,6 +80,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   state: defaultAppState,
   loaded: false,
   saving: false,
+  currentUserId: null,
 
   setState: (updater) => {
     set((s) => ({ state: updater(s.state) }));
@@ -207,15 +238,21 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   },
 
   reset: () => {
+    const userId = get().currentUserId;
+    clearDraft(userId);
     set((s) => ({ state: { ...blankAppState(), pageVisibility: s.state.pageVisibility } }));
     scheduleSave(get);
   },
 
-  load: async () => {
-    // ყოველ შესვლაზე სრულიად ცარიელი, შეუვსებელი ფორმა იხსნება — არაფერი
-    // (მათ შორის გვერდების ხედვადობის პარამეტრიც) აღარ ნარჩუნდება წინა
-    // შესვლიდან. საერთო "ცოცხალი" მდგომარეობა Supabase-დან საერთოდ აღარ იტვირთება.
-    set({ state: blankAppState(), loaded: true });
+  load: async (userId: string) => {
+    set({ currentUserId: userId });
+    // Refresh-ისას (იმავე ბრაუზერში, იმავე მომხმარებლის მიერ) აღდგება ლოკალურად
+    // შენახული დაუმთავრებელი ნამუშევარი — არაფერი არ იკარგება. სხვა კოდით
+    // შესვლისას (ან პირველად ამ ბრაუზერში) დრაფტი არ არსებობს და ცარიელი
+    // ფორმა იხსნება — საერთო Supabase-ის "ცოცხალი" მდგომარეობა არასდროს იტვირთება,
+    // რომ სხვის დაუმთავრებელ ნამუშევარს არასდროს ხედავდე.
+    const draft = loadDraft(userId);
+    set({ state: draft ?? blankAppState(), loaded: true });
   },
 
   save: async () => {
@@ -232,6 +269,10 @@ export const useEconStore = create<StoreShape>((set, get) => ({
 }));
 
 function scheduleSave(get: () => StoreShape) {
+  // ლოკალური დრაფტი მყისიერად (და უფასოდ) ინახება — refresh-ისას არაფერი არ
+  // დაიკარგება, თუნდაც Supabase-ის შენახვა ჯერ არ დასრულებულიყოს.
+  const s = get();
+  saveDraft(s.currentUserId, s.state);
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => get().save(), 600);
 }

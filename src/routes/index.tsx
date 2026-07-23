@@ -34,11 +34,11 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { state, loaded, saving, load, reset } = useEconStore();
-  const { isFull, logout, actorName, role, canViewPage } = useAccessRole();
+  const { isFull, logout, actorName, role, canViewPage, userId } = useAccessRole();
   const [finishing, setFinishing] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(userId); }, [load, userId]);
 
   const eco = computeEconomics(state);
   // ორივე კოდით ყველა მონაცემი და ტაბი სრულად ხელმისაწვდომია (დეტალური
