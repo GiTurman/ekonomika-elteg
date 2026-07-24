@@ -105,9 +105,11 @@ function Index() {
             <h1 className="text-lg font-semibold leading-tight">{state.project.projectName || "პროექტი"} — განფასება</h1>
             <p className="text-xs text-muted-foreground">Fuji Hitech / KLEEMANN economic model (Excel template v3)</p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Cloud className="h-4 w-4" />
-            {saving ? (<><Loader2 className="h-3 w-3 animate-spin" /> ინახება…</>) : (loaded ? "შენახულია" : "იტვირთება…")}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1 whitespace-nowrap">
+              <Cloud className="h-4 w-4" />
+              {saving ? (<><Loader2 className="h-3 w-3 animate-spin" /> ინახება…</>) : (loaded ? "შენახულია" : "იტვირთება…")}
+            </span>
             <Button size="sm" variant="outline" onClick={() => exportToXlsx(state)}>
               <Download className="h-4 w-4 mr-1" /> Excel
             </Button>

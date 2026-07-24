@@ -172,7 +172,7 @@ export function ArchiveDialog() {
         ) : items.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">არქივი ცარიელია</p>
         ) : (
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
