@@ -103,7 +103,8 @@ export function exportToXlsx(state: AppState) {
   s2.push(["თარიღი", f.rateDate]);
   s2.push([]);
   const pctRowStart2 = s2.length;
-  s2.push(["დღგ", f.vatRate]);
+  s2.push(["დანადგარის დღგ", f.equipmentVatRate]);
+  s2.push(["დღგ (გარდა დანადგარისა)", f.otherVatRate]);
   s2.push(["საშემოსავლო", f.incomeTaxRate]);
   s2.push(["საპენსიო", f.pensionRate]);
   const pctRowEnd2 = s2.length - 1;

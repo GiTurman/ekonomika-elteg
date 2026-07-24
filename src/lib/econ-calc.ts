@@ -15,7 +15,7 @@ export interface UnitEconomics {
   priceNoExtras: number; // H = F + G
   extras: number; // I = H*cont + (factory+allocatedBank)*fx + other + grounding + factory*warranty + monthlyService*freeMonths
   priceNoVat: number; // J = H + I
-  vat: number; // K = J * vatRate
+  vat: number; // K = equipmentPortion*equipmentVatRate + otherPortion*otherVatRate
   bankGuarantee: number; // L
   finalPrice: number; // M_final = (J + K + L) * (1 + brokerCommissionPct)
   marginPct: number; // N = G / J
@@ -294,8 +294,13 @@ export function computeEconomics(state: AppState): FullEconomics {
       freeServicePerUnit +
       guaranteeAmountPerUnit;
     const J = H + I;
-    const K = J * f.vatRate;
-    const L = (((J + K) * f.guaranteePct) * f.guaranteeAnnualPct * f.guaranteeDays / 365) * (1 + f.vatRate);
+    // დღგ გაყოფილია: "დანადგარის" ნაწილი (D + მისი ფასნამატი — ზოგჯერ
+    // განთავისუფლებულია) და "დანარჩენი" (მონტაჟი + მისი ფასნამატი + ყველა
+    // დამატებითი ხარჯი — ყოველთვის იბეგრება სტანდარტული განაკვეთით).
+    const equipmentPortion = D * (1 + u.equipmentMarkupPct);
+    const otherPortion = J - equipmentPortion;
+    const K = equipmentPortion * f.equipmentVatRate + otherPortion * f.otherVatRate;
+    const L = (((J + K) * f.guaranteePct) * f.guaranteeAnnualPct * f.guaranteeDays / 365) * (1 + f.otherVatRate);
     const M = J + K + L;
     const finalPrice = M * (1 + u.brokerCommissionPct);
     const marginPct = J ? G / J : 0;
@@ -391,11 +396,15 @@ export function computeEconomics(state: AppState): FullEconomics {
   const extrasTotal = contingency + fxRisk + otherTotal + groundingTotal + warrantyCost + freeServiceCost + guaranteeAmountCost;
 
   const reportPriceNoVat = reportPriceNoExtras + extrasTotal;
-  const reportVat = reportPriceNoVat * f.vatRate;
+  // იგივე გაყოფა, რაც ცხრილის pass-ში — რომ checkDiff ყოველთვის ~0-ს
+  // შეესაბამებოდეს (იხ. ზემოთ "First pass" კომენტარი).
+  const equipmentPortionTotal = units.reduce((s, u) => s + purchaseCostOf(u) * (1 + u.equipmentMarkupPct), 0);
+  const otherPortionTotal = reportPriceNoVat - equipmentPortionTotal;
+  const reportVat = equipmentPortionTotal * f.equipmentVatRate + otherPortionTotal * f.otherVatRate;
   const priceWithVat = reportPriceNoVat + reportVat;
   const guaranteeBase = priceWithVat * f.guaranteePct;
   const guaranteeFee = (guaranteeBase * f.guaranteeAnnualPct * f.guaranteeDays) / 365;
-  const finalContractPriceExBroker = (reportPriceNoVat + guaranteeFee) * (1 + f.vatRate);
+  const finalContractPriceExBroker = priceWithVat + guaranteeFee * (1 + f.otherVatRate);
   const finalContractPrice = finalContractPriceExBroker + brokerTotal;
   const totalMarginPct = reportPriceNoVat ? markupTotal / reportPriceNoVat : 0;
 
@@ -508,7 +517,7 @@ export function suggestPaymentExpenses(state: AppState, which: "A" | "B"): { lab
   const advance = -supplierBase * p.procurementAdvancePct;
   const balance = -supplierBase * (1 - p.procurementAdvancePct);
   const intTransport = -report.intTransportTotal;
-  const customsVat = -((supplierBase + report.intTransportTotal) * f.vatRate);
+  const customsVat = -((supplierBase + report.intTransportTotal) * f.equipmentVatRate);
   const installMob = -(report.mechPayroll + report.elecPayroll) * 0.6;
   const installFinal = -(report.mechPayroll + report.elecPayroll) * 0.4;
 
@@ -520,10 +529,12 @@ export function suggestPaymentExpenses(state: AppState, which: "A" | "B"): { lab
     { label: "მონტაჟი — მობილიზაცია (60%)", amount: installMob, afterTranche: iInstallMob },
     { label: "მონტაჟი — დასრულება (40%)", amount: installFinal, afterTranche: iInstallFinal },
   ];
-  // დღგ ბიუჯეტში — თითოეულ ტრანშზე, ცალკე (ეს ნაწილი ყოველთვის სუფთად განზოგადდება N ტრანშზე)
+  // დღგ ბიუჯეტში — თითოეულ ტრანშზე, ცალკე. ტრანში შერეული (დანადგარი+დანარჩენი)
+  // ფასის % არის, ამიტომ აქ საშუალო შეწონილ დღგ-ის განაკვეთს ვიყენებთ.
+  const effectiveVatRate = report.priceNoVat ? report.vat / report.priceNoVat : 0;
   sc.tranches.forEach((t, i) => {
     const T = t.pct * contractPrice;
-    out.push({ label: `დღგ ბიუჯეტში — ${t.label}`, amount: -T / (1 + f.vatRate) * f.vatRate, afterTranche: i });
+    out.push({ label: `დღგ ბიუჯეტში — ${t.label}`, amount: -T / (1 + effectiveVatRate) * effectiveVatRate, afterTranche: i });
   });
   return out;
 }

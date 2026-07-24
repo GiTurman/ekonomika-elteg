@@ -92,7 +92,8 @@ export const defaultAppState: AppState = {
     rateDate: "2026-06-15",
     usdRate: 2.6577,
     eurRate: 3.0768,
-    vatRate: 0.18,
+    equipmentVatRate: 0.18,
+    otherVatRate: 0.18,
     incomeTaxRate: 0.20,
     pensionRate: 0.04,
     mealPerDay: 0,
@@ -214,9 +215,19 @@ export function normalizeAppState(loaded: Partial<AppState>): AppState {
     scaffolding: u.scaffolding ?? 0,
   }));
   const loadedPayment: any = loaded.payment ?? {};
+  const loadedFinance: any = loaded.finance ?? {};
+  // ძველ პროექტებს ჰქონდათ ერთიანი vatRate — თუ ახალი გაყოფილი ველები არ
+  // არსებობს, ორივეს ძველი მნიშვნელობა ენიჭება (გამოთვლა უცვლელი რჩება).
+  const financeMigrated = { ...loadedFinance };
+  if (financeMigrated.equipmentVatRate === undefined && typeof financeMigrated.vatRate === "number") {
+    financeMigrated.equipmentVatRate = financeMigrated.vatRate;
+  }
+  if (financeMigrated.otherVatRate === undefined && typeof financeMigrated.vatRate === "number") {
+    financeMigrated.otherVatRate = financeMigrated.vatRate;
+  }
   return {
     project: { ...defaultAppState.project, ...loadedProject, units },
-    finance: { ...defaultAppState.finance, ...(loaded.finance ?? {}) },
+    finance: { ...defaultAppState.finance, ...financeMigrated },
     payment: {
       procurementAdvancePct: loadedPayment.procurementAdvancePct ?? defaultAppState.payment.procurementAdvancePct,
       scenarioA: normalizeScenario(loadedPayment.scenarioA, defaultAppState.payment.scenarioA),

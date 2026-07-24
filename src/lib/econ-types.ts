@@ -104,7 +104,8 @@ export interface FinancialAssumptions {
   usdRate: number;   // 1 USD = ? GEL
   eurRate: number;   // 1 EUR = ? GEL
   // Tax
-  vatRate: number;       // 0.18
+  equipmentVatRate: number; // დანადგარის დღგ — ზოგ შემთხვევაში დანადგარი დღგ-სგან განთავისუფლებულია
+  otherVatRate: number;     // დღგ ყველაფერზე, დანადგარის გარდა (მონტაჟი, ფასნამატი, დამატებითი ხარჯები)
   incomeTaxRate: number; // 0.20 (საშემოსავლო)
   pensionRate: number;   // 0.04 (საპენსიო)
   // Travel per-diem rates (GEL)

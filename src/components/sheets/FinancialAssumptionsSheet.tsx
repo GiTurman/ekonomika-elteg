@@ -62,8 +62,10 @@ export function FinancialAssumptionsSheet() {
         <Card>
           <CardHeader><CardTitle>2. საგადასახადო პარამეტრები</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">დღგ-ის განაკვეთი</span>
-              <PercentInput value={f.vatRate} onChange={(v) => updateFinance({ vatRate: v })} /></label>
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">დანადგარის დღგ</span>
+              <PercentInput value={f.equipmentVatRate} onChange={(v) => updateFinance({ equipmentVatRate: v })} /></label>
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">დღგ (გარდა დანადგარისა)</span>
+              <PercentInput value={f.otherVatRate} onChange={(v) => updateFinance({ otherVatRate: v })} /></label>
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">საშემოსავლო</span>
               <PercentInput value={f.incomeTaxRate} onChange={(v) => updateFinance({ incomeTaxRate: v })} /></label>
             <label className="grid gap-1"><span className="text-xs text-muted-foreground">საპენსიო</span>
