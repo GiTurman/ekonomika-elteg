@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,144 +7,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Archive as ArchiveIcon, FolderOpen, Loader2, Trash2, Eraser, Copy } from "lucide-react";
-import { deleteArchiveEntry, clearArchive, listArchiveFull, loadArchiveEntry, setIncludeInAnalytics, type ArchiveEntryFull } from "@/lib/archive";
-import { Checkbox } from "@/components/ui/checkbox";
-import { normalizeAppState } from "@/lib/econ-defaults";
-import { EQUIPMENT_CATEGORY_LABEL } from "@/lib/econ-types";
-import { useEconStore } from "@/lib/econ-store";
-import { useAccessRole } from "@/components/AccessGate";
-import { logActivity } from "@/lib/activityLog";
-
-// პროექტის დანადგარებიდან — უნიკალური ბრენდები, ტიპები, ქვეყნები, არქივის
-// სიაში მოკლე მიმოხილვისთვის (დასახელების ქვეშ, პატარა ტექსტად).
-function summarizeUnits(entry: ArchiveEntryFull): string {
-  const units = entry.data?.project?.units ?? [];
-  if (units.length === 0) return "";
-  const brands = Array.from(new Set(units.map((u) => u.brand?.trim()).filter(Boolean)));
-  const kinds = Array.from(new Set(units.map((u) => EQUIPMENT_CATEGORY_LABEL[u.category] ?? u.category).filter(Boolean)));
-  const countries = Array.from(new Set(units.map((u) => u.country?.trim()).filter(Boolean)));
-  const parts: string[] = [];
-  if (brands.length) parts.push(`ბრენდი: ${brands.join(", ")}`);
-  if (kinds.length) parts.push(`ტიპი: ${kinds.join(", ")}`);
-  if (countries.length) parts.push(`ქვეყანა: ${countries.join(", ")}`);
-  return parts.join(" · ");
-}
+import { Archive as ArchiveIcon } from "lucide-react";
+import { ArchiveList } from "@/components/ArchiveList";
 
 export function ArchiveDialog() {
-  const { isFull, actorName, role } = useAccessRole();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<ArchiveEntryFull[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [clearing, setClearing] = useState(false);
-  const { setState } = useEconStore();
-
-  const refresh = async () => {
-    setLoading(true);
-    try {
-      setItems(await listArchiveFull());
-    } catch (e) {
-      console.error("[archive] list failed", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (open) refresh();
-  }, [open]);
-
-  const handleOpenEntry = async (id: string) => {
-    if (!confirm("მიმდინარე ეკრანზე არსებული მონაცემები ჩანაცვლდება არქივიდან ამოღებული ვერსიით. გავაგრძელო?")) return;
-    setBusyId(id);
-    try {
-      const entryName = items.find((it) => it.id === id)?.name ?? id;
-      const state = await loadArchiveEntry(id);
-      setState((cur) => ({ ...normalizeAppState(state), pageVisibility: cur.pageVisibility }));
-      setOpen(false);
-      logActivity(actorName, role, "არქივიდან პროექტის გახსნა", entryName);
-    } catch (e) {
-      console.error("[archive] load failed", e);
-      alert("არქივის ჩანაწერის ჩატვირთვა ვერ მოხერხდა.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  // ერთი პროექტის რამდენიმე ვარიანტისთვის — სრულად აკოპირებს არჩეულ არქივის
-  // ჩანაწერს სამუშაო ეკრანზე, სახელს სთავაზობს "— ვარიანტი 2" და ა.შ., და
-  // "დასრულება და შენახვისას" ცალკე ჩანაწერად ინახება. ორიგინალს არ ეხება.
-  const handleDuplicateVariant = async (id: string) => {
-    if (!confirm("მიმდინარე ეკრანზე არსებული მონაცემები ჩანაცვლდება ამ პროექტის ასლით — ახალი ვარიანტისთვის. გავაგრძელო?")) return;
-    setBusyId(id);
-    try {
-      const raw = await loadArchiveEntry(id);
-      const normalized = normalizeAppState(raw);
-      const baseName = normalized.project.projectName.replace(/\s*—\s*ვარიანტი\s*\d+\s*$/, "").trim();
-      const suggested = `${baseName} — ვარიანტი 2`;
-      const newName = prompt("ახალი ვარიანტის დასახელება (საჭიროებისამებრ შეასწორე ნომერი):", suggested);
-      if (!newName || !newName.trim()) { setBusyId(null); return; }
-      setState((cur) => ({
-        ...normalized,
-        project: { ...normalized.project, projectName: newName.trim() },
-        pageVisibility: cur.pageVisibility,
-      }));
-      setOpen(false);
-      logActivity(actorName, role, "პროექტის დუბლირება ახალ ვარიანტად", `${baseName} → ${newName.trim()}`);
-    } catch (e) {
-      console.error("[archive] duplicate failed", e);
-      alert("დუბლირება ვერ მოხერხდა.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleToggleAnalytics = async (it: ArchiveEntryFull) => {
-    const next = !it.include_in_analytics;
-    setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, include_in_analytics: next } : x)));
-    try {
-      await setIncludeInAnalytics(it.id, next);
-      logActivity(actorName, role, "ანალიტიკაში ჩართვის შეცვლა", `${it.name} → ${next ? "ჩართული" : "გამორთული"}`);
-    } catch (e) {
-      console.error("[archive] analytics toggle failed", e);
-      alert("განახლება ვერ მოხერხდა.");
-      refresh();
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("წავშალო არქივის ეს ჩანაწერი? ეს მოქმედება შეუქცევადია.")) return;
-    setBusyId(id);
-    try {
-      const entryName = items.find((it) => it.id === id)?.name ?? id;
-      await deleteArchiveEntry(id);
-      await refresh();
-      logActivity(actorName, role, "არქივის ჩანაწერის წაშლა", entryName);
-    } catch (e) {
-      console.error("[archive] delete failed", e);
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleClearAll = async () => {
-    if (items.length === 0) return;
-    if (!confirm(`დარწმუნებული ხართ? წაიშლება არქივის ყველა ჩანაწერი (${items.length} ცალი). ეს მოქმედება შეუქცევადია.`)) return;
-    const count = items.length;
-    setClearing(true);
-    try {
-      await clearArchive();
-      await refresh();
-      logActivity(actorName, role, "არქივის სრული გასუფთავება", `${count} ჩანაწერი`);
-    } catch (e) {
-      console.error("[archive] clear failed", e);
-      alert("არქივის გასუფთავება ვერ მოხერხდა.");
-    } finally {
-      setClearing(false);
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -155,86 +22,12 @@ export function ArchiveDialog() {
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between pr-6">
-            <span>დასრულებული განფასებების არქივი</span>
-            {isFull && items.length > 0 && (
-              <Button size="sm" variant="outline" onClick={handleClearAll} disabled={clearing}>
-                {clearing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eraser className="h-4 w-4 mr-1" />}
-                არქივის გასუფთავება
-              </Button>
-            )}
-          </DialogTitle>
+          <DialogTitle>დასრულებული განფასებების არქივი</DialogTitle>
         </DialogHeader>
-        {loading ? (
-          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" /> იტვირთება…
-          </div>
-        ) : items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">არქივი ცარიელია</p>
-        ) : (
-          <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>დასახელება</TableHead>
-                  <TableHead>თარიღი</TableHead>
-                  {isFull && <TableHead className="text-center">ანალიტიკაში</TableHead>}
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((it) => {
-                  const summary = summarizeUnits(it);
-                  return (
-                  <TableRow key={it.id}>
-                    <TableCell className="font-medium">
-                      <div>{it.name}</div>
-                      {summary && <div className="text-xs text-muted-foreground font-normal mt-0.5">{summary}</div>}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(it.created_at).toLocaleString("ka-GE")}
-                    </TableCell>
-                    {isFull && (
-                      <TableCell className="text-center">
-                        <Checkbox checked={it.include_in_analytics} onCheckedChange={() => handleToggleAnalytics(it)} />
-                      </TableCell>
-                    )}
-                    <TableCell className="flex justify-end gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={busyId === it.id}
-                        onClick={() => handleOpenEntry(it.id)}
-                        title="გახსნა"
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={busyId === it.id}
-                        onClick={() => handleDuplicateVariant(it.id)}
-                        title="დუბლირება ახალ ვარიანტად"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={busyId === it.id}
-                        onClick={() => handleDelete(it.id)}
-                        title="წაშლა"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <div className="max-h-[70vh] overflow-y-auto">
+          {/* key=open რომ ყოველ გახსნაზე თავიდან ჩაიტვირთოს სია */}
+          {open && <ArchiveList key="dialog" onNavigateAway={() => setOpen(false)} />}
+        </div>
       </DialogContent>
     </Dialog>
   );
