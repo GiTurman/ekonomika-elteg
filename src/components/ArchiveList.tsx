@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FolderOpen, Loader2, Trash2, Eraser, Copy } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { FolderOpen, Loader2, Trash2, Eraser, Copy, X } from "lucide-react";
 import { deleteArchiveEntry, clearArchive, listArchiveFull, loadArchiveEntry, setIncludeInAnalytics, type ArchiveEntryFull } from "@/lib/archive";
 import { normalizeAppState } from "@/lib/econ-defaults";
 import { EQUIPMENT_CATEGORY_LABEL } from "@/lib/econ-types";
@@ -33,7 +35,28 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [yearFilter, setYearFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const { setState } = useEconStore();
+
+  const years = useMemo(() => {
+    const set = new Set(items.map((it) => new Date(it.created_at).getFullYear()));
+    return Array.from(set).sort((a, b) => b - a);
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((it) => {
+      const d = new Date(it.created_at);
+      if (yearFilter !== "all" && String(d.getFullYear()) !== yearFilter) return false;
+      if (dateFrom && d < new Date(dateFrom + "T00:00:00")) return false;
+      if (dateTo && d > new Date(dateTo + "T23:59:59")) return false;
+      return true;
+    });
+  }, [items, yearFilter, dateFrom, dateTo]);
+
+  const hasActiveFilter = yearFilter !== "all" || !!dateFrom || !!dateTo;
+  const clearFilters = () => { setYearFilter("all"); setDateFrom(""); setDateTo(""); };
 
   const refresh = async () => {
     setLoading(true);
@@ -143,7 +166,7 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
           განახლება
@@ -156,12 +179,37 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
         )}
       </div>
 
+      {items.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap text-sm">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">ფილტრი:</span>
+          <Select value={yearFilter} onValueChange={setYearFilter}>
+            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="წელი" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ყველა წელი</SelectItem>
+              {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">-დან</span>
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-36 text-xs" />
+          <span className="text-xs text-muted-foreground">-მდე</span>
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-36 text-xs" />
+          {hasActiveFilter && (
+            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={clearFilters}>
+              <X className="h-3.5 w-3.5 mr-1" /> გასუფთავება
+            </Button>
+          )}
+          <span className="text-xs text-muted-foreground ml-auto">{filteredItems.length} / {items.length}</span>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mr-2" /> იტვირთება…
         </div>
       ) : items.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">არქივი ცარიელია</p>
+      ) : filteredItems.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">ფილტრით ჩანაწერი ვერ მოიძებნა.</p>
       ) : (
         <div className="overflow-x-auto">
           <Table>
@@ -174,7 +222,7 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((it) => {
+              {filteredItems.map((it) => {
                 const summary = summarizeUnits(it);
                 return (
                   <TableRow key={it.id}>
