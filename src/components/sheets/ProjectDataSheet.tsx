@@ -6,24 +6,26 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumberInput, PercentInput, TextInput, fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 import { allocateProjectCosts } from "@/lib/econ-calc";
-import { EQUIPMENT_CATEGORY_LABEL, PROJECT_STATUS_LABEL, type EquipmentCategory, type ProjectStatus } from "@/lib/econ-types";
+import { EQUIPMENT_CATEGORY_LABEL, EQUIPMENT_CATEGORY_PREFIX, PROJECT_STATUS_LABEL, type EquipmentCategory, type ProjectStatus } from "@/lib/econ-types";
 import { Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
+import { useEffect, useState } from "react";
+import { listDropdownOptions } from "@/lib/dropdownOptions";
 
 const PROJECT_STATUS_ORDER: ProjectStatus[] = ["in_progress", "won", "lost", "stalled"];
 
-const UNIT_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string; kind: "text" | "num" }> = [
+const UNIT_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string; kind: "text" | "num" | "select" }> = [
   { key: "id", label: "#", kind: "text" },
   { key: "capacity", label: "ტვირთ. (კგ)", kind: "num" },
   { key: "floors", label: "სართ.", kind: "num" },
   { key: "currency", label: "ვალუტა", kind: "text" },
-  { key: "brand", label: "ბრენდი", kind: "text" },
+  { key: "brand", label: "ბრენდი", kind: "select" },
   { key: "model", label: "მოდელი", kind: "text" },
-  { key: "country", label: "ქვეყანა", kind: "text" },
+  { key: "country", label: "ქვეყანა", kind: "select" },
   { key: "kind", label: "სახეობა", kind: "text" },
   { key: "type", label: "ტიპი", kind: "text" },
   { key: "delivery", label: "მიწოდება", kind: "text" },
-  { key: "mrType", label: "MR/MRL", kind: "text" },
+  { key: "mrType", label: "MR/MRL", kind: "select" },
   { key: "specDate", label: "სპეც. თარიღი", kind: "text" },
   { key: "variant", label: "ვარიანტი", kind: "num" },
   { key: "productionWeeks", label: "წარმოება (კვ)", kind: "num" },
@@ -31,6 +33,9 @@ const UNIT_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: stri
   { key: "reserveWeeks", label: "რეზერვი (კვ)", kind: "num" },
   { key: "installWeeks", label: "მონტაჟი (კვ)", kind: "num" },
 ];
+
+// UNIT_COLS-ის key-ები ერგება dropdown_options ცხრილის field_key-ებს (brand/country/mrType)
+const SELECT_FIELD_MAP: Partial<Record<string, string>> = { brand: "brand", country: "country", mrType: "mrType" };
 
 // Directly editable per-unit $ cost fields (bank/intl-transport/terminal/local-transport
 // are entered once at project level — see "3.1" card — and auto-distributed here as
@@ -79,6 +84,25 @@ export function ProjectDataSheet() {
   const seeAccommodation = canSeeField("travel.accommodation");
   const seeHouseRent = canSeeField("travel.houseRent");
   const seeDistanceFuel = canSeeField("travel.distanceFuel");
+
+  const [dropdownOpts, setDropdownOpts] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    listDropdownOptions()
+      .then((list) => setDropdownOpts(Object.fromEntries(list.map((o) => [o.fieldKey, o.options]))))
+      .catch((e) => console.error("[dropdown-options] load failed", e));
+  }, []);
+
+  // კატეგორიის შეცვლისას დანადგარის ID ავტომატურად ერგება კონვენციას
+  // (ლიფტი→L, ესკალატორი→E, ტრაველატორი→T, საპარკინგე→PK, პლატფორმა→PL),
+  // შემდეგი თავისუფალი ნომრით იმავე პროექტში.
+  const handleCategoryChange = (unitId: string, category: EquipmentCategory) => {
+    const prefix = EQUIPMENT_CATEGORY_PREFIX[category];
+    const used = p.units
+      .filter((x) => x.id !== unitId && x.id.startsWith(prefix) && /^\d+$/.test(x.id.slice(prefix.length)))
+      .map((x) => parseInt(x.id.slice(prefix.length), 10));
+    const nextNum = used.length ? Math.max(...used) + 1 : 1;
+    updateUnit(unitId, { category, id: `${prefix}${nextNum}` });
+  };
 
   const setTravel = (patch: Partial<typeof t>) =>
     updateProject({ travel: { ...t, ...patch } });
@@ -157,7 +181,7 @@ export function ProjectDataSheet() {
                   {seeCategory && (
                     <TableCell className="p-1 min-w-[140px]">
                       {canEditField("unit.category") ? (
-                        <Select value={u.category} onValueChange={(v) => updateUnit(u.id, { category: v as EquipmentCategory })}>
+                        <Select value={u.category} onValueChange={(v) => handleCategoryChange(u.id, v as EquipmentCategory)}>
                           <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {(Object.keys(EQUIPMENT_CATEGORY_LABEL) as EquipmentCategory[]).map((c) => (
@@ -173,9 +197,20 @@ export function ProjectDataSheet() {
                   {visibleUnitCols.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[92px]">
                       {canEditField("unit." + c.key) ? (
-                        c.kind === "num"
-                          ? <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
-                          : <TextInput value={String(u[c.key] ?? "")} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                        c.kind === "num" ? (
+                          <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                        ) : c.kind === "select" ? (
+                          <Select value={String(u[c.key] ?? "")} onValueChange={(v) => updateUnit(u.id, { [c.key]: v } as any)}>
+                            <SelectTrigger className="h-8 text-sm min-w-[110px]"><SelectValue placeholder="—" /></SelectTrigger>
+                            <SelectContent>
+                              {(dropdownOpts[SELECT_FIELD_MAP[c.key] ?? ""] ?? []).map((opt) => (
+                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <TextInput value={String(u[c.key] ?? "")} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                        )
                       ) : (
                         <div className={"h-8 flex items-center px-2 text-sm " + computedCls}>{String(u[c.key] ?? "")}</div>
                       )}

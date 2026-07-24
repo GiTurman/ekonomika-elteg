@@ -59,6 +59,24 @@ export type Database = {
         }
         Relationships: []
       }
+      dropdown_options: {
+        Row: {
+          field_key: string
+          label: string
+          options: string[]
+        }
+        Insert: {
+          field_key: string
+          label: string
+          options?: string[]
+        }
+        Update: {
+          field_key?: string
+          label?: string
+          options?: string[]
+        }
+        Relationships: []
+      }
       field_visibility: {
         Row: {
           allowed_roles: string[]

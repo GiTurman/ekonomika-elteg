@@ -4,17 +4,105 @@ import { listUsers, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser
 import { listFieldPermissions, updateFieldPermission, type FieldPermission } from "@/lib/fieldPermissions";
 import { listFieldVisibility, updateFieldVisibility, type FieldVisibility } from "@/lib/fieldVisibility";
 import { listPagePermissions, updatePagePermission, type PagePermission } from "@/lib/pagePermissions";
+import { listDropdownOptions, updateDropdownOptions, type DropdownOptions } from "@/lib/dropdownOptions";
 import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { TextInput } from "./sheet-ui";
-import { Loader2, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Plus, Trash2, X } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 
 const NON_FULL_ROLES: AccessRole[] = ["commercial", "technical", "accounting", "procurement", "administration"];
+
+function DropdownOptionsPanel() {
+  const { actorName, role: myRole } = useAccessRole();
+  const [items, setItems] = useState<DropdownOptions[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [newValue, setNewValue] = useState<Record<string, string>>({});
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setItems(await listDropdownOptions());
+    } catch (e) {
+      console.error("[dropdown-options] load failed", e);
+      setError("სიების ჩატვირთვა ვერ მოხერხდა.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const commit = async (item: DropdownOptions, nextOptions: string[]) => {
+    setItems((prev) => prev.map((x) => (x.fieldKey === item.fieldKey ? { ...x, options: nextOptions } : x)));
+    try {
+      await updateDropdownOptions(item.fieldKey, nextOptions);
+      logActivity(actorName, myRole, "სიის განახლება — " + item.label, nextOptions.join(", "));
+    } catch (e) {
+      console.error("[dropdown-options] update failed", e);
+      alert("განახლება ვერ მოხერხდა.");
+      refresh();
+    }
+  };
+
+  const addOption = (item: DropdownOptions) => {
+    const v = (newValue[item.fieldKey] ?? "").trim();
+    if (!v || item.options.includes(v)) return;
+    commit(item, [...item.options, v]);
+    setNewValue((prev) => ({ ...prev, [item.fieldKey]: "" }));
+  };
+
+  const removeOption = (item: DropdownOptions, opt: string) => {
+    commit(item, item.options.filter((o) => o !== opt));
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>ჩამონათვალები — ბრენდი / ქვეყანა / MR-MRL</CardTitle>
+        <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+          განახლება
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          ეს სიები ივსება drop-down-ებად „შესატანი მონაცემები" გვერდზე (დანადგარების ცხრილი). აქ დამატებული/წაშლილი
+          მნიშვნელობა მაშინვე აისახება ფორმაში.
+        </p>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {items.map((item) => (
+          <div key={item.fieldKey} className="space-y-2">
+            <div className="text-sm font-medium">{item.label}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {item.options.map((opt) => (
+                <Badge key={opt} variant="secondary" className="text-xs cursor-pointer" onClick={() => removeOption(item, opt)}>
+                  {opt} <X className="h-3 w-3 ml-1" />
+                </Badge>
+              ))}
+              {item.options.length === 0 && <span className="text-xs text-muted-foreground">ცარიელია</span>}
+            </div>
+            <div className="flex items-center gap-2 max-w-sm">
+              <TextInput
+                value={newValue[item.fieldKey] ?? ""}
+                onChange={(v) => setNewValue((prev) => ({ ...prev, [item.fieldKey]: v }))}
+                placeholder="ახალი მნიშვნელობა..."
+              />
+              <Button size="sm" variant="outline" onClick={() => addOption(item)}><Plus className="h-4 w-4" /></Button>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 function PagePermissionsPanel() {
   const { actorName, role: myRole, refreshPagePermissions } = useAccessRole();
@@ -427,6 +515,7 @@ export function LogSheet() {
     <div className="space-y-4">
       <UsersPanel />
       <PagePermissionsPanel />
+      <DropdownOptionsPanel />
       <FieldVisibilityPanel />
       <FieldPermissionsPanel />
 

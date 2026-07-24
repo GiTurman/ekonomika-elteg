@@ -10,6 +10,16 @@ export const EQUIPMENT_CATEGORY_LABEL: Record<EquipmentCategory, string> = {
   platform: "შშმ პლატფორმა",
 };
 
+// კატეგორია → ID-ის პრეფიქსი. კატეგორიის შეცვლისას დანადგარის ID ავტომატურად
+// ერგება ამ კონვენციას (მაგ. ესკალატორი → E1, E2...).
+export const EQUIPMENT_CATEGORY_PREFIX: Record<EquipmentCategory, string> = {
+  lift: "L",
+  escalator: "E",
+  travelator: "T",
+  parking: "PK",
+  platform: "PL",
+};
+
 export interface Unit {
   id: string;           // e.g. "L1"
   category: EquipmentCategory; // მინიმალური მოგების ზღვრების დასათვლელად
