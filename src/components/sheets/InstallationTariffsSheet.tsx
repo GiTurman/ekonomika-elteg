@@ -1,64 +1,173 @@
+import { useEffect, useState } from "react";
+import { useAccessRole } from "@/components/AccessGate";
 import { useEconStore } from "@/lib/econ-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { NumberInput, PercentInput, fmtNum, computedCls } from "./sheet-ui";
-import { EQUIPMENT_CATEGORY_LABEL, type EquipmentCategory, type InstallTariffs } from "@/lib/econ-types";
-
-const SECTIONS: Array<{ key: keyof InstallTariffs; title: string }> = [
-  { key: "capUnder1000", title: "სამონტაჟო სამუშაო — ტვირთამწეობა < 1000 კგ" },
-  { key: "capOver1000", title: "სამონტაჟო სამუშაო — ტვირთამწეობა ≥ 1000 კგ" },
-  { key: "elec", title: "ელექტრომონტაჟი" },
-  { key: "helper", title: "დამხმარე პერსონალი" },
-];
+import { Button } from "@/components/ui/button";
+import { NumberInput, PercentInput, TextInput, fmtUsd, fmtPct, computedCls } from "./sheet-ui";
+import { EQUIPMENT_CATEGORY_LABEL, type EquipmentCategory } from "@/lib/econ-types";
+import { listTariffRules, updateTariffRule, deleteTariffRule, createTariffRule, type TariffRule } from "@/lib/installTariffRules";
+import { logActivity } from "@/lib/activityLog";
+import { Loader2, RefreshCw, Trash2, Plus } from "lucide-react";
 
 const CATEGORY_ORDER: EquipmentCategory[] = ["lift", "escalator", "travelator", "parking", "platform"];
 
+function rangeLabel(min: number | null, max: number | null, unit: string): string {
+  if (min == null && max == null) return "—";
+  if (min != null && max != null) return `${min}–${max} ${unit}`;
+  if (min != null) return `${min}+ ${unit}`;
+  return `≤${max} ${unit}`;
+}
+
 export function InstallationTariffsSheet() {
-  const { state, setTariffRow, setProfitThreshold } = useEconStore();
-  const f = state.finance;
-  const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
+  const { isFull, actorName, role } = useAccessRole();
+  const { state, setProfitThreshold } = useEconStore();
+  const [rules, setRules] = useState<TariffRule[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setRules(await listTariffRules());
+    } catch (e) {
+      console.error("[tariffs] load failed", e);
+      setError("ტარიფების ჩატვირთვა ვერ მოხერხდა.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const commit = async (rule: TariffRule, patch: Partial<TariffRule>, logNote?: string) => {
+    setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, ...patch } : r)));
+    try {
+      await updateTariffRule(rule.id, patch);
+      if (logNote) logActivity(actorName, role, logNote, rule.label);
+    } catch (e) {
+      console.error("[tariffs] update failed", e);
+      alert("განახლება ვერ მოხერხდა.");
+      refresh();
+    }
+  };
+
+  const handleDelete = async (rule: TariffRule) => {
+    if (!confirm(`წავშალო ტარიფი "${rule.label}"?`)) return;
+    try {
+      await deleteTariffRule(rule.id);
+      await refresh();
+      logActivity(actorName, role, "სატარიფო ხაზის წაშლა", rule.label);
+    } catch (e) {
+      console.error("[tariffs] delete failed", e);
+      alert("წაშლა ვერ მოხერხდა.");
+    }
+  };
+
+  const handleAdd = async (category: EquipmentCategory) => {
+    const label = prompt("ახალი ტარიფის დასახელება:");
+    if (!label || !label.trim()) return;
+    const id = `${category}_${Date.now()}`;
+    try {
+      await createTariffRule({ id, label: label.trim(), category, mechRate: 0, elecRate: 0, capMin: null, capMax: null, floorMin: null, floorMax: null, note: null });
+      await refresh();
+      logActivity(actorName, role, "ახალი სატარიფო ხაზის დამატება", label.trim());
+    } catch (e) {
+      console.error("[tariffs] create failed", e);
+      alert("დამატება ვერ მოხერხდა.");
+    }
+  };
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle>მონტაჟის მომსახურების სატარიფო ცხრილი</CardTitle></CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          დამოუკიდებელი მონტაჟის მომსახურების ფასების ცნობარი (მაგ. ლიფტზე, რომელიც არ არის ამ კომპანიის მიერ მიწოდებული).
-          იგი <b>არ მონაწილეობს</b> მიმდინარე პროექტის «ეკონომიკა» ფურცლის გაანგარიშებაში. ღირებულებები კორექტირებადია და
-          ინახება ავტომატურად. გროსი ფასი ავტომატურად ითვლის საშემოსავლო და საპენსიო დარიცხვებს (ნეტოდან) — მხოლოდ დოლარში.
+        <CardHeader><CardTitle>მონტაჟის სტანდარტული ტარიფები</CardTitle></CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-1">
+          <p>
+            ეს არის კომპანიის სტანდარტული, დამტკიცებული სამონტაჟო ტარიფები (USD, ხელზე ასაღები). „შესატანი მონაცემები"
+            გვერდზე, დანადგარის ტარიფის მიხედვით არჩევისას, მონტაჟისა და ელექტრომონტაჟის განაკვეთები
+            <b> ავტომატურად აქედან წამოვა</b> — ხელით შესწორება შემდეგაც შესაძლებელია.
+          </p>
+          {isFull ? (
+            <p>რედაქტირება/დამატება/წაშლა — მხოლოდ ფინანსების ხელმისაწვდომობაშია.</p>
+          ) : (
+            <p className="text-amber-600">ამ ცხრილის კორექტირება მხოლოდ ფინანსებს შეუძლია — შენ მხოლოდ სანახავად გაქვს წვდომა.</p>
+          )}
         </CardContent>
       </Card>
 
-      {SECTIONS.map((sec) => (
-        <Card key={sec.key}>
-          <CardHeader><CardTitle>{sec.title}</CardTitle></CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>კატეგორია</TableHead>
-                  <TableHead className="text-right">USD ნეტო</TableHead>
-                  <TableHead className="text-right">USD გროსი</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {state.tariffs[sec.key].map((r, i) => {
-                  const gross = r.usdNet * grossFactor;
-                  return (
-                    <TableRow key={r.label}>
-                      <TableCell className="text-sm">{r.label}</TableCell>
-                      <TableCell className="p-1 w-36">
-                        <NumberInput value={r.usdNet} onChange={(v) => setTariffRow(sec.key, i, v)} />
-                      </TableCell>
-                      <TableCell className={"text-right " + computedCls}>$ {fmtNum(gross)}</TableCell>
+      {CATEGORY_ORDER.map((cat) => {
+        const catRules = rules.filter((r) => r.category === cat);
+        if (catRules.length === 0 && !isFull) return null;
+        return (
+          <Card key={cat}>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{EQUIPMENT_CATEGORY_LABEL[cat]}</CardTitle>
+              <div className="flex gap-2">
+                {cat === CATEGORY_ORDER[0] && (
+                  <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                    განახლება
+                  </Button>
+                )}
+                {isFull && <Button size="sm" variant="outline" onClick={() => handleAdd(cat)}><Plus className="h-4 w-4 mr-1" /> ხაზი</Button>}
+              </div>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              {error && <p className="text-sm text-destructive mb-2">{error}</p>}
+              {catRules.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">ტარიფი არ არის მითითებული.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-xs">
+                      <TableHead>დასახელება</TableHead>
+                      <TableHead className="text-right">მექ. $/სართ.</TableHead>
+                      <TableHead className="text-right">ელ. $/სართ.</TableHead>
+                      <TableHead>ტვირთამწეობა</TableHead>
+                      <TableHead>სართული</TableHead>
+                      {isFull && <TableHead />}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ))}
+                  </TableHeader>
+                  <TableBody>
+                    {catRules.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="p-1 min-w-[220px]">
+                          {isFull ? <TextInput value={r.label} onChange={(v) => commit(r, { label: v })} /> : r.label}
+                        </TableCell>
+                        <TableCell className="p-1 w-28">
+                          {isFull ? (
+                            <NumberInput value={r.mechRate} onChange={(v) => commit(r, { mechRate: v }, "ტარიფის განახლება")} />
+                          ) : (
+                            <div className={"text-right " + computedCls}>{fmtUsd(r.mechRate)}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="p-1 w-28">
+                          {isFull ? (
+                            <NumberInput value={r.elecRate} onChange={(v) => commit(r, { elecRate: v }, "ტარიფის განახლება")} />
+                          ) : (
+                            <div className={"text-right " + computedCls}>{fmtUsd(r.elecRate)}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{rangeLabel(r.capMin, r.capMax, "კგ")}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{rangeLabel(r.floorMin, r.floorMax, "სართ.")}</TableCell>
+                        {isFull && (
+                          <TableCell className="p-1">
+                            <Button size="icon" variant="ghost" onClick={() => handleDelete(r)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
 
       <Card>
         <CardHeader><CardTitle>მინიმალური მოგების ზღვრები დანადგარის კატეგორიის მიხედვით</CardTitle></CardHeader>

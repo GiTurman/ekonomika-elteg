@@ -11,6 +11,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import { useEffect, useState } from "react";
 import { listDropdownOptions } from "@/lib/dropdownOptions";
+import { listTariffRules, findMatchingLiftRule, type TariffRule } from "@/lib/installTariffRules";
 
 const PROJECT_STATUS_ORDER: ProjectStatus[] = ["in_progress", "won", "lost", "stalled"];
 
@@ -91,6 +92,18 @@ export function ProjectDataSheet() {
       .then((list) => setDropdownOpts(Object.fromEntries(list.map((o) => [o.fieldKey, o.options]))))
       .catch((e) => console.error("[dropdown-options] load failed", e));
   }, []);
+
+  const [tariffRules, setTariffRules] = useState<TariffRule[]>([]);
+  useEffect(() => {
+    listTariffRules().catch((e) => { console.error("[tariffs] load failed", e); return []; }).then(setTariffRules);
+  }, []);
+
+  // ტარიფის არჩევისას (ან ლიფტისთვის — ავტომატურად, ტვირთამწეობის/სართულების
+  // მიხედვით) მონტაჟისა და ელექტრომონტაჟის განაკვეთები ავსებს ამ სტანდარტული
+  // ტარიფიდან. ხელით შესწორება შემდეგაც შესაძლებელია.
+  const applyTariff = (unitId: string, rule: TariffRule) => {
+    updateUnit(unitId, { mechRateGel: rule.mechRate, elecRateGel: rule.elecRate });
+  };
 
   // კატეგორიის შეცვლისას დანადგარის ID ავტომატურად ერგება კონვენციას
   // (ლიფტი→L, ესკალატორი→E, ტრაველატორი→T, საპარკინგე→PK, პლატფორმა→PL),
@@ -336,13 +349,39 @@ export function ProjectDataSheet() {
             <TableHeader>
               <TableRow>
                 <TableHead className="whitespace-nowrap text-xs">#</TableHead>
+                <TableHead className="whitespace-nowrap text-xs">ტარიფი</TableHead>
                 {visibleRateCols.map((c) => <TableHead key={c.key} className="whitespace-nowrap text-xs">{c.label}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {p.units.map((u) => (
+              {p.units.map((u) => {
+                const catRules = tariffRules.filter((r) => r.category === u.category);
+                const suggested = u.category === "lift" ? findMatchingLiftRule(tariffRules, u.capacity, u.floors) : null;
+                return (
                 <TableRow key={u.id}>
                   <TableCell className="p-1 font-semibold">{u.id}</TableCell>
+                  <TableCell className="p-1 min-w-[220px]">
+                    {canEditField("unit.mechRateGel") ? (
+                      catRules.length > 0 ? (
+                        <Select value="" onValueChange={(v) => { const r = catRules.find((x) => x.id === v); if (r) applyTariff(u.id, r); }}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder={suggested ? `შემოთავაზება: ${suggested.label}` : "ტარიფის არჩევა…"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {catRules.map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.id === suggested?.id ? "✓ " : ""}{r.label} (${r.mechRate}/${r.elecRate})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">ტარიფი არ არის</span>
+                      )
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   {visibleRateCols.map((c) => (
                     <TableCell key={c.key} className="p-1 min-w-[110px]">
                       {canEditField("unit." + c.key) ? (
@@ -357,7 +396,8 @@ export function ProjectDataSheet() {
                     </TableCell>
                   ))}
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

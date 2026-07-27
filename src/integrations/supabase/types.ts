@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      install_tariff_rules: {
+        Row: {
+          cap_max: number | null
+          cap_min: number | null
+          category: string
+          elec_rate: number
+          floor_max: number | null
+          floor_min: number | null
+          id: string
+          label: string
+          mech_rate: number
+          note: string | null
+          sort_order: number
+        }
+        Insert: {
+          cap_max?: number | null
+          cap_min?: number | null
+          category: string
+          elec_rate?: number
+          floor_max?: number | null
+          floor_min?: number | null
+          id: string
+          label: string
+          mech_rate?: number
+          note?: string | null
+          sort_order?: number
+        }
+        Update: {
+          cap_max?: number | null
+          cap_min?: number | null
+          category?: string
+          elec_rate?: number
+          floor_max?: number | null
+          floor_min?: number | null
+          id?: string
+          label?: string
+          mech_rate?: number
+          note?: string | null
+          sort_order?: number
+        }
+        Relationships: []
+      }
       dropdown_options: {
         Row: {
           field_key: string
