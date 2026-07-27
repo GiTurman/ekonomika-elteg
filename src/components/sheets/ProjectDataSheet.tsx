@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumberInput, PercentInput, TextInput, fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 import { allocateProjectCosts } from "@/lib/econ-calc";
-import { EQUIPMENT_CATEGORY_LABEL, EQUIPMENT_CATEGORY_PREFIX, PROJECT_STATUS_LABEL, type EquipmentCategory, type ProjectStatus } from "@/lib/econ-types";
+import { EQUIPMENT_CATEGORY_LABEL, EQUIPMENT_CATEGORY_PREFIX, PROJECT_STATUS_LABEL, type EquipmentCategory, type ProjectStatus, type Unit } from "@/lib/econ-types";
 import { Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import { useEffect, useState } from "react";
@@ -105,6 +105,24 @@ export function ProjectDataSheet() {
     updateUnit(unitId, { mechRateGel: rule.mechRate, elecRateGel: rule.elecRate });
   };
 
+  // "2. დანადგარების ცხრილში" კატეგორიის/ტვირთამწეობის/სართულების შევსებისას
+  // ლიფტისთვის ტარიფი ავტომატურად გამოითვლება და ერთვის იმავე patch-ში —
+  // ცალკე 3.2-ში ხელით არჩევა აღარ სჭირდება (თუმცა შემდეგაც თავისუფლად
+  // შესწორებადია). ესკალატორი/პლატფორმისთვის, სადაც რამდენიმე ქვეტიპია
+  // შესაძლებელი ცალსახა განმასხვავებლის გარეშე, ეს კვლავ 3.2-ში ხელით ირჩევა.
+  const updateUnitAndTariff = (unitId: string, patch: Partial<Unit>) => {
+    const u = p.units.find((x) => x.id === unitId);
+    let finalPatch: Partial<Unit> = patch;
+    if (u && ("capacity" in patch || "floors" in patch || "category" in patch)) {
+      const next = { ...u, ...patch };
+      if (next.category === "lift") {
+        const rule = findMatchingLiftRule(tariffRules, next.capacity, next.floors);
+        if (rule) finalPatch = { ...patch, mechRateGel: rule.mechRate, elecRateGel: rule.elecRate };
+      }
+    }
+    updateUnit(unitId, finalPatch);
+  };
+
   // კატეგორიის შეცვლისას დანადგარის ID ავტომატურად ერგება კონვენციას
   // (ლიფტი→L, ესკალატორი→E, ტრაველატორი→T, საპარკინგე→PK, პლატფორმა→PL),
   // შემდეგი თავისუფალი ნომრით იმავე პროექტში.
@@ -114,7 +132,7 @@ export function ProjectDataSheet() {
       .filter((x) => x.id !== unitId && x.id.startsWith(prefix) && /^\d+$/.test(x.id.slice(prefix.length)))
       .map((x) => parseInt(x.id.slice(prefix.length), 10));
     const nextNum = used.length ? Math.max(...used) + 1 : 1;
-    updateUnit(unitId, { category, id: `${prefix}${nextNum}` });
+    updateUnitAndTariff(unitId, { category, id: `${prefix}${nextNum}` });
   };
 
   const setTravel = (patch: Partial<typeof t>) =>
@@ -211,7 +229,7 @@ export function ProjectDataSheet() {
                     <TableCell key={c.key} className="p-1 min-w-[92px]">
                       {canEditField("unit." + c.key) ? (
                         c.kind === "num" ? (
-                          <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                          <NumberInput value={u[c.key] as number} onChange={(v) => updateUnitAndTariff(u.id, { [c.key]: v } as any)} />
                         ) : c.kind === "select" ? (
                           <Select value={String(u[c.key] ?? "")} onValueChange={(v) => updateUnit(u.id, { [c.key]: v } as any)}>
                             <SelectTrigger className="h-8 text-sm min-w-[110px]"><SelectValue placeholder="—" /></SelectTrigger>
