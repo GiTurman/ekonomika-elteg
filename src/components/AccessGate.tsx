@@ -100,7 +100,12 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
   const canViewPage = (pageKey: string): boolean => {
     if (user.role === "full") return true; // ფინანსები ყოველთვის ხედავს ყველა გვერდს
     const perm = pagePerms.find((p) => p.pageKey === pageKey);
-    if (!perm) return true; // უცნობი/ჯერ არარეგისტრირებული გვერდი — ნაგულისხმევად ხილვადია
+    if (!perm) {
+      // "ანალიტიკა მუშა" — მუშა/დაუმთავრებელი მონაცემებია; სანამ ცალსახად არ
+      // ჩაირთვება პანელიდან, არა-ფინანსებს ნაგულისხმევად დამალული აქვთ.
+      if (pageKey === "analytics_working") return false;
+      return true; // სხვა უცნობი/ჯერ არარეგისტრირებული გვერდი — ნაგულისხმევად ხილვადი
+    }
     return perm.allowedRoles.includes(user.role);
   };
 

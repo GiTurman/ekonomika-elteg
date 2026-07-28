@@ -3,7 +3,7 @@ import { listActivityLog, type ActivityLogEntry } from "@/lib/activityLog";
 import { listUsers, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser, type AccessRole } from "@/lib/access";
 import { listFieldPermissions, updateFieldPermission, type FieldPermission } from "@/lib/fieldPermissions";
 import { listFieldVisibility, updateFieldVisibility, type FieldVisibility } from "@/lib/fieldVisibility";
-import { listPagePermissions, updatePagePermission, type PagePermission } from "@/lib/pagePermissions";
+import { listPagePermissions, updatePagePermission, upsertPagePermission, type PagePermission } from "@/lib/pagePermissions";
 import { listDropdownOptions, updateDropdownOptions, type DropdownOptions } from "@/lib/dropdownOptions";
 import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,7 +114,13 @@ function PagePermissionsPanel() {
     setLoading(true);
     setError(null);
     try {
-      setPerms(await listPagePermissions());
+      const loaded = await listPagePermissions();
+      // "ანალიტიკა მუშა" — თუ ბაზაში row ჯერ არ არსებობს, ვირტუალურად ვამატებთ
+      // ცარიელი უფლებებით, რომ პანელში checkbox-ები მაინც გამოჩნდეს და ჩართვა შესაძლებელი იყოს.
+      if (!loaded.some((p) => p.pageKey === "analytics_working")) {
+        loaded.push({ pageKey: "analytics_working", label: "ანალიტიკა მუშა", allowedRoles: [] });
+      }
+      setPerms(loaded);
     } catch (e) {
       console.error("[permissions] page load failed", e);
       setError("გვერდების ხედვადობის ჩატვირთვა ვერ მოხერხდა.");
@@ -130,7 +136,12 @@ function PagePermissionsPanel() {
     const nextRoles = has ? perm.allowedRoles.filter((r) => r !== role) : [...perm.allowedRoles, role];
     setPerms((prev) => prev.map((p) => (p.pageKey === perm.pageKey ? { ...p, allowedRoles: nextRoles } : p)));
     try {
-      await updatePagePermission(perm.pageKey, nextRoles);
+      // "analytics_working" შესაძლოა ბაზაში ჯერ არ არსებობდეს — ამიტომ upsert.
+      if (perm.pageKey === "analytics_working") {
+        await upsertPagePermission(perm.pageKey, perm.label, nextRoles);
+      } else {
+        await updatePagePermission(perm.pageKey, nextRoles);
+      }
       refreshPagePermissions(); // მიმდინარე სესიაშიც დაუყოვნებლივ ამოქმედდეს
       logActivity(actorName, myRole, "გვერდის ხედვადობის ცვლილება", `${perm.label} → ${nextRoles.map((r) => (ROLE_LABEL as Record<string, string>)[r]).join(", ") || "არავინ"}`);
     } catch (e) {

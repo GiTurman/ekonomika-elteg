@@ -20,3 +20,12 @@ export async function updatePagePermission(pageKey: string, allowedRoles: string
   const { error } = await supabase.from("page_permissions").update({ allowed_roles: allowedRoles }).eq("page_key", pageKey);
   if (error) throw error;
 }
+
+// upsert — ისეთი გვერდისთვის, რომლის row-ც შესაძლოა ჯერ არ არსებობდეს ბაზაში
+// (მაგ. ახლად დამატებული "analytics_working"). თუ არ არსებობს — ქმნის, თუ არსებობს — ანახლებს.
+export async function upsertPagePermission(pageKey: string, label: string, allowedRoles: string[]): Promise<void> {
+  const { error } = await supabase
+    .from("page_permissions")
+    .upsert({ page_key: pageKey, label, allowed_roles: allowedRoles }, { onConflict: "page_key" });
+  if (error) throw error;
+}

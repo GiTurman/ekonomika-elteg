@@ -100,7 +100,7 @@ function MultiSelect({ label, options, selected, onChange }: {
   );
 }
 
-export function AnalyticsSheet() {
+export function AnalyticsSheet({ mode = "final" }: { mode?: "final" | "working" }) {
   const { isFull } = useAccessRole();
   const [entries, setEntries] = useState<ArchiveEntryFull[]>([]);
   const [loading, setLoading] = useState(false);
@@ -130,7 +130,10 @@ export function AnalyticsSheet() {
   const allUnits: UnitRecord[] = useMemo(() => {
     const out: UnitRecord[] = [];
     for (const entry of entries) {
-      if (!entry.include_in_analytics) continue; // "ანალიტიკაში ჩართვა" checkbox — არქივის დიალოგში
+      // "ანალიტიკა" (final) — მხოლოდ ანალიტიკაში ჩართული (მონიშნული) პროექტები.
+      // "ანალიტიკა მუშა" (working) — მხოლოდ მოუნიშნავი (ჯერ არ ჩართული) პროექტები.
+      if (mode === "final" && !entry.include_in_analytics) continue;
+      if (mode === "working" && entry.include_in_analytics) continue;
       let eco;
       try {
         eco = computeEconomics(normalizeAppState(entry.data));
@@ -159,7 +162,7 @@ export function AnalyticsSheet() {
       });
     }
     return out;
-  }, [entries]);
+  }, [entries, mode]);
 
   const projectOptions = useMemo(() => Array.from(new Set(allUnits.map((u) => u.projectName))).sort(), [allUnits]);
   const brandOptions = useMemo(() => Array.from(new Set(allUnits.map((u) => u.brand))).sort(), [allUnits]);
@@ -259,7 +262,9 @@ export function AnalyticsSheet() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          დაშბორდი აგებულია არქივში შენახული, ანალიტიკაში ჩართული პროექტების მონაცემებზე.
+          {mode === "working"
+            ? "მუშა დაშბორდი — არქივში შენახული, ანალიტიკაში ჯერ არ ჩართული (მოუნიშნავი) პროექტების მონაცემებზე."
+            : "დაშბორდი აგებულია არქივში შენახული, ანალიტიკაში ჩართული პროექტების მონაცემებზე."}
           {isFull ? " ხედვა: სუფთა ფინანსური (დღგ-ს გარეშე)." : " ხედვა: დღგ-ს ჩათვლით."}
         </p>
         <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>

@@ -58,10 +58,11 @@ function Index() {
   const showPaymentTab = isFull || canViewPage("payment");
   const showTariffsTab = isFull || canViewPage("tariffs");
   const showAnalyticsTab = isFull || canViewPage("analytics");
+  const showAnalyticsWorkingTab = isFull || canViewPage("analytics_working");
   const showComparisonTab = isFull || canViewPage("comparison");
   const showArchiveTab = isFull || canViewPage("archive");
-  const visibleTabCount = [showInputTab, showEconomicsTab, showPaymentTab, showTariffsTab, showAnalyticsTab, showComparisonTab, showArchiveTab].filter(Boolean).length + (isFull ? 1 : 0);
-  const tabsGridColsClass = visibleTabCount >= 8 ? "md:grid-cols-8" : visibleTabCount === 7 ? "md:grid-cols-7" : visibleTabCount === 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+  const visibleTabCount = [showInputTab, showEconomicsTab, showPaymentTab, showTariffsTab, showAnalyticsTab, showAnalyticsWorkingTab, showComparisonTab, showArchiveTab].filter(Boolean).length + (isFull ? 1 : 0);
+  const tabsGridColsClass = visibleTabCount >= 9 ? "md:grid-cols-9" : visibleTabCount === 8 ? "md:grid-cols-8" : visibleTabCount === 7 ? "md:grid-cols-7" : visibleTabCount === 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
   const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : showComparisonTab ? "comparison" : showArchiveTab ? "archive" : "analytics";
 
   const handleFinish = async () => {
@@ -151,6 +152,7 @@ function Index() {
             {showPaymentTab && <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>}
             {showTariffsTab && <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>}
             {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
+            {showAnalyticsWorkingTab && <TabsTrigger value="analytics_working">ანალიტიკა მუშა</TabsTrigger>}
             {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
           </TabsList>
           {isFull && (
@@ -173,7 +175,8 @@ function Index() {
             {showArchiveTab && <TabsContent value="archive"><ArchiveSheet /></TabsContent>}
             {showPaymentTab && <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>}
             {showTariffsTab && <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>}
-            {showAnalyticsTab && <TabsContent value="analytics"><AnalyticsSheet /></TabsContent>}
+            {showAnalyticsTab && <TabsContent value="analytics"><AnalyticsSheet mode="final" /></TabsContent>}
+            {showAnalyticsWorkingTab && <TabsContent value="analytics_working"><AnalyticsSheet mode="working" /></TabsContent>}
             {isFull && <TabsContent value="log"><LogSheet /></TabsContent>}
           </div>
         </Tabs>
