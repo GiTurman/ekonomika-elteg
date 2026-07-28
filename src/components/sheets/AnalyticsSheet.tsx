@@ -26,12 +26,23 @@ function marginColor(pct: number): string {
 }
 
 // ბრენდის სახელები ხშირად სხვადასხვა რეგისტრში შედის ("KLEEMANN" vs "Kleemann"),
-// რაც ჯგუფვისას მათ სხვადასხვა ბრენდად აქცევდა (ორი ცალკე ბარი ერთი ბრენდისთვის).
-// ვნორმალიზებთ ერთიან ("Title Case") ფორმაში მხოლოდ ანალიტიკის ჯგუფვისა და
-// ჩვენებისთვის — საწყისი მონაცემი (არქივი/მიმდინარე პროექტი) უცვლელი რჩება.
+// ან ვარიაციით ("Hitach" vs "Hitachi"), რაც ჯგუფვისას მათ სხვადასხვა ბრენდად
+// აქცევდა (ორი ცალკე ბარი ერთი ბრენდისთვის). ჯერ ვასწორებთ ცნობილ ვარიაციებს
+// (alias), მერე ვნორმალიზებთ ერთიან "Title Case" ფორმაში — მხოლოდ ანალიტიკის
+// ჯგუფვისა და ჩვენებისთვის. საწყისი მონაცემი (არქივი/მიმდინარე პროექტი) უცვლელი რჩება.
+//
+// ცნობილი ვარიაციები → კანონიკური სახელი (key შედარდება პატარა ასოებით, trim-ით):
+const BRAND_ALIASES: Record<string, string> = {
+  "hitach": "Hitachi",
+  "hitachi": "Hitachi",
+  "kleemann": "Kleemann",
+};
+
 function normalizeBrand(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
+  const alias = BRAND_ALIASES[trimmed.toLowerCase()];
+  if (alias) return alias;
   return trimmed
     .split(/\s+/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
