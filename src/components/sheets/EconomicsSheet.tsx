@@ -239,7 +239,8 @@ export function EconomicsSheet() {
             // ღილაკი — ყველა ხაზის გამოთვლილ თანხას გადაიტანს «საბოლოო შეთავაზება» სვეტში.
             const copyComputedToOffer = () => {
               for (const b of blocks) {
-                for (const [label, val] of b.rows) {
+                for (const [label, val, bold] of b.rows) {
+                  if (bold) continue; // ჯამური ხაზები ავტომატურად ითვლება — არ ვწერთ
                   setManualCell("finalOffer", b.title + "|" + label, val);
                 }
               }
@@ -281,20 +282,35 @@ export function EconomicsSheet() {
 function ReportBlock({ title, rows }: { title: string; rows: Array<[string, number, boolean?]> }) {
   const mc = useContext(ManualCtx);
 
-  // ხაზის უნიკალური key = ბლოკის სათაური + ხაზის დასახელება (განსხვავებულ
-  // ბლოკებში ერთი და იგივე label-ის რომ არ გადაეფაროს, მაგ. "ჯამი — ...").
   const keyOf = (label: string) => title + "|" + label;
 
-  // სვეტების ჯამები: თუ ხაზზე ხელით თანხაა შეყვანილი — ის ითვლება, თუ არა —
-  // გამოთვლილი (val). ასე ჯამი ყოველთვის სრულია, ნაწილობრივ შევსებაზეც.
-  let sumFinal = 0, sumFact = 0;
-  if (mc) {
-    for (const [label, val] of rows) {
-      const k = keyOf(label);
-      sumFinal += mc.finalOffer[k] ?? val;
-      sumFact += mc.factual[k] ?? val;
+  // bold ხაზი = ბლოკის ჯამური სტრიქონი. მას ხელით არ ავსებენ — ავტომატურად
+  // დაითვლება. "ჯამი — " პრეფიქსის ხაზი = მის წინა არა-bold ხაზების ჯამი
+  // (ცალკეული input-ების ან, თუ ცარიელია, გამოთვლილის ჯამი). დანარჩენი bold
+  // ხაზები (მაგ. "სულ ფასნამატი", "ფასი დღგ-ს გარეშე") ჯაჭვურ გამოთვლას
+  // ეყრდნობა — მათ «საბოლოო»/«ფაქტი» სვეტში პირდაპირ გამოთვლილი value ჩნდება.
+  const isSimpleSum = (label: string) => label.startsWith("ჯამი —") || label.startsWith("ჯამი (");
+
+  // მოცემული ხაზისთვის, ხელით სვეტის (col) მნიშვნელობა:
+  //   - bold "ჯამი —" ხაზი → მის წინა არა-bold ხაზების ჯამი (input-ი ან val)
+  //   - bold სხვა ხაზი → გამოთვლილი val (ჯაჭვური, არა მარტივი ჯამი)
+  //   - ჩვეულებრივი ხაზი → input-ი თუ არსებობს, თუ არა — val
+  const colValue = (col: "finalOffer" | "factual", idx: number): number => {
+    if (!mc) return rows[idx][1];
+    const [label, val, bold] = rows[idx];
+    if (!bold) return mc[col][keyOf(label)] ?? val;
+    if (isSimpleSum(label)) {
+      // წინა არა-bold ხაზების ჯამი ამ ბლოკში (ბოლო bold-მდე)
+      let s = 0;
+      for (let i = 0; i < idx; i++) {
+        const [l2, v2, b2] = rows[i];
+        if (b2) continue;
+        s += mc[col][keyOf(l2)] ?? v2;
+      }
+      return s;
     }
-  }
+    return val; // ჯაჭვური bold — გამოთვლილივე
+  };
 
   return (
     <div className="mb-4">
@@ -311,7 +327,7 @@ function ReportBlock({ title, rows }: { title: string; rows: Array<[string, numb
           </TableHeader>
         )}
         <TableBody>
-          {rows.map(([label, val, bold]) => {
+          {rows.map(([label, val, bold], idx) => {
             const k = keyOf(label);
             return (
               <TableRow key={label} className={bold ? "font-semibold bg-muted/30" : ""}>
@@ -320,32 +336,30 @@ function ReportBlock({ title, rows }: { title: string; rows: Array<[string, numb
                 {mc && (
                   <>
                     <TableCell className="text-right p-1">
-                      <ManualCell
-                        saved={mc.finalOffer[k]} computed={val} editable={mc.editable}
-                        onSet={(v) => mc.onSet("finalOffer", k, v)}
-                      />
+                      {bold ? (
+                        <span className={"text-right " + linkedCls}>{fmtUsd(colValue("finalOffer", idx))}</span>
+                      ) : (
+                        <ManualCell
+                          saved={mc.finalOffer[k]} computed={val} editable={mc.editable}
+                          onSet={(v) => mc.onSet("finalOffer", k, v)}
+                        />
+                      )}
                     </TableCell>
                     <TableCell className="text-right p-1">
-                      <ManualCell
-                        saved={mc.factual[k]} computed={val} editable={mc.editable}
-                        onSet={(v) => mc.onSet("factual", k, v)}
-                      />
+                      {bold ? (
+                        <span className={"text-right " + linkedCls}>{fmtUsd(colValue("factual", idx))}</span>
+                      ) : (
+                        <ManualCell
+                          saved={mc.factual[k]} computed={val} editable={mc.editable}
+                          onSet={(v) => mc.onSet("factual", k, v)}
+                        />
+                      )}
                     </TableCell>
                   </>
                 )}
               </TableRow>
             );
           })}
-          {mc && (
-            <TableRow className="font-semibold border-t-2">
-              <TableCell>ჯამი ({title})</TableCell>
-              <TableCell className={"text-right " + computedCls}>
-                {fmtUsd(rows.reduce((s, [, v]) => s + v, 0))}
-              </TableCell>
-              <TableCell className={"text-right " + linkedCls}>{fmtUsd(sumFinal)}</TableCell>
-              <TableCell className={"text-right " + linkedCls}>{fmtUsd(sumFact)}</TableCell>
-            </TableRow>
-          )}
         </TableBody>
       </Table>
     </div>
