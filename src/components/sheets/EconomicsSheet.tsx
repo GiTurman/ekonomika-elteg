@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fmtUsd, fmtPct, computedCls, linkedCls } from "./sheet-ui";
 import { EQUIPMENT_CATEGORY_LABEL } from "@/lib/econ-types";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 
@@ -179,58 +180,85 @@ export function EconomicsSheet() {
           </p>
         </CardHeader>
         <CardContent>
-          <ReportBlock title="შესყიდვის ხარჯები" rows={[
-            ["ქარხნული ფასი", eco.report.factoryTotal],
-            ["საბანკო საკომისიო", eco.report.bankCommTotal],
-            ["საერთაშორისო ტრანსპორტირება", eco.report.intTransportTotal],
-            ["ტერმინალის მომსახურება", eco.report.terminalTotal],
-            ["ადგილზე ტრანსპორტირება", eco.report.localTransportTotal],
-            ["ჯამი — შესყიდვის თვითღირებულება", eco.report.purchaseTotal, true],
-          ]}/>
-          <ReportBlock title="მონტაჟის ხარჯები" rows={[
-            ["მონტაჟის ანაზღაურება (დარიცხვებით)", eco.report.mechPayroll],
-            ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll],
-            ["მივლინების ხარჯი (სრული)", eco.report.travelTotal],
-            ["მასალები", eco.report.materialsTotal],
-            ["ხარაჩო", eco.report.scaffoldingTotal],
-            ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal, true],
-          ]}/>
-          <ReportBlock title="ფასნამატი" rows={[
-            ["სულ თვითღირებულება", eco.report.costTotal, true],
-            ["დანადგარის ფასნამატი", eco.report.equipmentMarkup],
-            ["მონტაჟის ფასნამატი", eco.report.installMarkup],
-            ["სულ ფასნამატი", eco.report.markupTotal, true],
-            ["ფასი დამატებითი ხარჯების გარეშე", eco.report.priceNoExtras, true],
-          ]}/>
-          <ReportBlock title="დამატებითი ხარჯები" rows={[
-            ["გაუთვალისწინებელი ხარჯი", eco.report.contingency],
-            ["საბანკო სავალუტო რისკი", eco.report.fxRisk],
-            ["სხვა ხარჯები", eco.report.otherTotal],
-            ["დამიწება/ზედამხედველობა", eco.report.groundingTotal],
-            ["საშუამავლო საკომისიო", eco.report.brokerTotal],
-            ["გარანტიის ხარჯი", eco.report.warrantyCost],
-            ["უფასო სერვისი", eco.report.freeServiceCost],
-            ["გარანტიის თანხა (ჯამურად)", eco.report.guaranteeAmountCost],
-            ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
-          ]}/>
-          {isFull ? (
-            <ReportBlock title="საბოლოო ფასი" rows={[
-              ["ფასი დღგ-ს გარეშე", eco.report.priceNoVat, true],
-              ["დღგ", eco.report.vat],
-              ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
-              ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
-              ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
-              ["გასაყიდი ფასი (დღგ-ს ჩათვლით)", eco.report.finalContractPrice, true],
-            ]}/>
-          ) : (
-            <ReportBlock title="საბოლოო ფასი (დღგ-ს ჩათვლით)" rows={[
-              ["დღგ", eco.report.vat],
-              ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
-              ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
-              ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
-              ["საბოლოო კონტრაქტის ფასი", eco.report.finalContractPrice, true],
-            ]}/>
-          )}
+          {(() => {
+            // ერთი წყარო — ReportBlock-ებიც აქედან ივსება და ღილაკის "გადატანა"-ც
+            // ამ სიაზე მუშაობს, რომ key-ები ზუსტად ემთხვეოდეს (title|label).
+            const blocks: Array<{ title: string; rows: Array<[string, number, boolean?]> }> = [
+              { title: "შესყიდვის ხარჯები", rows: [
+                ["ქარხნული ფასი", eco.report.factoryTotal],
+                ["საბანკო საკომისიო", eco.report.bankCommTotal],
+                ["საერთაშორისო ტრანსპორტირება", eco.report.intTransportTotal],
+                ["ტერმინალის მომსახურება", eco.report.terminalTotal],
+                ["ადგილზე ტრანსპორტირება", eco.report.localTransportTotal],
+                ["ჯამი — შესყიდვის თვითღირებულება", eco.report.purchaseTotal, true],
+              ]},
+              { title: "მონტაჟის ხარჯები", rows: [
+                ["მონტაჟის ანაზღაურება (დარიცხვებით)", eco.report.mechPayroll],
+                ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll],
+                ["მივლინების ხარჯი (სრული)", eco.report.travelTotal],
+                ["მასალები", eco.report.materialsTotal],
+                ["ხარაჩო", eco.report.scaffoldingTotal],
+                ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal, true],
+              ]},
+              { title: "ფასნამატი", rows: [
+                ["სულ თვითღირებულება", eco.report.costTotal, true],
+                ["დანადგარის ფასნამატი", eco.report.equipmentMarkup],
+                ["მონტაჟის ფასნამატი", eco.report.installMarkup],
+                ["სულ ფასნამატი", eco.report.markupTotal, true],
+                ["ფასი დამატებითი ხარჯების გარეშე", eco.report.priceNoExtras, true],
+              ]},
+              { title: "დამატებითი ხარჯები", rows: [
+                ["გაუთვალისწინებელი ხარჯი", eco.report.contingency],
+                ["საბანკო სავალუტო რისკი", eco.report.fxRisk],
+                ["სხვა ხარჯები", eco.report.otherTotal],
+                ["დამიწება/ზედამხედველობა", eco.report.groundingTotal],
+                ["საშუამავლო საკომისიო", eco.report.brokerTotal],
+                ["გარანტიის ხარჯი", eco.report.warrantyCost],
+                ["უფასო სერვისი", eco.report.freeServiceCost],
+                ["გარანტიის თანხა (ჯამურად)", eco.report.guaranteeAmountCost],
+                ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
+              ]},
+              isFull
+                ? { title: "საბოლოო ფასი", rows: [
+                    ["ფასი დღგ-ს გარეშე", eco.report.priceNoVat, true],
+                    ["დღგ", eco.report.vat],
+                    ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
+                    ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
+                    ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
+                    ["გასაყიდი ფასი (დღგ-ს ჩათვლით)", eco.report.finalContractPrice, true],
+                  ]}
+                : { title: "საბოლოო ფასი (დღგ-ს ჩათვლით)", rows: [
+                    ["დღგ", eco.report.vat],
+                    ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
+                    ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
+                    ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
+                    ["საბოლოო კონტრაქტის ფასი", eco.report.finalContractPrice, true],
+                  ]},
+            ];
+
+            // ღილაკი — ყველა ხაზის გამოთვლილ თანხას გადაიტანს «საბოლოო შეთავაზება» სვეტში.
+            const copyComputedToOffer = () => {
+              for (const b of blocks) {
+                for (const [label, val] of b.rows) {
+                  setManualCell("finalOffer", b.title + "|" + label, val);
+                }
+              }
+            };
+
+            return (
+              <>
+                {isFull && (
+                  <div className="mb-3 flex justify-end">
+                    <Button variant="outline" size="sm" onClick={copyComputedToOffer}>
+                      <ArrowRight className="h-4 w-4 mr-1" />
+                      გამოთვლილის გადატანა «საბოლოო შეთავაზებაში»
+                    </Button>
+                  </div>
+                )}
+                {blocks.map((b) => <ReportBlock key={b.title} title={b.title} rows={b.rows} />)}
+              </>
+            );
+          })()}
           {isFull && (
             <div className="mt-4 flex items-center justify-between rounded border p-3 bg-muted/40">
               <span className="text-sm font-semibold">✓ შემოწმება: ცხრილის ჯამი − დეტალური ანგარიში</span>
