@@ -135,6 +135,7 @@ export const defaultAppState: AppState = {
   tariffs: defaultTariffs,
   profitThresholds: defaultProfitThresholds,
   pageVisibility: { input: true, economics: true, payment: true, tariffs: false, analytics: false },
+  manualColumns: { finalOffer: {}, factual: {} },
 };
 
 export const emptyUnit = mkUnit;
@@ -236,6 +237,10 @@ export function normalizeAppState(loaded: Partial<AppState>): AppState {
     tariffs: { ...defaultAppState.tariffs, ...(loaded.tariffs ?? {}) },
     profitThresholds: { ...defaultAppState.profitThresholds, ...(loaded.profitThresholds ?? {}) },
     pageVisibility: { ...defaultAppState.pageVisibility, ...(loaded.pageVisibility ?? {}) },
+    manualColumns: {
+      finalOffer: { ...((loaded.manualColumns as any)?.finalOffer ?? {}) },
+      factual: { ...((loaded.manualColumns as any)?.factual ?? {}) },
+    },
   };
 }
 
@@ -278,5 +283,6 @@ export function blankAppState(): AppState {
     tariffs: JSON.parse(JSON.stringify(defaultAppState.tariffs)),
     profitThresholds: JSON.parse(JSON.stringify(defaultAppState.profitThresholds)),
     pageVisibility: { ...defaultAppState.pageVisibility },
+    manualColumns: { finalOffer: {}, factual: {} },
   };
 }

@@ -183,6 +183,14 @@ export interface PageVisibility {
   analytics: boolean; // "ანალიტიკა"
 }
 
+// ეკონომიკის დეტალურ ანგარიშში, გამოთვლილი თანხის გვერდით ხელით შესატანი
+// ორი დამატებითი სვეტი. key = ანგარიშის ხაზის დასახელება (label).
+// ცარიელი (undefined) მნიშვნელობა ნიშნავს, რომ ხაზზე თანხა შეტანილი არ არის.
+export interface ManualColumns {
+  finalOffer: Record<string, number>; // საბოლოო შეთავაზება
+  factual: Record<string, number>;    // ფაქტი — რეალურად გასული თანხები
+}
+
 export interface AppState {
   project: ProjectData;
   finance: FinancialAssumptions;
@@ -190,4 +198,5 @@ export interface AppState {
   tariffs: InstallTariffs;
   profitThresholds: Record<EquipmentCategory, ProfitThreshold>;
   pageVisibility: PageVisibility;
+  manualColumns: ManualColumns;
 }

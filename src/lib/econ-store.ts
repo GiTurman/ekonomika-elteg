@@ -13,6 +13,7 @@ interface StoreShape {
   updateProject: (patch: Partial<AppState["project"]>) => void;
   updateFinance: (patch: Partial<AppState["finance"]>) => void;
   updatePayment: (patch: Partial<AppState["payment"]>) => void;
+  setManualCell: (col: "finalOffer" | "factual", lineKey: string, value: number | null) => void;
   updateUnit: (id: string, patch: Partial<Unit>) => void;
   addUnit: () => void;
   removeUnit: (id: string) => void;
@@ -93,6 +94,24 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   },
   updateFinance: (patch) => {
     set((s) => ({ state: { ...s.state, finance: { ...s.state.finance, ...patch } } }));
+    scheduleSave(get);
+  },
+  setManualCell: (col, lineKey, value) => {
+    set((s) => {
+      const current = { ...(s.state.manualColumns?.[col] ?? {}) };
+      // null/NaN ან ცარიელი — ხაზი იშლება (გამოთვლილი თანხა დარჩება placeholder-ად)
+      if (value === null || Number.isNaN(value as number)) {
+        delete current[lineKey];
+      } else {
+        current[lineKey] = value as number;
+      }
+      return {
+        state: {
+          ...s.state,
+          manualColumns: { ...s.state.manualColumns, [col]: current },
+        },
+      };
+    });
     scheduleSave(get);
   },
   updatePayment: (patch) => {

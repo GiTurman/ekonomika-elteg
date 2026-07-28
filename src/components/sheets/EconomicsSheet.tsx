@@ -3,14 +3,63 @@ import { computeEconomics } from "@/lib/econ-calc";
 import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fmtUsd, fmtPct, computedCls } from "./sheet-ui";
+import { fmtUsd, fmtPct, computedCls, linkedCls } from "./sheet-ui";
 import { EQUIPMENT_CATEGORY_LABEL } from "@/lib/econ-types";
 import { AlertTriangle } from "lucide-react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { Input } from "@/components/ui/input";
+
+// ReportBlock-ის ხელით შესატანი სვეტების კონტექსტი — რომ ყველა ბლოკს
+// ცალ-ცალკე props არ გადავცე. თუ null-ია (მაგ. Comparison-ში), სვეტები არ ჩანს.
+interface ManualColsCtx {
+  editable: boolean;
+  finalOffer: Record<string, number>;
+  factual: Record<string, number>;
+  onSet: (col: "finalOffer" | "factual", key: string, v: number | null) => void;
+}
+const ManualCtx = createContext<ManualColsCtx | null>(null);
+
+// ცალკე input ხელით სვეტებისთვის: ცარიელი ("") ≠ 0. placeholder-ად გამოთვლილ
+// თანხას აჩვენებს, რომ ცხადი იყოს "ჯერ არ შევსებულა" vs "შეყვანილია 0".
+function ManualCell({
+  saved, computed, onSet, editable,
+}: { saved: number | undefined; computed: number; onSet: (v: number | null) => void; editable: boolean }) {
+  const [text, setText] = useState(() => (saved === undefined ? "" : String(saved)));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(saved === undefined ? "" : String(saved));
+  }, [saved]);
+
+  if (!editable) {
+    return <span className={"text-right " + (saved === undefined ? "text-muted-foreground/50" : linkedCls)}>
+      {saved === undefined ? fmtUsd(computed) : fmtUsd(saved)}
+    </span>;
+  }
+  return (
+    <Input
+      type="number" inputMode="decimal" step="any"
+      className="h-8 text-right w-32 ml-auto"
+      value={text}
+      placeholder={fmtUsd(computed)}
+      onFocus={(e) => { focused.current = true; e.target.select(); }}
+      onChange={(e) => {
+        const v = e.target.value;
+        setText(v);
+        if (v === "") { onSet(null); return; }
+        if (v === "-" || v === ".") return;
+        const n = Number(v);
+        if (!Number.isNaN(n)) onSet(n);
+      }}
+      onBlur={() => { focused.current = false; }}
+    />
+  );
+}
 
 export function EconomicsSheet() {
-  const { state } = useEconStore();
+  const { state, setManualCell } = useEconStore();
   const { isFull } = useAccessRole();
   const eco = computeEconomics(state);
+  const mc = state.manualColumns ?? { finalOffer: {}, factual: {} };
 
   // Full (Elteg_2026_GT!) — ფინანსების "სუფთა" ხედი: დღგ საერთოდ არ ჩანს,
   //   საბოლოო რიცხვი = ფასი დღგ-ს გარეშე.
@@ -119,9 +168,15 @@ export function EconomicsSheet() {
         </CardContent>
       </Card>
 
+      <ManualCtx.Provider value={{ editable: isFull, finalOffer: mc.finalOffer, factual: mc.factual, onSet: setManualCell }}>
       <Card>
         <CardHeader>
           <CardTitle>2. პროექტის დეტალური ანგარიში (დამოუკიდებელი გამოთვლა — შემოწმებისთვის)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            «გამოთვლილი» — ავტომატური თანხა. «საბოლოო შეთავაზება» — კლიენტისთვის შეთავაზებული საბოლოო თანხა.
+            «ფაქტი» — რეალურად გასული თანხა (ბუღალტრისა და შენ მიერ). ცარიელი უჯრა = შესატანი არ არის;
+            placeholder-ად ნაცრისფრად გამოთვლილი თანხა ჩანს. სვეტების ჯამები ბოლოში ავტომატურად ითვლება.
+          </p>
         </CardHeader>
         <CardContent>
           <ReportBlock title="შესყიდვის ხარჯები" rows={[
@@ -190,22 +245,79 @@ export function EconomicsSheet() {
           </div>
         </CardContent>
       </Card>
+      </ManualCtx.Provider>
     </div>
   );
 }
 
 function ReportBlock({ title, rows }: { title: string; rows: Array<[string, number, boolean?]> }) {
+  const mc = useContext(ManualCtx);
+
+  // ხაზის უნიკალური key = ბლოკის სათაური + ხაზის დასახელება (განსხვავებულ
+  // ბლოკებში ერთი და იგივე label-ის რომ არ გადაეფაროს, მაგ. "ჯამი — ...").
+  const keyOf = (label: string) => title + "|" + label;
+
+  // სვეტების ჯამები: თუ ხაზზე ხელით თანხაა შეყვანილი — ის ითვლება, თუ არა —
+  // გამოთვლილი (val). ასე ჯამი ყოველთვის სრულია, ნაწილობრივ შევსებაზეც.
+  let sumFinal = 0, sumFact = 0;
+  if (mc) {
+    for (const [label, val] of rows) {
+      const k = keyOf(label);
+      sumFinal += mc.finalOffer[k] ?? val;
+      sumFact += mc.factual[k] ?? val;
+    }
+  }
+
   return (
     <div className="mb-4">
       <div className="text-sm font-semibold mb-1">{title}</div>
       <Table>
-        <TableBody>
-          {rows.map(([label, val, bold]) => (
-            <TableRow key={label} className={bold ? "font-semibold bg-muted/30" : ""}>
-              <TableCell>{label}</TableCell>
-              <TableCell className={"text-right " + computedCls}>{fmtUsd(val)}</TableCell>
+        {mc && (
+          <TableHeader>
+            <TableRow>
+              <TableHead>ხარჯის დასახელება</TableHead>
+              <TableHead className="text-right">გამოთვლილი</TableHead>
+              <TableHead className="text-right w-36">საბოლოო შეთავაზება</TableHead>
+              <TableHead className="text-right w-36">ფაქტი</TableHead>
             </TableRow>
-          ))}
+          </TableHeader>
+        )}
+        <TableBody>
+          {rows.map(([label, val, bold]) => {
+            const k = keyOf(label);
+            return (
+              <TableRow key={label} className={bold ? "font-semibold bg-muted/30" : ""}>
+                <TableCell>{label}</TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtUsd(val)}</TableCell>
+                {mc && (
+                  <>
+                    <TableCell className="text-right p-1">
+                      <ManualCell
+                        saved={mc.finalOffer[k]} computed={val} editable={mc.editable}
+                        onSet={(v) => mc.onSet("finalOffer", k, v)}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right p-1">
+                      <ManualCell
+                        saved={mc.factual[k]} computed={val} editable={mc.editable}
+                        onSet={(v) => mc.onSet("factual", k, v)}
+                      />
+                    </TableCell>
+                  </>
+                )}
+              </TableRow>
+            );
+          })}
+          {mc && (
+            <TableRow className="font-semibold border-t-2">
+              <TableCell>ჯამი ({title})</TableCell>
+              <TableCell className={"text-right " + computedCls}>
+                {fmtUsd(rows.reduce((s, [, v]) => s + v, 0))}
+              </TableCell>
+              <TableCell className={"text-right " + linkedCls}>{fmtUsd(sumFinal)}</TableCell>
+              <TableCell className={"text-right " + linkedCls}>{fmtUsd(sumFact)}</TableCell>
+            </TableRow>
+          )}
         </TableBody>
       </Table>
     </div>
