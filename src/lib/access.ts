@@ -1,10 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type AccessRole = "full" | "commercial" | "technical" | "accounting" | "procurement" | "administration" | "partial";
+export type AccessRole = "full" | "commercial" | "sales" | "technical" | "accounting" | "procurement" | "administration" | "partial";
 
 export const ROLE_LABEL: Record<AccessRole, string> = {
   full: "ფინანსები",
   commercial: "კომერცია",
+  sales: "გაყიდვები",
   technical: "ტექნიკური",
   accounting: "ბუღალტერია",
   procurement: "შესყიდვები",

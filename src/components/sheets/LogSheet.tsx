@@ -16,7 +16,7 @@ import { TextInput } from "./sheet-ui";
 import { Loader2, RefreshCw, Plus, Trash2, X } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 
-const NON_FULL_ROLES: AccessRole[] = ["commercial", "technical", "accounting", "procurement", "administration"];
+const NON_FULL_ROLES: AccessRole[] = ["commercial", "sales", "technical", "accounting", "procurement", "administration"];
 
 function DropdownOptionsPanel() {
   const { actorName, role: myRole } = useAccessRole();
@@ -478,6 +478,7 @@ function UsersPanel() {
                     <SelectContent>
                       <SelectItem value="full">ფინანსები</SelectItem>
                       <SelectItem value="commercial">კომერცია</SelectItem>
+                      <SelectItem value="sales">გაყიდვები</SelectItem>
                       <SelectItem value="technical">ტექნიკური</SelectItem>
                       <SelectItem value="accounting">ბუღალტერია</SelectItem>
                       <SelectItem value="procurement">შესყიდვები</SelectItem>
