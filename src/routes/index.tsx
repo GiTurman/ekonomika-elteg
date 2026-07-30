@@ -150,7 +150,7 @@ function Index() {
             {showComparisonTab && <TabsTrigger value="comparison">შედარება</TabsTrigger>}
             {showArchiveTab && <TabsTrigger value="archive">არქივი</TabsTrigger>}
             {showPaymentTab && <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>}
-            {showTariffsTab && <TabsTrigger value="tariffs">მონტაჟის ტარიფები</TabsTrigger>}
+            {showTariffsTab && <TabsTrigger value="tariffs">ტარიფები</TabsTrigger>}
             {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
             {showAnalyticsWorkingTab && <TabsTrigger value="analytics_working">ანალიტიკა მუშა</TabsTrigger>}
             {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}

@@ -12,6 +12,7 @@ interface StoreShape {
   setState: (updater: (s: AppState) => AppState) => void;
   updateProject: (patch: Partial<AppState["project"]>) => void;
   updateFinance: (patch: Partial<AppState["finance"]>) => void;
+  updateDefaultRates: (patch: Partial<AppState["defaultRates"]>) => void;
   updatePayment: (patch: Partial<AppState["payment"]>) => void;
   setManualCell: (col: "finalOffer" | "factual", lineKey: string, value: number | null) => void;
   updateUnit: (id: string, patch: Partial<Unit>) => void;
@@ -94,6 +95,10 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   },
   updateFinance: (patch) => {
     set((s) => ({ state: { ...s.state, finance: { ...s.state.finance, ...patch } } }));
+    scheduleSave(get);
+  },
+  updateDefaultRates: (patch) => {
+    set((s) => ({ state: { ...s.state, defaultRates: { ...s.state.defaultRates, ...patch } } }));
     scheduleSave(get);
   },
   setManualCell: (col, lineKey, value) => {
@@ -213,7 +218,14 @@ export const useEconStore = create<StoreShape>((set, get) => ({
         const num = m ? parseInt(m[2], 10) + 1 : units.length + 1;
         nu = { ...last, id: `${prefix}${num}` };
       } else {
-        nu = emptyUnit("L1");
+        // პირველი დანადგარი — "ტარიფები" ტაბზე დაყენებული სტანდარტული
+        // განაკვეთებით იწყება (ფასნამატი დანადგ./მონტ., სავალუტო რისკი).
+        const dr = s.state.defaultRates ?? { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, fxRiskPct: 0.02 };
+        nu = { ...emptyUnit("L1"),
+          equipmentMarkupPct: dr.equipmentMarkupPct,
+          installMarkupPct: dr.installMarkupPct,
+          fxRiskPct: dr.fxRiskPct,
+        };
       }
       return { state: { ...s.state, project: { ...s.state.project, units: [...units, nu] } } };
     });

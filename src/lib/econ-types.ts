@@ -191,6 +191,15 @@ export interface ManualColumns {
   factual: Record<string, number>;    // ფაქტი — რეალურად გასული თანხები
 }
 
+// "ტარიფები" ტაბზე დაყენებული სტანდარტული (default) განაკვეთები. ახალი
+// დანადგარი/პროექტი ამ მნიშვნელობებით იწყება; კონკრეტულ დანადგარზე per-unit
+// კორექტირება რჩება ("შესატანი მონაცემები" ტაბზე).
+export interface DefaultRates {
+  equipmentMarkupPct: number; // დანადგარის ფასნამატი %
+  installMarkupPct: number;   // მონტაჟის ფასნამატი %
+  fxRiskPct: number;          // საბანკო სავალუტო რისკი %
+}
+
 export interface AppState {
   project: ProjectData;
   finance: FinancialAssumptions;
@@ -199,4 +208,5 @@ export interface AppState {
   profitThresholds: Record<EquipmentCategory, ProfitThreshold>;
   pageVisibility: PageVisibility;
   manualColumns: ManualColumns;
+  defaultRates: DefaultRates;
 }

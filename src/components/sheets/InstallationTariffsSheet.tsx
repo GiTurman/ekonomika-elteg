@@ -21,7 +21,9 @@ function rangeLabel(min: number | null, max: number | null, unit: string): strin
 
 export function InstallationTariffsSheet() {
   const { isFull, actorName, role } = useAccessRole();
-  const { state, setProfitThreshold } = useEconStore();
+  const { state, setProfitThreshold, updateDefaultRates, updateFinance } = useEconStore();
+  const dr = state.defaultRates;
+  const f = state.finance;
   const [rules, setRules] = useState<TariffRule[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,6 +206,131 @@ export function InstallationTariffsSheet() {
               </TableBody>
             </Table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* სტანდარტული ფასნამატები და რისკი — ახალი დანადგარი ამ განაკვეთებით იწყება */}
+      <Card>
+        <CardHeader>
+          <CardTitle>სტანდარტული ფასნამატები და რისკი (default)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            ეს განაკვეთები ავტომატურად მიენიჭება ახალ დანადგარს. კონკრეტული დანადგარისთვის
+            ინდივიდუალური კორექტირება ხდება «შესატანი მონაცემები» ტაბზე.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableBody>
+              <TableRow>
+                <TableCell>დანადგარის ფასნამატი %</TableCell>
+                <TableCell className="text-right w-40">
+                  {isFull ? (
+                    <PercentInput value={dr.equipmentMarkupPct} onChange={(v) => updateDefaultRates({ equipmentMarkupPct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(dr.equipmentMarkupPct)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>მონტაჟის ფასნამატი %</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={dr.installMarkupPct} onChange={(v) => updateDefaultRates({ installMarkupPct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(dr.installMarkupPct)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>საბანკო სავალუტო რისკი %</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={dr.fxRiskPct} onChange={(v) => updateDefaultRates({ fxRiskPct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(dr.fxRiskPct)}</div>}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* საგადასახადო პარამეტრები — იგივე გლობალური მნიშვნელობა, რაც «ფინანსურ დაშვებებში» */}
+      <Card>
+        <CardHeader>
+          <CardTitle>საგადასახადო პარამეტრები</CardTitle>
+          <p className="text-xs text-muted-foreground">იგივე მნიშვნელობა, რაც «ფინანსური დაშვებები» ტაბზე — ორივე ადგილას რედაქტირებადია.</p>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableBody>
+              <TableRow>
+                <TableCell>დანადგარის დღგ %</TableCell>
+                <TableCell className="text-right w-40">
+                  {isFull ? (
+                    <PercentInput value={f.equipmentVatRate} onChange={(v) => updateFinance({ equipmentVatRate: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(f.equipmentVatRate)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>დღგ % (მონტაჟი/დანარჩენი)</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={f.otherVatRate} onChange={(v) => updateFinance({ otherVatRate: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(f.otherVatRate)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>საშემოსავლო %</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={f.incomeTaxRate} onChange={(v) => updateFinance({ incomeTaxRate: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(f.incomeTaxRate)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>საპენსიო %</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={f.pensionRate} onChange={(v) => updateFinance({ pensionRate: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(f.pensionRate)}</div>}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* საბანკო გარანტია — იგივე გლობალური მნიშვნელობა, რაც «ფინანსურ დაშვებებში» */}
+      <Card>
+        <CardHeader>
+          <CardTitle>საბანკო გარანტია</CardTitle>
+          <p className="text-xs text-muted-foreground">იგივე მნიშვნელობა, რაც «ფინანსური დაშვებები» ტაბზე — ორივე ადგილას რედაქტირებადია.</p>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableBody>
+              <TableRow>
+                <TableCell>გარანტიის % (ბაზა ფასიდან)</TableCell>
+                <TableCell className="text-right w-40">
+                  {isFull ? (
+                    <PercentInput value={f.guaranteePct} onChange={(v) => updateFinance({ guaranteePct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(f.guaranteePct)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>წლიური საკომისიო %</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={f.guaranteeAnnualPct} onChange={(v) => updateFinance({ guaranteeAnnualPct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(f.guaranteeAnnualPct)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>დღეების რაოდენობა</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <NumberInput value={f.guaranteeDays} onChange={(v) => updateFinance({ guaranteeDays: v })} />
+                  ) : <div className={"text-right " + computedCls}>{f.guaranteeDays}</div>}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

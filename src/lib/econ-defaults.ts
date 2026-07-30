@@ -136,6 +136,7 @@ export const defaultAppState: AppState = {
   profitThresholds: defaultProfitThresholds,
   pageVisibility: { input: true, economics: true, payment: true, tariffs: false, analytics: false },
   manualColumns: { finalOffer: {}, factual: {} },
+  defaultRates: { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, fxRiskPct: 0.02 },
 };
 
 export const emptyUnit = mkUnit;
@@ -241,6 +242,7 @@ export function normalizeAppState(loaded: Partial<AppState>): AppState {
       finalOffer: { ...((loaded.manualColumns as any)?.finalOffer ?? {}) },
       factual: { ...((loaded.manualColumns as any)?.factual ?? {}) },
     },
+    defaultRates: { ...defaultAppState.defaultRates, ...((loaded as any).defaultRates ?? {}) },
   };
 }
 
@@ -284,5 +286,6 @@ export function blankAppState(): AppState {
     profitThresholds: JSON.parse(JSON.stringify(defaultAppState.profitThresholds)),
     pageVisibility: { ...defaultAppState.pageVisibility },
     manualColumns: { finalOffer: {}, factual: {} },
+    defaultRates: { ...defaultAppState.defaultRates },
   };
 }
