@@ -1,4 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
+import { listPagePermissions, updatePagePermission } from "./pagePermissions";
+import { listFieldPermissions, updateFieldPermission } from "./fieldPermissions";
+import { listFieldVisibility, updateFieldVisibility } from "./fieldVisibility";
 
 export type AccessRole = "full" | "commercial" | "sales" | "technical" | "accounting" | "procurement" | "administration" | "partial";
 
@@ -61,7 +64,41 @@ export async function listUsers(): Promise<AppUser[]> {
   return (data ?? []).map(rowToUser);
 }
 
+// "გაყიდვები" (sales) როლის პირველად შექმნისას, მას კომერციის (commercial)
+// უფლებები ერთჯერადად გადმოაქვს — შემდეგ sales დამოუკიდებელი როლია და ცალკე
+// იმართება პანელიდან. seed მხოლოდ მაშინ სრულდება, თუ sales ჯერ არსად არ არის
+// დამატებული permission-ცხრილებში (ე.ი. ნამდვილად პირველი sales-მომხმარებელია);
+// განმეორებით შექმნა უფლებებს აღარ გადააწერს.
+async function seedSalesFromCommercialIfFirstTime(): Promise<void> {
+  const [pages, fperms, fvis] = await Promise.all([
+    listPagePermissions(),
+    listFieldPermissions(),
+    listFieldVisibility(),
+  ]);
+  const salesAlreadyPresent =
+    pages.some((p) => p.allowedRoles.includes("sales")) ||
+    fperms.some((p) => p.allowedRoles.includes("sales")) ||
+    fvis.some((v) => v.allowedRoles.includes("sales"));
+  if (salesAlreadyPresent) return; // უკვე დათესილია — ხელს აღარ ვახლებთ
+
+  await Promise.all([
+    ...pages
+      .filter((p) => p.allowedRoles.includes("commercial"))
+      .map((p) => updatePagePermission(p.pageKey, [...p.allowedRoles, "sales"])),
+    ...fperms
+      .filter((p) => p.allowedRoles.includes("commercial"))
+      .map((p) => updateFieldPermission(p.fieldKey, [...p.allowedRoles, "sales"])),
+    ...fvis
+      .filter((v) => v.allowedRoles.includes("commercial"))
+      .map((v) => updateFieldVisibility(v.fieldKey, [...v.allowedRoles, "sales"])),
+  ]);
+}
+
 export async function createUser(name: string, code: string, role: AccessRole): Promise<void> {
+  if (role === "sales") {
+    // შესაძლო შეცდომა seed-ში არ უნდა შეაფერხოს მომხმარებლის შექმნა
+    try { await seedSalesFromCommercialIfFirstTime(); } catch (e) { console.error("sales seed failed", e); }
+  }
   const { error } = await supabase.from("app_users").insert({ name, code, role });
   if (error) throw error;
 }

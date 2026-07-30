@@ -83,27 +83,18 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     return <CodeScreen onSuccess={(u) => { storeUser(u); setUser(u); loadFieldPermissions(); loadFieldVisibility(); loadPagePermissions(); }} />;
   }
 
-  // "გაყიდვები" (sales) — "კომერცია"-ს (commercial) დუბლირებული როლია: ხედავს/
-  // რედაქტირებს ყველაფერს, რაზეც commercial-ს აქვს უფლება. ამიტომ უფლების
-  // შემოწმებისას sales-ს commercial-იც ჩაეთვლება (allowed_roles-ში commercial
-  // საკმარისია — sales ცალკე ჩართვას არ საჭიროებს).
-  const effectiveRoles = (role: AccessRole): AccessRole[] =>
-    role === "sales" ? ["sales", "commercial"] : [role];
-  const roleAllowed = (allowed: string[]): boolean =>
-    effectiveRoles(user.role).some((r) => allowed.includes(r));
-
   const canEditField = (fieldKey: string): boolean => {
     if (user.role === "full") return true; // ფინანსებს ყოველთვის შეუძლია ყველაფრის რედაქტირება
     const perm = fieldPerms.find((p) => p.fieldKey === fieldKey);
     if (!perm) return true; // უცნობი/ჯერ არარეგისტრირებული ველი — ნაგულისხმევად ღიაა
-    return roleAllowed(perm.allowedRoles);
+    return perm.allowedRoles.includes(user.role);
   };
 
   const canSeeField = (fieldKey: string): boolean => {
     if (user.role === "full") return true; // ფინანსები ყოველთვის ხედავს ყველაფერს
     const vis = fieldVis.find((v) => v.fieldKey === fieldKey);
     if (!vis) return true; // უცნობი/ჯერ არარეგისტრირებული ველი — ნაგულისხმევად ხილვადია
-    return roleAllowed(vis.allowedRoles);
+    return vis.allowedRoles.includes(user.role);
   };
 
   const canViewPage = (pageKey: string): boolean => {
@@ -115,7 +106,7 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       if (pageKey === "analytics_working") return false;
       return true; // სხვა უცნობი/ჯერ არარეგისტრირებული გვერდი — ნაგულისხმევად ხილვადი
     }
-    return roleAllowed(perm.allowedRoles);
+    return perm.allowedRoles.includes(user.role);
   };
 
   return (
