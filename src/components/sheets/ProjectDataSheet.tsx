@@ -62,10 +62,11 @@ const UNIT_RATE_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label:
 ];
 
 export function ProjectDataSheet() {
-  const { state, updateProject, updateUnit, addUnit, removeUnit } = useEconStore();
+  const { state, updateProject, updateUnit, addUnit, removeUnit, updateFinance } = useEconStore();
   const { isFull, actorName, role, canEditField, canSeeField } = useAccessRole();
   const p = state.project;
   const t = p.travel;
+  const f = state.finance;
   const alloc = allocateProjectCosts(state);
   // დაწყების თარიღს პარტნიორი ავსებს პირველად; ერთხელ შევსების შემდეგ
   // მის შესწორებას მხოლოდ ფინანსები ახერხებს.
@@ -186,6 +187,13 @@ export function ProjectDataSheet() {
           <TextInput value={p.buildingType} onChange={(v) => updateProject({ buildingType: v })} /></label>
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">პროექტის ჩაბარების წელი</span>
           <NumberInput value={p.completionYear} onChange={(v) => updateProject({ completionYear: v })} /></label>
+          {canSeeField("finance.guaranteePct") && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საბანკო გარანტიის % (ბაზა ფასიდან)</span>
+            {canEditField("finance.guaranteePct") ? (
+              <PercentInput value={f.guaranteePct} onChange={(v) => updateFinance({ guaranteePct: v })} />
+            ) : <div className={"text-right " + computedCls}>{fmtPct(f.guaranteePct)}</div>}
+            </label>
+          )}
           <div className="md:col-span-2 text-sm text-muted-foreground">
             დანადგარების რაოდენობა (ავტომატურად): <span className="font-mono font-semibold">{p.units.length}</span>
           </div>
