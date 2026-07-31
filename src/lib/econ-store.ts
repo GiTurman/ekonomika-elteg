@@ -9,6 +9,10 @@ interface StoreShape {
   loaded: boolean;
   saving: boolean;
   currentUserId: string | null;
+  // არქივიდან გახსნილი ჩანაწერის ID — "დასრულება და შენახვა" ამ ჩანაწერს
+  // გადააწერს (თარიღი უცვლელი). null = ახალი პროექტი (ახალ ჩანაწერად შეინახება).
+  loadedArchiveId: string | null;
+  setLoadedArchiveId: (id: string | null) => void;
   setState: (updater: (s: AppState) => AppState) => void;
   updateProject: (patch: Partial<AppState["project"]>) => void;
   updateFinance: (patch: Partial<AppState["finance"]>) => void;
@@ -65,6 +69,23 @@ function clearDraft(userId: string | null) {
   window.localStorage.removeItem(draftKey(userId));
 }
 
+// გახსნილი არქივის ID-ს ცალკე ვინახავთ localStorage-ში, რომ refresh-ის შემდეგაც
+// ვიცოდეთ, პროექტი არქივიდანაა გახსნილი (ხელახლა შენახვისას იმავე ჩანაწერს
+// გადავაწერთ, ახალს არ შევქმნით).
+function archiveIdKey(userId: string) {
+  return `elteg-archiveid-${userId}`;
+}
+function saveArchiveId(userId: string | null, id: string | null) {
+  if (!userId) return;
+  try {
+    if (id) window.localStorage.setItem(archiveIdKey(userId), id);
+    else window.localStorage.removeItem(archiveIdKey(userId));
+  } catch (e) { console.error("[econ-store] archiveId save failed", e); }
+}
+function loadArchiveId(userId: string): string | null {
+  try { return window.localStorage.getItem(archiveIdKey(userId)); } catch { return null; }
+}
+
 // ახალი ტრანშის ავტომატური ლეიბლისთვის (I, II, III, IV, V, ...) — არსებული
 // ტრანშების ("I ტრანში", "II ტრანში"...) სტილის შესანარჩუნებლად.
 function toGeorgianOrdinal(n: number): string {
@@ -83,6 +104,8 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   loaded: false,
   saving: false,
   currentUserId: null,
+  loadedArchiveId: null,
+  setLoadedArchiveId: (id) => { saveArchiveId(get().currentUserId, id); set({ loadedArchiveId: id }); },
 
   setState: (updater) => {
     set((s) => ({ state: updater(s.state) }));
@@ -271,7 +294,8 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   reset: () => {
     const userId = get().currentUserId;
     clearDraft(userId);
-    set((s) => ({ state: { ...blankAppState(), pageVisibility: s.state.pageVisibility } }));
+    saveArchiveId(userId, null);
+    set((s) => ({ state: { ...blankAppState(), pageVisibility: s.state.pageVisibility }, loadedArchiveId: null }));
     scheduleSave(get);
   },
 
@@ -283,7 +307,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     // ფორმა იხსნება — საერთო Supabase-ის "ცოცხალი" მდგომარეობა არასდროს იტვირთება,
     // რომ სხვის დაუმთავრებელ ნამუშევარს არასდროს ხედავდე.
     const draft = loadDraft(userId);
-    set({ state: draft ?? blankAppState(), loaded: true });
+    set({ state: draft ?? blankAppState(), loaded: true, loadedArchiveId: draft ? loadArchiveId(userId) : null });
   },
 
   save: async () => {

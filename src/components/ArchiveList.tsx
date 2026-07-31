@@ -38,7 +38,7 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const { setState } = useEconStore();
+  const { setState, setLoadedArchiveId } = useEconStore();
 
   // "სახელების ჩასწორება" dialog — ყველა არქივში ტექსტური სახელის ჩანაცვლება
   const [renameOpen, setRenameOpen] = useState(false);
@@ -111,6 +111,7 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
       const entryName = items.find((it) => it.id === id)?.name ?? id;
       const state = await loadArchiveEntry(id);
       setState((cur) => ({ ...normalizeAppState(state), pageVisibility: cur.pageVisibility }));
+      setLoadedArchiveId(id); // ხელახლა შენახვისას ამ ჩანაწერს გადააწერს (თარიღი უცვლელი)
       onNavigateAway?.();
       logActivity(actorName, role, "არქივიდან პროექტის გახსნა", entryName);
     } catch (e) {
@@ -139,6 +140,7 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
         project: { ...normalized.project, projectName: newName.trim() },
         pageVisibility: cur.pageVisibility,
       }));
+      setLoadedArchiveId(null); // ახალი ვარიანტი — ცალკე ჩანაწერად შეინახოს, ორიგინალს არ ეხება
       onNavigateAway?.();
       logActivity(actorName, role, "პროექტის დუბლირება ახალ ვარიანტად", `${baseName} → ${newName.trim()}`);
     } catch (e) {

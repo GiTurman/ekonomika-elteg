@@ -14,7 +14,7 @@ import { InstallationTariffsSheet } from "@/components/sheets/InstallationTariff
 import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
 import { ComparisonSheet } from "@/components/sheets/ComparisonSheet";
 import { ArchiveSheet } from "@/components/sheets/ArchiveSheet";
-import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye } from "lucide-react";
+import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye, X } from "lucide-react";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
 import { ArchiveDialog } from "@/components/ArchiveDialog";
@@ -34,10 +34,11 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { state, loaded, saving, load, reset } = useEconStore();
+  const { state, loaded, saving, load, reset, loadedArchiveId, setLoadedArchiveId } = useEconStore();
   const { isFull, logout, actorName, role, canViewPage, userId } = useAccessRole();
   const [finishing, setFinishing] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [saveDialog, setSaveDialog] = useState<null | { mode: "overwrite" | "new"; name: string; existingId?: string }>(null);
 
   useEffect(() => { load(userId); }, [load, userId]);
 
@@ -65,33 +66,49 @@ function Index() {
   const tabsGridColsClass = visibleTabCount >= 9 ? "md:grid-cols-9" : visibleTabCount === 8 ? "md:grid-cols-8" : visibleTabCount === 7 ? "md:grid-cols-7" : visibleTabCount === 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
   const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : showComparisonTab ? "comparison" : showArchiveTab ? "archive" : "analytics";
 
+  // "დასრულება და შენახვა" — ამზადებს დიალოგს (გადავაწერო?), რეალურ ჩაწერას
+  // doSave აკეთებს დადასტურებაზე.
   const handleFinish = async () => {
+    setSavedMsg(null);
+    // არქივიდან გახსნილი პროექტი — იმავე ჩანაწერს გადავაწერთ (სახელი/თარიღი უცვლელი).
+    if (loadedArchiveId) {
+      setSaveDialog({ mode: "overwrite", name: state.project.projectName || "პროექტი", existingId: loadedArchiveId });
+      return;
+    }
+    // ახალი პროექტი — სახელი თარიღით. თუ იგივე სახელი უკვე არსებობს, გადავაწერით ვკითხავთ.
     const name = (state.project.projectName || "პროექტი") + " — " + new Date().toLocaleDateString("ka-GE");
     setFinishing(true);
-    setSavedMsg(null);
     try {
       const existing = await findArchiveByName(name);
+      setFinishing(false);
       if (existing) {
-        const overwrite = confirm(
-          `არქივში უკვე არსებობს იგივე სახელის ჩანაწერი: "${name}". გადავაწერო არსებული?`
-        );
-        if (!overwrite) {
-          setFinishing(false);
-          return;
-        }
-        await updateArchiveEntry(existing.id, state);
-        setSavedMsg("გადაწერილია არქივში: " + name);
-        logActivity(actorName, role, "პროექტის გადაწერა არქივში", name);
+        setSaveDialog({ mode: "overwrite", name, existingId: existing.id });
       } else {
-        await saveToArchive(name, state);
-        setSavedMsg("შენახულია არქივში: " + name);
-        logActivity(actorName, role, "პროექტის შენახვა არქივში", name);
+        setSaveDialog({ mode: "new", name });
       }
-      const startNew = confirm("განფასება შენახულია არქივში. დავიწყოთ ახალი, ცარიელი განფასება?");
-      if (startNew) {
-        reset();
-        logActivity(actorName, role, "ახალი, ცარიელი პროექტის დაწყება");
+    } catch (e) {
+      console.error("[archive] name check failed", e);
+      setFinishing(false);
+      setSaveDialog({ mode: "new", name });
+    }
+  };
+
+  const doSave = async () => {
+    if (!saveDialog) return;
+    setFinishing(true);
+    try {
+      if (saveDialog.mode === "overwrite" && saveDialog.existingId) {
+        // მხოლოდ data ნახლდება — სახელი და created_at (თარიღი) უცვლელი რჩება.
+        await updateArchiveEntry(saveDialog.existingId, state);
+        setLoadedArchiveId(saveDialog.existingId); // გახსნილად რჩება
+        setSavedMsg("გადაწერილია არქივში: " + saveDialog.name);
+        logActivity(actorName, role, "პროექტის გადაწერა არქივში", saveDialog.name);
+      } else {
+        await saveToArchive(saveDialog.name, state);
+        setSavedMsg("შენახულია არქივში: " + saveDialog.name);
+        logActivity(actorName, role, "პროექტის შენახვა არქივში", saveDialog.name);
       }
+      setSaveDialog(null);
     } catch (e) {
       console.error("[archive] save failed", e);
       alert("არქივში შენახვა ვერ მოხერხდა. სცადეთ ხელახლა.");
@@ -118,6 +135,15 @@ function Index() {
             </Button>
             <ArchiveDialog />
             <DataRequestDialog />
+            <Button size="sm" variant="outline" onClick={() => {
+              if (confirm("ახალი, ცარიელი განფასების დაწყება? მიმდინარე ეკრანი გასუფთავდება (თუ ჯერ არ შეგინახავს, ჯერ შეინახე).")) {
+                reset();
+                setLoadedArchiveId(null);
+                logActivity(actorName, role, "ახალი, ცარიელი პროექტის დაწყება");
+              }
+            }}>
+              ახალი
+            </Button>
             <Button size="sm" onClick={handleFinish} disabled={finishing}>
               {finishing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
               დასრულება და შენახვა
@@ -141,6 +167,37 @@ function Index() {
           </div>
         )}
       </header>
+
+      {saveDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !finishing && setSaveDialog(null)}>
+          <div className="bg-card border rounded-lg shadow-lg p-4 w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">
+                {saveDialog.mode === "overwrite" ? "მონაცემების გადაწერა" : "არქივში შენახვა"}
+              </h3>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setSaveDialog(null)} disabled={finishing} title="დახურვა ცვლილებების გარეშე">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {saveDialog.mode === "overwrite" ? (
+                <>არქივში უკვე არსებობს ეს ჩანაწერი: <span className="font-medium text-foreground">„{saveDialog.name}“</span>. გადავაწერო არსებულ მონაცემებს? შენახვის თარიღი უცვლელი დარჩება.</>
+              ) : (
+                <>განფასება შეინახება არქივში ახალ ჩანაწერად: <span className="font-medium text-foreground">„{saveDialog.name}“</span>.</>
+              )}
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button size="sm" variant="ghost" onClick={() => setSaveDialog(null)} disabled={finishing}>
+                <X className="h-4 w-4 mr-1" /> გაუქმება
+              </Button>
+              <Button size="sm" onClick={doSave} disabled={finishing}>
+                {finishing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                {saveDialog.mode === "overwrite" ? "გადაწერა" : "შენახვა"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="container mx-auto px-4 py-6">
         <Tabs defaultValue={defaultTab}>
