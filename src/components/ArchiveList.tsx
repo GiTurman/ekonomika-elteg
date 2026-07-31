@@ -4,8 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { FolderOpen, Loader2, Trash2, Eraser, Copy, X } from "lucide-react";
-import { deleteArchiveEntry, clearArchive, listArchiveFull, loadArchiveEntry, setIncludeInAnalytics, type ArchiveEntryFull } from "@/lib/archive";
+import { FolderOpen, Loader2, Trash2, Eraser, Copy, X, Replace } from "lucide-react";
+import { deleteArchiveEntry, clearArchive, listArchiveFull, loadArchiveEntry, setIncludeInAnalytics, renameAcrossArchive, type RenameField, type ArchiveEntryFull } from "@/lib/archive";
 import { normalizeAppState } from "@/lib/econ-defaults";
 import { EQUIPMENT_CATEGORY_LABEL } from "@/lib/econ-types";
 import { useEconStore } from "@/lib/econ-store";
@@ -39,6 +39,36 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const { setState } = useEconStore();
+
+  // "სახელების ჩასწორება" dialog — ყველა არქივში ტექსტური სახელის ჩანაცვლება
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameField, setRenameField] = useState<RenameField>("kind");
+  const [renameOld, setRenameOld] = useState("");
+  const [renameNew, setRenameNew] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  const RENAME_FIELD_LABEL: Record<RenameField, string> = {
+    brand: "ბრენდი", kind: "სახეობა", model: "მოდელი", type: "ტიპი", country: "ქვეყანა",
+  };
+
+  const handleRename = async () => {
+    if (!renameOld.trim()) { alert("მიუთითე ძველი სახელი."); return; }
+    setRenaming(true);
+    try {
+      const n = await renameAcrossArchive(renameField, renameOld, renameNew);
+      await refresh();
+      logActivity(actorName, role, "არქივში სახელის ჩასწორება",
+        `${RENAME_FIELD_LABEL[renameField]}: "${renameOld.trim()}" → "${renameNew.trim()}" (${n} ჩანაწერი)`);
+      alert(n > 0 ? `განახლდა ${n} ჩანაწერი.` : "დამთხვევა ვერ მოიძებნა — შესაძლოა სახელი ზუსტად არ ემთხვევა.");
+      setRenameOpen(false);
+      setRenameOld(""); setRenameNew("");
+    } catch (e) {
+      console.error("[archive] rename failed", e);
+      alert("სახელების ჩასწორება ვერ მოხერხდა.");
+    } finally {
+      setRenaming(false);
+    }
+  };
 
   const years = useMemo(() => {
     const set = new Set(items.map((it) => new Date(it.created_at).getFullYear()));
@@ -172,12 +202,65 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
           განახლება
         </Button>
         {isFull && items.length > 0 && (
+          <Button size="sm" variant="outline" onClick={() => setRenameOpen(true)}>
+            <Replace className="h-4 w-4 mr-1" />
+            სახელების ჩასწორება
+          </Button>
+        )}
+        {isFull && items.length > 0 && (
           <Button size="sm" variant="outline" onClick={handleClearAll} disabled={clearing}>
             {clearing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eraser className="h-4 w-4 mr-1" />}
             არქივის გასუფთავება
           </Button>
         )}
       </div>
+
+      {renameOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setRenameOpen(false)}>
+          <div className="bg-card border rounded-lg shadow-lg p-4 w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">სახელების ჩასწორება არქივში</h3>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setRenameOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              ყველა არქივის ჩანაწერში, არჩეულ ველში ზუსტ სახელს ჩაანაცვლებს ახლით.
+              შენახვის თარიღი უცვლელი რჩება.
+            </p>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-foreground">ველი</span>
+              <Select value={renameField} onValueChange={(v) => setRenameField(v as RenameField)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="brand">ბრენდი</SelectItem>
+                  <SelectItem value="kind">სახეობა</SelectItem>
+                  <SelectItem value="model">მოდელი</SelectItem>
+                  <SelectItem value="type">ტიპი</SelectItem>
+                  <SelectItem value="country">ქვეყანა</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-foreground">ძველი სახელი (ზუსტად)</span>
+              <Input value={renameOld} onChange={(e) => setRenameOld(e.target.value)} placeholder="მაგ. dumb" />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-foreground">ახალი სახელი</span>
+              <Input value={renameNew} onChange={(e) => setRenameNew(e.target.value)} placeholder="მაგ. dumwaiter" />
+            </label>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button size="sm" variant="ghost" onClick={() => setRenameOpen(false)} disabled={renaming}>
+                <X className="h-4 w-4 mr-1" /> გაუქმება
+              </Button>
+              <Button size="sm" onClick={handleRename} disabled={renaming}>
+                {renaming ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Replace className="h-4 w-4 mr-1" />}
+                ჩასწორება
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap text-sm">

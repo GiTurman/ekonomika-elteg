@@ -85,6 +85,43 @@ export interface ArchiveEntryFull extends ArchiveEntry {
   data: AppState;
 }
 
+// "სახელების ჩასწორება" — ყველა არქივის ჩანაწერში, დანადგარების მითითებულ
+// ტექსტურ ველში (brand/kind/model/type/country) ზუსტ სახელს ჩაანაცვლებს ახლით.
+// აბრუნებს რამდენ ჩანაწერში მოხდა ცვლილება. სახელი (created_at) არ ინახება ხელახლა
+// — მხოლოდ data ნახლდება, ე.ი. თარიღი უცვლელი რჩება.
+export type RenameField = "brand" | "kind" | "model" | "type" | "country";
+
+export async function renameAcrossArchive(
+  field: RenameField, oldValue: string, newValue: string
+): Promise<number> {
+  const oldV = oldValue.trim();
+  const newV = newValue.trim();
+  if (!oldV) return 0;
+
+  const all = await listArchiveFull();
+  let changed = 0;
+  for (const entry of all) {
+    const units = entry.data?.project?.units ?? [];
+    let touched = false;
+    for (const u of units) {
+      if ((u as any)[field]?.trim?.() === oldV) {
+        (u as any)[field] = newV;
+        touched = true;
+      }
+    }
+    if (touched) {
+      const json = JSON.stringify(entry.data);
+      const { error } = await supabase
+        .from("app_backups")
+        .update({ data: entry.data as any, size_bytes: json.length })
+        .eq("id", entry.id);
+      if (error) throw error;
+      changed++;
+    }
+  }
+  return changed;
+}
+
 // ანალიტიკის დაშბორდისთვის — არქივის ყველა ჩანაწერი სრული მონაცემით.
 export async function listArchiveFull(): Promise<ArchiveEntryFull[]> {
   const { data, error } = await supabase
