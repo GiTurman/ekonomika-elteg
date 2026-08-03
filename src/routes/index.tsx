@@ -64,8 +64,7 @@ function Index() {
   const showPlanTab = isFull || canViewPage("plan");
   const showComparisonTab = isFull || canViewPage("comparison");
   const showArchiveTab = isFull || canViewPage("archive");
-  const visibleTabCount = [showInputTab, showEconomicsTab, showPaymentTab, showTariffsTab, showAnalyticsTab, showAnalyticsWorkingTab, showPlanTab, showComparisonTab, showArchiveTab].filter(Boolean).length + (isFull ? 1 : 0);
-  const tabsGridColsClass = visibleTabCount >= 10 ? "md:grid-cols-10" : visibleTabCount === 9 ? "md:grid-cols-9" : visibleTabCount === 8 ? "md:grid-cols-8" : visibleTabCount === 7 ? "md:grid-cols-7" : visibleTabCount === 6 ? "md:grid-cols-6" : visibleTabCount === 5 ? "md:grid-cols-5" : visibleTabCount === 4 ? "md:grid-cols-4" : visibleTabCount === 3 ? "md:grid-cols-3" : visibleTabCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+
   const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : showComparisonTab ? "comparison" : showArchiveTab ? "archive" : "analytics";
 
   // "დასრულება და შენახვა" — ამზადებს დიალოგს (გადავაწერო?), რეალურ ჩაწერას
@@ -203,7 +202,7 @@ function Index() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs defaultValue={defaultTab}>
-          <TabsList className={"grid h-auto grid-cols-2 " + tabsGridColsClass}>
+          <TabsList className="flex flex-wrap h-auto gap-1 justify-start">
             {showInputTab && <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>}
             {showEconomicsTab && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
             {showComparisonTab && <TabsTrigger value="comparison">შედარება</TabsTrigger>}
