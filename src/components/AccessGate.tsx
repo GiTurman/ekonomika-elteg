@@ -104,6 +104,8 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       // "ანალიტიკა მუშა" — მუშა/დაუმთავრებელი მონაცემებია; სანამ ცალსახად არ
       // ჩაირთვება პანელიდან, არა-ფინანსებს ნაგულისხმევად დამალული აქვთ.
       if (pageKey === "analytics_working") return false;
+      // "გეგმა და შესრულებები" — ნაგულისხმევად მხოლოდ გაყიდვები ხედავს (+ ფინანსები).
+      if (pageKey === "plan") return user.role === "sales";
       return true; // სხვა უცნობი/ჯერ არარეგისტრირებული გვერდი — ნაგულისხმევად ხილვადი
     }
     return perm.allowedRoles.includes(user.role);

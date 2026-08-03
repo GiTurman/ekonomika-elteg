@@ -73,6 +73,9 @@ export type ProjectStatus = "in_progress" | "won" | "lost" | "stalled";
 export interface ProjectData {
   // 0. შიდა ინფო
   responsiblePerson: string;   // მომუშავე პირის სახელი და გვარი
+  salesPersonId: string;       // გამყიდველი — app_users-ის ID (sales როლი); გეგმა/შესრულების მიკუთვნებისთვის
+  contractDate: string;        // კონტრაქტის გაფორმების თარიღი (YYYY-MM-DD)
+  firstTrancheDate: string;    // პირველი ტრანშის ჩარიცხვის თარიღი — ორივე შევსება ნიშნავს "შესრულებულია"
   leadSource: string;          // საიდან მოვიდა პროექტი
   startDate: string;           // მუშაობის დაწყების თარიღი — ავსებს Partner, კორექტირება მხოლოდ Finance-ს შეუძლია
   closeDate: string;           // პროექტის დახურვის თარიღი

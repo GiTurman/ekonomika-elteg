@@ -120,6 +120,9 @@ function PagePermissionsPanel() {
       if (!loaded.some((p) => p.pageKey === "analytics_working")) {
         loaded.push({ pageKey: "analytics_working", label: "ანალიტიკა მუშა", allowedRoles: [] });
       }
+      if (!loaded.some((p) => p.pageKey === "plan")) {
+        loaded.push({ pageKey: "plan", label: "გეგმა და შესრულებები", allowedRoles: ["sales"] });
+      }
       setPerms(loaded);
     } catch (e) {
       console.error("[permissions] page load failed", e);
@@ -137,7 +140,7 @@ function PagePermissionsPanel() {
     setPerms((prev) => prev.map((p) => (p.pageKey === perm.pageKey ? { ...p, allowedRoles: nextRoles } : p)));
     try {
       // "analytics_working" შესაძლოა ბაზაში ჯერ არ არსებობდეს — ამიტომ upsert.
-      if (perm.pageKey === "analytics_working") {
+      if (perm.pageKey === "analytics_working" || perm.pageKey === "plan") {
         await upsertPagePermission(perm.pageKey, perm.label, nextRoles);
       } else {
         await updatePagePermission(perm.pageKey, nextRoles);

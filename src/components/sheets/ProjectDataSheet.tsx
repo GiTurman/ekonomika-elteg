@@ -11,6 +11,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import { useEffect, useState } from "react";
 import { listDropdownOptions } from "@/lib/dropdownOptions";
+import { listUsers, type AppUser } from "@/lib/access";
 import { listTariffRules, findMatchingLiftRule, type TariffRule } from "@/lib/installTariffRules";
 
 const PROJECT_STATUS_ORDER: ProjectStatus[] = ["in_progress", "won", "lost", "stalled"];
@@ -99,6 +100,12 @@ export function ProjectDataSheet() {
     listTariffRules().catch((e) => { console.error("[tariffs] load failed", e); return []; }).then(setTariffRules);
   }, []);
 
+  // გამყიდველების სია (sales როლი) — პროექტის "გამყიდველი" ველისთვის
+  const [salesUsers, setSalesUsers] = useState<AppUser[]>([]);
+  useEffect(() => {
+    listUsers().then((us) => setSalesUsers(us.filter((u) => u.role === "sales"))).catch((e) => console.error("[users] load failed", e));
+  }, []);
+
   // ტარიფის არჩევისას (ან ლიფტისთვის — ავტომატურად, ტვირთამწეობის/სართულების
   // მიხედვით) მონტაჟისა და ელექტრომონტაჟის განაკვეთები ავსებს ამ სტანდარტული
   // ტარიფიდან. ხელით შესწორება შემდეგაც შესაძლებელია.
@@ -148,6 +155,37 @@ export function ProjectDataSheet() {
         <CardContent className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">მომუშავე პირის სახელი და გვარი</span>
           <TextInput value={p.responsiblePerson} onChange={(v) => updateProject({ responsiblePerson: v })} /></label>
+          {canSeeField("project.salesPersonId") && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">გამყიდველი</span>
+              {canEditField("project.salesPersonId") ? (
+                <Select value={p.salesPersonId || "none"} onValueChange={(v) => updateProject({ salesPersonId: v === "none" ? "" : v })}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="აირჩიე გამყიდველი" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    {salesUsers.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className={"h-9 flex items-center px-3 rounded-md border bg-muted/30 " + computedCls}>
+                  {salesUsers.find((u) => u.id === p.salesPersonId)?.name ?? "—"}
+                </div>
+              )}
+            </label>
+          )}
+          {canSeeField("project.contractDate") && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">კონტრაქტის გაფორმების თარიღი</span>
+              {canEditField("project.contractDate") ? (
+                <TextInput value={p.contractDate} onChange={(v) => updateProject({ contractDate: v })} placeholder="წწწწ-თთ-დდ" />
+              ) : <div className={"h-9 flex items-center px-3 rounded-md border bg-muted/30 " + computedCls}>{p.contractDate}</div>}
+            </label>
+          )}
+          {canSeeField("project.firstTrancheDate") && (
+            <label className="grid gap-1"><span className="text-xs text-muted-foreground">პირველი ტრანშის ჩარიცხვის თარიღი</span>
+              {canEditField("project.firstTrancheDate") ? (
+                <TextInput value={p.firstTrancheDate} onChange={(v) => updateProject({ firstTrancheDate: v })} placeholder="წწწწ-თთ-დდ" />
+              ) : <div className={"h-9 flex items-center px-3 rounded-md border bg-muted/30 " + computedCls}>{p.firstTrancheDate}</div>}
+            </label>
+          )}
           <label className="grid gap-1"><span className="text-xs text-muted-foreground">საიდან მოვიდა პროექტი</span>
           <TextInput value={p.leadSource} onChange={(v) => updateProject({ leadSource: v })} /></label>
           <label className="grid gap-1">

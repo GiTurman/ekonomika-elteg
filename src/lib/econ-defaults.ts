@@ -64,6 +64,9 @@ export const defaultProfitThresholds: Record<EquipmentCategory, ProfitThreshold>
 export const defaultAppState: AppState = {
   project: {
     responsiblePerson: "",
+    salesPersonId: "",
+    contractDate: "",
+    firstTrancheDate: "",
     leadSource: "",
     startDate: "",
     closeDate: "",
@@ -254,6 +257,9 @@ export function blankAppState(): AppState {
   return {
     project: {
       responsiblePerson: "",
+      salesPersonId: "",
+      contractDate: "",
+      firstTrancheDate: "",
       leadSource: "",
       startDate: "",
       closeDate: "",
