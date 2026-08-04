@@ -30,6 +30,7 @@ const mkUnit = (id: string, floors = 19): Unit => ({
   equipmentMarkupPct: 0.03,
   installMarkupPct: 0.50,
   contingencyPct: 0.03,
+  overheadPct: 0,
   fxRiskPct: 0.02,
   warrantyPct: 0,
 });
@@ -176,6 +177,7 @@ const blankUnit = (id: string): Unit => ({
   equipmentMarkupPct: 0,
   installMarkupPct: 0,
   contingencyPct: 0,
+  overheadPct: 0,
   fxRiskPct: 0,
   warrantyPct: 0,
 });
@@ -218,6 +220,7 @@ export function normalizeAppState(loaded: Partial<AppState>): AppState {
     ...u,
     category: u.category ?? "lift",
     scaffolding: u.scaffolding ?? 0,
+    overheadPct: u.overheadPct ?? 0,
   }));
   const loadedPayment: any = loaded.payment ?? {};
   const loadedFinance: any = loaded.finance ?? {};
