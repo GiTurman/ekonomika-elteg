@@ -58,6 +58,7 @@ const UNIT_RATE_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label:
   { key: "equipmentMarkupPct", label: "დანადგარის ფასნამატი %", kind: "pct" },
   { key: "installMarkupPct", label: "მონტაჟის ფასნამატი %", kind: "pct" },
   { key: "contingencyPct", label: "გაუთვალისწინებელი %", kind: "pct" },
+  { key: "overheadPct", label: "ზედნადები %", kind: "pct" },
   { key: "fxRiskPct", label: "საბანკო სავალუტო რისკი %", kind: "pct" },
   { key: "warrantyPct", label: "გარანტიის % (ქარხნული ფასიდან)", kind: "pct" },
 ];
