@@ -201,6 +201,8 @@ export interface ManualColumns {
 export interface DefaultRates {
   equipmentMarkupPct: number; // დანადგარის ფასნამატი %
   installMarkupPct: number;   // მონტაჟის ფასნამატი %
+  contingencyPct: number;     // გაუთვალისწინებელი ხარჯი %
+  overheadPct: number;        // ზედნადები ხარჯი %
   fxRiskPct: number;          // საბანკო სავალუტო რისკი %
 }
 
