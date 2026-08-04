@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 // ReportBlock-ის ხელით შესატანი სვეტების კონტექსტი — რომ ყველა ბლოკს
 // ცალ-ცალკე props არ გადავცე. თუ null-ია (მაგ. Comparison-ში), სვეტები არ ჩანს.
 interface ManualColsCtx {
-  editable: boolean;
+  canEditBlock: (blockKey: string) => boolean;
+  canSeeBlock: (blockKey: string) => boolean;
   finalOffer: Record<string, number>;
   factual: Record<string, number>;
   onSet: (col: "finalOffer" | "factual", key: string, v: number | null) => void;
@@ -58,7 +59,7 @@ function ManualCell({
 
 export function EconomicsSheet() {
   const { state, setManualCell } = useEconStore();
-  const { isFull } = useAccessRole();
+  const { isFull, canEditField, canSeeField } = useAccessRole();
   const eco = computeEconomics(state);
   const mc = state.manualColumns ?? { finalOffer: {}, factual: {} };
 
@@ -169,7 +170,11 @@ export function EconomicsSheet() {
         </CardContent>
       </Card>
 
-      <ManualCtx.Provider value={{ editable: isFull, finalOffer: mc.finalOffer, factual: mc.factual, onSet: setManualCell }}>
+      <ManualCtx.Provider value={{
+        canEditBlock: (bk) => canEditField("econ." + bk),
+        canSeeBlock: (bk) => canSeeField("econ." + bk),
+        finalOffer: mc.finalOffer, factual: mc.factual, onSet: setManualCell,
+      }}>
       <Card>
         <CardHeader>
           <CardTitle>2. პროექტის დეტალური ანგარიში (დამოუკიდებელი გამოთვლა — შემოწმებისთვის)</CardTitle>
@@ -183,8 +188,8 @@ export function EconomicsSheet() {
           {(() => {
             // ერთი წყარო — ReportBlock-ებიც აქედან ივსება და ღილაკის "გადატანა"-ც
             // ამ სიაზე მუშაობს, რომ key-ები ზუსტად ემთხვეოდეს (title|label).
-            const blocks: Array<{ title: string; rows: Array<[string, number, boolean?]> }> = [
-              { title: "შესყიდვის ხარჯები", rows: [
+            const blocks: Array<{ title: string; blockKey: string; rows: Array<[string, number, boolean?]> }> = [
+              { title: "შესყიდვის ხარჯები", blockKey: "purchase", rows: [
                 ["ქარხნული ფასი", eco.report.factoryTotal],
                 ["საბანკო საკომისიო", eco.report.bankCommTotal],
                 ["საერთაშორისო ტრანსპორტირება", eco.report.intTransportTotal],
@@ -192,7 +197,7 @@ export function EconomicsSheet() {
                 ["ადგილზე ტრანსპორტირება", eco.report.localTransportTotal],
                 ["ჯამი — შესყიდვის თვითღირებულება", eco.report.purchaseTotal, true],
               ]},
-              { title: "მონტაჟის ხარჯები", rows: [
+              { title: "მონტაჟის ხარჯები", blockKey: "install", rows: [
                 ["მონტაჟის ანაზღაურება (დარიცხვებით)", eco.report.mechPayroll],
                 ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll],
                 ["მივლინების ხარჯი (სრული)", eco.report.travelTotal],
@@ -200,14 +205,14 @@ export function EconomicsSheet() {
                 ["ხარაჩო", eco.report.scaffoldingTotal],
                 ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal, true],
               ]},
-              { title: "ფასნამატი", rows: [
+              { title: "ფასნამატი", blockKey: "markup", rows: [
                 ["სულ თვითღირებულება", eco.report.costTotal, true],
                 ["დანადგარის ფასნამატი", eco.report.equipmentMarkup],
                 ["მონტაჟის ფასნამატი", eco.report.installMarkup],
                 ["სულ ფასნამატი", eco.report.markupTotal, true],
                 ["ფასი დამატებითი ხარჯების გარეშე", eco.report.priceNoExtras, true],
               ]},
-              { title: "დამატებითი ხარჯები", rows: [
+              { title: "დამატებითი ხარჯები", blockKey: "extras", rows: [
                 ["გაუთვალისწინებელი ხარჯი", eco.report.contingency],
                 ["ზედნადები ხარჯი", eco.report.overhead],
                 ["საბანკო სავალუტო რისკი", eco.report.fxRisk],
@@ -220,7 +225,7 @@ export function EconomicsSheet() {
                 ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
               ]},
               isFull
-                ? { title: "საბოლოო ფასი", rows: [
+                ? { title: "საბოლოო ფასი", blockKey: "final", rows: [
                     ["ფასი დღგ-ს გარეშე", eco.report.priceNoVat, true],
                     ["დღგ", eco.report.vat],
                     ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
@@ -228,7 +233,7 @@ export function EconomicsSheet() {
                     ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
                     ["გასაყიდი ფასი (დღგ-ს ჩათვლით)", eco.report.finalContractPrice, true],
                   ]}
-                : { title: "საბოლოო ფასი (დღგ-ს ჩათვლით)", rows: [
+                : { title: "საბოლოო ფასი (დღგ-ს ჩათვლით)", blockKey: "final", rows: [
                     ["დღგ", eco.report.vat],
                     ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
                     ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
@@ -257,7 +262,7 @@ export function EconomicsSheet() {
                     </Button>
                   </div>
                 )}
-                {blocks.map((b) => <ReportBlock key={b.title} title={b.title} rows={b.rows} />)}
+                {blocks.map((b) => <ReportBlock key={b.title} title={b.title} blockKey={b.blockKey} rows={b.rows} />)}
               </>
             );
           })()}
@@ -280,8 +285,13 @@ export function EconomicsSheet() {
   );
 }
 
-function ReportBlock({ title, rows }: { title: string; rows: Array<[string, number, boolean?]> }) {
+function ReportBlock({ title, blockKey, rows }: { title: string; blockKey: string; rows: Array<[string, number, boolean?]> }) {
   const mc = useContext(ManualCtx);
+  // ბლოკ-დონის უფლებები: canSee → ხედავს input სვეტებს; canEdit → ავსებს.
+  const canSee = mc ? mc.canSeeBlock(blockKey) : false;
+  const canEdit = mc ? mc.canEditBlock(blockKey) : false;
+  // input სვეტები ჩანს მხოლოდ თუ კონტექსტი არსებობს და ბლოკი ხილვადია.
+  const showManual = !!mc && canSee;
 
   const keyOf = (label: string) => title + "|" + label;
 
@@ -317,7 +327,7 @@ function ReportBlock({ title, rows }: { title: string; rows: Array<[string, numb
     <div className="mb-4">
       <div className="text-sm font-semibold mb-1">{title}</div>
       <Table>
-        {mc && (
+        {showManual && (
           <TableHeader>
             <TableRow>
               <TableHead>ხარჯის დასახელება</TableHead>
@@ -334,15 +344,15 @@ function ReportBlock({ title, rows }: { title: string; rows: Array<[string, numb
               <TableRow key={label} className={bold ? "font-semibold bg-muted/30" : ""}>
                 <TableCell>{label}</TableCell>
                 <TableCell className={"text-right " + computedCls}>{fmtUsd(val)}</TableCell>
-                {mc && (
+                {showManual && (
                   <>
                     <TableCell className="text-right p-1">
                       {bold ? (
                         <span className={"text-right " + linkedCls}>{fmtUsd(colValue("finalOffer", idx))}</span>
                       ) : (
                         <ManualCell
-                          saved={mc.finalOffer[k]} computed={val} editable={mc.editable}
-                          onSet={(v) => mc.onSet("finalOffer", k, v)}
+                          saved={mc!.finalOffer[k]} computed={val} editable={canEdit}
+                          onSet={(v) => mc!.onSet("finalOffer", k, v)}
                         />
                       )}
                     </TableCell>
@@ -351,8 +361,8 @@ function ReportBlock({ title, rows }: { title: string; rows: Array<[string, numb
                         <span className={"text-right " + linkedCls}>{fmtUsd(colValue("factual", idx))}</span>
                       ) : (
                         <ManualCell
-                          saved={mc.factual[k]} computed={val} editable={mc.editable}
-                          onSet={(v) => mc.onSet("factual", k, v)}
+                          saved={mc!.factual[k]} computed={val} editable={canEdit}
+                          onSet={(v) => mc!.onSet("factual", k, v)}
                         />
                       )}
                     </TableCell>
