@@ -232,18 +232,24 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     set((s) => {
       const units = s.state.project.units;
       const last = units[units.length - 1];
+      // ფასნამატები (დანადგ./მონტ.) და სავალუტო რისკი — ყოველთვის "ტარიფები"
+      // ტაბიდან (defaultRates), ყველა ახალ დანადგარზე, არა წინადან.
+      const dr = s.state.defaultRates ?? { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, fxRiskPct: 0.02 };
       let nu: Unit;
       if (last) {
-        // ახალი დანადგარი = წინას სრული ასლი (id-ის გარდა) — მომხმარებელი
-        // ხელით შეცვლის მხოლოდ იმ ველებს, რაც განსხვავებულია.
+        // ახალი დანადგარი = წინას ასლი (id-ის გარდა) — ტექნიკური/ხარჯების
+        // ველები მემკვიდრეობით, მაგრამ ფასნამატები ტარიფებიდან თავიდან ისმება.
         const m = last.id.match(/^([A-Za-z]+)(\d+)$/);
         const prefix = m ? m[1] : "L";
         const num = m ? parseInt(m[2], 10) + 1 : units.length + 1;
-        nu = { ...last, id: `${prefix}${num}` };
+        nu = { ...last, id: `${prefix}${num}`,
+          equipmentMarkupPct: dr.equipmentMarkupPct,
+          installMarkupPct: dr.installMarkupPct,
+          fxRiskPct: dr.fxRiskPct,
+        };
       } else {
         // პირველი დანადგარი — "ტარიფები" ტაბზე დაყენებული სტანდარტული
         // განაკვეთებით იწყება (ფასნამატი დანადგ./მონტ., სავალუტო რისკი).
-        const dr = s.state.defaultRates ?? { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, fxRiskPct: 0.02 };
         nu = { ...emptyUnit("L1"),
           equipmentMarkupPct: dr.equipmentMarkupPct,
           installMarkupPct: dr.installMarkupPct,
