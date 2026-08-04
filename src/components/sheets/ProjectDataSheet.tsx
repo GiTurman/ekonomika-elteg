@@ -53,8 +53,8 @@ const UNIT_FINANCIAL_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; l
 // Per-unit labor rates and margin/risk parameters (moved from global "ფინანსური
 // დაშვებები" — previously a single value applied to every unit).
 const UNIT_RATE_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string; kind: "num" | "pct" }> = [
-  { key: "mechRateGel", label: "მონტაჟი (₾/სართული)", kind: "num" },
-  { key: "elecRateGel", label: "ელექტრომონტაჟი (₾/სართული)", kind: "num" },
+  { key: "mechRateGel", label: "მონტაჟი ($/სართული)", kind: "num" },
+  { key: "elecRateGel", label: "ელექტრომონტაჟი ($/სართული)", kind: "num" },
   { key: "equipmentMarkupPct", label: "დანადგარის ფასნამატი %", kind: "pct" },
   { key: "installMarkupPct", label: "მონტაჟის ფასნამატი %", kind: "pct" },
   { key: "contingencyPct", label: "გაუთვალისწინებელი %", kind: "pct" },
