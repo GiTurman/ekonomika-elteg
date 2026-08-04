@@ -238,6 +238,22 @@ export function InstallationTariffsSheet() {
                 </TableCell>
               </TableRow>
               <TableRow>
+                <TableCell>გაუთვალისწინებელი ხარჯი %</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={dr.contingencyPct} onChange={(v) => updateDefaultRates({ contingencyPct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(dr.contingencyPct)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>ზედნადები ხარჯი %</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <PercentInput value={dr.overheadPct} onChange={(v) => updateDefaultRates({ overheadPct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(dr.overheadPct)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
                 <TableCell>საბანკო სავალუტო რისკი %</TableCell>
                 <TableCell className="text-right">
                   {isFull ? (
