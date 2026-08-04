@@ -56,6 +56,7 @@ export interface Unit {
   equipmentMarkupPct: number;
   installMarkupPct: number;
   contingencyPct: number;
+  overheadPct: number;       // ზედნადები ხარჯი — H × overheadPct (გაუთვალისწინებელის ანალოგიით)
   fxRiskPct: number;
   warrantyPct: number;       // % of factory price
 }
