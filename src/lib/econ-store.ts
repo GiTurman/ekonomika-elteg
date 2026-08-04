@@ -234,7 +234,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
       const last = units[units.length - 1];
       // ფასნამატები (დანადგ./მონტ.) და სავალუტო რისკი — ყოველთვის "ტარიფები"
       // ტაბიდან (defaultRates), ყველა ახალ დანადგარზე, არა წინადან.
-      const dr = s.state.defaultRates ?? { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, fxRiskPct: 0.02 };
+      const dr = s.state.defaultRates ?? { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, contingencyPct: 0.03, overheadPct: 0, fxRiskPct: 0.02 };
       let nu: Unit;
       if (last) {
         // ახალი დანადგარი = წინას ასლი (id-ის გარდა) — ტექნიკური/ხარჯების
@@ -245,6 +245,8 @@ export const useEconStore = create<StoreShape>((set, get) => ({
         nu = { ...last, id: `${prefix}${num}`,
           equipmentMarkupPct: dr.equipmentMarkupPct,
           installMarkupPct: dr.installMarkupPct,
+          contingencyPct: dr.contingencyPct ?? last.contingencyPct,
+          overheadPct: dr.overheadPct ?? 0,
           fxRiskPct: dr.fxRiskPct,
         };
       } else {
@@ -253,6 +255,8 @@ export const useEconStore = create<StoreShape>((set, get) => ({
         nu = { ...emptyUnit("L1"),
           equipmentMarkupPct: dr.equipmentMarkupPct,
           installMarkupPct: dr.installMarkupPct,
+          contingencyPct: dr.contingencyPct ?? 0.03,
+          overheadPct: dr.overheadPct ?? 0,
           fxRiskPct: dr.fxRiskPct,
         };
       }
