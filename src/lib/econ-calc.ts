@@ -60,6 +60,7 @@ export interface ProjectReport {
   priceNoExtras: number; // D60
   // Extras
   contingency: number; // D62
+  overhead: number; // ზედნადები ხარჯი — H × overheadPct (გაუთვალისწინებელის შემდეგ)
   fxRisk: number; // D63
   otherTotal: number; // D64
   groundingTotal: number; // D65
@@ -287,6 +288,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     const H = F + G;
     const I =
       H * u.contingencyPct +
+      H * (u.overheadPct ?? 0) +
       (u.factoryPrice + allocated.bank) * u.fxRiskPct +
       u.otherCost +
       u.grounding +
@@ -378,6 +380,12 @@ export function computeEconomics(state: AppState): FullEconomics {
     const H = D + E + D * u.equipmentMarkupPct + E * u.installMarkupPct;
     return s + H * u.contingencyPct;
   }, 0);
+  const overhead = units.reduce((s, u) => {
+    const D = purchaseCostOf(u);
+    const E = installCostOf(u);
+    const H = D + E + D * u.equipmentMarkupPct + E * u.installMarkupPct;
+    return s + H * (u.overheadPct ?? 0);
+  }, 0);
   const fxRisk = units.reduce((s, u) => s + (u.factoryPrice + (alloc.bank.get(u.id) ?? 0)) * u.fxRiskPct, 0);
   const otherTotal = units.reduce((s, u) => s + u.otherCost, 0);
   const groundingTotal = units.reduce((s, u) => s + u.grounding, 0);
@@ -393,7 +401,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     const M = r.finalPrice / (1 + pct);
     return s + (r.finalPrice - M);
   }, 0);
-  const extrasTotal = contingency + fxRisk + otherTotal + groundingTotal + warrantyCost + freeServiceCost + guaranteeAmountCost;
+  const extrasTotal = contingency + overhead + fxRisk + otherTotal + groundingTotal + warrantyCost + freeServiceCost + guaranteeAmountCost;
 
   const reportPriceNoVat = reportPriceNoExtras + extrasTotal;
   // იგივე გაყოფა, რაც ცხრილის pass-ში — რომ checkDiff ყოველთვის ~0-ს
@@ -427,6 +435,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     markupTotal,
     priceNoExtras: reportPriceNoExtras,
     contingency,
+    overhead,
     fxRisk,
     otherTotal,
     groundingTotal,
