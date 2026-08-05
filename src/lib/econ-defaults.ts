@@ -271,7 +271,7 @@ export function blankAppState(): AppState {
       location: "",
       buildingType: "",
       completionYear: new Date().getFullYear(),
-      units: [blankUnit("L1"), blankUnit("L2")],
+      units: [],
       bankCommissionTotal: 0,
       intTransportTotal: 0,
       terminalTotal: 0,
