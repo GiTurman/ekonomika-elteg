@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, MailQuestion } from "lucide-react";
+import { Mail, MailQuestion, Loader2 } from "lucide-react";
+import { useEconStore } from "@/lib/econ-store";
+import { saveToArchive, findArchiveByName, updateArchiveEntry } from "@/lib/archive";
 
 interface RequestCategory {
   key: string;
@@ -122,6 +124,8 @@ function loadStoredAddresses(): Record<string, string> {
 export function DataRequestDialog() {
   const [open, setOpen] = useState(false);
   const [addresses, setAddresses] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState<string | null>(null);
+  const { state, loadedArchiveId, setLoadedArchiveId } = useEconStore();
 
   useEffect(() => {
     if (open) setAddresses(loadStoredAddresses());
@@ -136,17 +140,52 @@ export function DataRequestDialog() {
     }
   };
 
-  const handleSend = (cat: RequestCategory) => {
+  // პროექტის ID-ს უზრუნველყოფა — ლინკისთვის. თუ ჯერ არ არის შენახული,
+  // ავტომატურად ინახავს არქივში (სახელით) და აბრუნებს ID-ს.
+  const ensureProjectId = async (): Promise<string | null> => {
+    if (loadedArchiveId) return loadedArchiveId;
+    const name = (state.project.projectName || "").trim();
+    if (!name) {
+      alert("პროექტს არ აქვს სახელი — ჯერ მიუთითეთ პროექტის სახელი, რომ ლინკი შეიქმნას.");
+      return null;
+    }
+    // ამავე სახელით უკვე არსებობს? — გადავაწეროთ, თორემ ახალი ჩანაწერი.
+    const existing = await findArchiveByName(name);
+    if (existing) {
+      await updateArchiveEntry(existing.id, state);
+      setLoadedArchiveId(existing.id);
+      return existing.id;
+    }
+    await saveToArchive(name, state);
+    const saved = await findArchiveByName(name);
+    if (saved) { setLoadedArchiveId(saved.id); return saved.id; }
+    return null;
+  };
+
+  const handleSend = async (cat: RequestCategory) => {
     const to = (addresses[cat.key] || "").trim();
     if (!to) {
       alert("გთხოვთ, ჯერ შეიყვანოთ მისამართი.");
       return;
     }
-    const mailto =
-      `mailto:${encodeURIComponent(to)}` +
-      `?subject=${encodeURIComponent(cat.subject)}` +
-      `&body=${encodeURIComponent(cat.body)}`;
-    window.location.href = mailto;
+    setSending(cat.key);
+    try {
+      const id = await ensureProjectId();
+      const link = id ? `${window.location.origin}/?project=${id}` : "";
+      const body = link
+        ? cat.body + `\n\n— — —\nპროექტის პირდაპირი ბმული (დააჭირეთ გასახსნელად):\n${link}`
+        : cat.body;
+      const mailto =
+        `mailto:${encodeURIComponent(to)}` +
+        `?subject=${encodeURIComponent(cat.subject)}` +
+        `&body=${encodeURIComponent(body)}`;
+      window.location.href = mailto;
+    } catch (e) {
+      console.error("[data-request] send failed", e);
+      alert("პროექტის შენახვა/ლინკის შექმნა ვერ მოხერხდა. სცადეთ ჯერ პროექტის შენახვა არქივში.");
+    } finally {
+      setSending(null);
+    }
   };
 
   return (
@@ -179,8 +218,8 @@ export function DataRequestDialog() {
                     onChange={(e) => handleAddressChange(cat.key, e.target.value)}
                   />
                 </div>
-                <Button size="sm" onClick={() => handleSend(cat)}>
-                  <Mail className="h-4 w-4 mr-1" /> გაგზავნა
+                <Button size="sm" onClick={() => handleSend(cat)} disabled={sending === cat.key}>
+                  {sending === cat.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />} გაგზავნა
                 </Button>
               </CardContent>
             </Card>
