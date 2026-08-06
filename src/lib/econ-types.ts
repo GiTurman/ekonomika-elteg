@@ -204,6 +204,7 @@ export interface DefaultRates {
   contingencyPct: number;     // გაუთვალისწინებელი ხარჯი %
   overheadPct: number;        // ზედნადები ხარჯი %
   fxRiskPct: number;          // საბანკო სავალუტო რისკი %
+  bankCommissionMinPerUnit: number; // ბანკის საკომისიო — მინიმუმი თითო დანადგარზე ($)
 }
 
 export interface AppState {
