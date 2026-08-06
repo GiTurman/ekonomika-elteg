@@ -121,7 +121,9 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
+      <Tabs defaultValue={defaultTab}>
+      <div className="sticky top-0 z-50 bg-background shadow-sm">
+      <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-lg font-semibold leading-tight">{state.project.projectName || "პროექტი"} — განფასება</h1>
@@ -176,6 +178,23 @@ function Index() {
           </div>
         )}
       </header>
+      <div className="bg-card border-b">
+        <div className="container mx-auto px-4">
+        <TabsList className="flex flex-wrap h-auto gap-1 justify-start">
+          {showInputTab && <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>}
+          {showEconomicsTab && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
+          {showComparisonTab && <TabsTrigger value="comparison">შედარება</TabsTrigger>}
+          {showArchiveTab && <TabsTrigger value="archive">არქივი</TabsTrigger>}
+          {showPaymentTab && <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>}
+          {showTariffsTab && <TabsTrigger value="tariffs">ტარიფები</TabsTrigger>}
+          {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
+          {showAnalyticsWorkingTab && <TabsTrigger value="analytics_working">ანალიტიკა მუშა</TabsTrigger>}
+          {showPlanTab && <TabsTrigger value="plan">გეგმა და შესრულებები</TabsTrigger>}
+          {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
+        </TabsList>
+        </div>
+      </div>
+      </div>
 
       {saveDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !finishing && setSaveDialog(null)}>
@@ -209,19 +228,6 @@ function Index() {
       )}
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue={defaultTab}>
-          <TabsList className="flex flex-wrap h-auto gap-1 justify-start">
-            {showInputTab && <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>}
-            {showEconomicsTab && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
-            {showComparisonTab && <TabsTrigger value="comparison">შედარება</TabsTrigger>}
-            {showArchiveTab && <TabsTrigger value="archive">არქივი</TabsTrigger>}
-            {showPaymentTab && <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>}
-            {showTariffsTab && <TabsTrigger value="tariffs">ტარიფები</TabsTrigger>}
-            {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
-            {showAnalyticsWorkingTab && <TabsTrigger value="analytics_working">ანალიტიკა მუშა</TabsTrigger>}
-            {showPlanTab && <TabsTrigger value="plan">გეგმა და შესრულებები</TabsTrigger>}
-            {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
-          </TabsList>
           {isFull && (
             <div className="container mx-auto px-4 pt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Eye className="h-3.5 w-3.5" /> მომხმარებლების გვერდების ხედვები და კოდები იმართება „ლოგი" ტაბზე.
@@ -247,8 +253,8 @@ function Index() {
             {showPlanTab && <TabsContent value="plan"><PlanSheet /></TabsContent>}
             {isFull && <TabsContent value="log"><LogSheet /></TabsContent>}
           </div>
-        </Tabs>
       </main>
+      </Tabs>
     </div>
   );
 }
