@@ -261,6 +261,14 @@ export function InstallationTariffsSheet() {
                   ) : <div className={"text-right " + computedCls}>{fmtPct(dr.fxRiskPct)}</div>}
                 </TableCell>
               </TableRow>
+              <TableRow>
+                <TableCell>ბანკის საკომისიო — მინ. თითო დანადგარზე ($)</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <NumberInput value={dr.bankCommissionMinPerUnit} onChange={(v) => updateDefaultRates({ bankCommissionMinPerUnit: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtUsd(dr.bankCommissionMinPerUnit)}</div>}
+                </TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </CardContent>
