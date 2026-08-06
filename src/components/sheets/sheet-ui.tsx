@@ -32,7 +32,7 @@ interface NumInProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "value"
   onChange: (v: number) => void;
   step?: string | number;
 }
-export function NumberInput({ value, onChange, className, step = "any", ...rest }: NumInProps) {
+export function NumberInput({ value, onChange, className, ...rest }: NumInProps) {
   const [text, setText] = useState(() => (Number.isFinite(value) ? String(value) : "0"));
   const focused = useRef(false);
 
@@ -45,18 +45,20 @@ export function NumberInput({ value, onChange, className, step = "any", ...rest 
   return (
     <Input
       {...rest}
-      type="number"
+      type="text"
       inputMode="decimal"
-      step={step}
       value={text}
       onFocus={(e) => {
         focused.current = true;
         e.target.select(); // clicking into a "0" field selects it, so typing replaces it entirely
       }}
       onChange={(e) => {
-        const v = e.target.value;
+        // numpad decimal key can emit "," on some locales — normalize so it isn't rejected.
+        const v = e.target.value.replace(",", ".");
+        // accept only numeric-shaped input; otherwise ignore the keystroke (caret stays put).
+        if (!/^-?\d*\.?\d*$/.test(v)) return;
         setText(v);
-        if (v === "" || v === "-" || v === ".") return; // let the user keep typing
+        if (v === "" || v === "-" || v === "." || v === "-.") return; // mid-typing, don't emit yet
         const n = Number(v);
         if (Number.isFinite(n)) onChange(n);
       }}
@@ -84,18 +86,18 @@ export function PercentInput({ value, onChange, className }: PctInProps) {
 
   return (
     <Input
-      type="number"
+      type="text"
       inputMode="decimal"
-      step="0.01"
       value={text}
       onFocus={(e) => {
         focused.current = true;
         e.target.select();
       }}
       onChange={(e) => {
-        const v = e.target.value;
+        const v = e.target.value.replace(",", ".");
+        if (!/^-?\d*\.?\d*$/.test(v)) return;
         setText(v);
-        if (v === "" || v === "-" || v === ".") return;
+        if (v === "" || v === "-" || v === "." || v === "-.") return;
         const n = Number(v);
         if (Number.isFinite(n)) onChange(n / 100);
       }}
