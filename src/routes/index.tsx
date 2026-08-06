@@ -15,9 +15,10 @@ import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
 import { PlanSheet } from "@/components/sheets/PlanSheet";
 import { ComparisonSheet } from "@/components/sheets/ComparisonSheet";
 import { ArchiveSheet } from "@/components/sheets/ArchiveSheet";
-import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye, X } from "lucide-react";
+import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye, X, LogOut, User } from "lucide-react";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
+import { ROLE_LABEL } from "@/lib/access";
 import { ArchiveDialog } from "@/components/ArchiveDialog";
 import { DataRequestDialog } from "@/components/DataRequestDialog";
 import { saveToArchive, findArchiveByName, updateArchiveEntry } from "@/lib/archive";
@@ -120,13 +121,17 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
+      <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-lg font-semibold leading-tight">{state.project.projectName || "პროექტი"} — განფასება</h1>
             <p className="text-xs text-muted-foreground">Fuji Hitech / KLEEMANN economic model (Excel template v3)</p>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1 whitespace-nowrap rounded-md bg-muted px-2 py-1 font-medium text-foreground" title="შესული მომხმარებელი">
+              <User className="h-4 w-4" />
+              {actorName ? `${actorName} — ${ROLE_LABEL[role] ?? role}` : (ROLE_LABEL[role] ?? role)}
+            </span>
             <span className="flex items-center gap-1 whitespace-nowrap">
               <Cloud className="h-4 w-4" />
               {saving ? (<><Loader2 className="h-3 w-3 animate-spin" /> ინახება…</>) : (loaded ? "შენახულია" : "იტვირთება…")}
@@ -151,6 +156,9 @@ function Index() {
             </Button>
             <Button size="icon" variant="ghost" title="კოდის შეცვლა" onClick={logout}>
               <KeyRound className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="outline" title="გამოსვლა" onClick={logout}>
+              <LogOut className="h-4 w-4 mr-1" /> გამოსვლა
             </Button>
           </div>
         </div>
