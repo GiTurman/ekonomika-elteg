@@ -21,7 +21,8 @@ import { useAccessRole } from "@/components/AccessGate";
 import { ROLE_LABEL } from "@/lib/access";
 import { ArchiveDialog } from "@/components/ArchiveDialog";
 import { DataRequestDialog } from "@/components/DataRequestDialog";
-import { saveToArchive, findArchiveByName, updateArchiveEntry } from "@/lib/archive";
+import { saveToArchive, findArchiveByName, updateArchiveEntry, loadArchiveEntry } from "@/lib/archive";
+import { normalizeAppState } from "@/lib/econ-defaults";
 import { logActivity } from "@/lib/activityLog";
 import { LogSheet } from "@/components/sheets/LogSheet";
 
@@ -36,13 +37,36 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { state, loaded, saving, load, reset, loadedArchiveId, setLoadedArchiveId } = useEconStore();
+  const { state, loaded, saving, load, reset, loadedArchiveId, setLoadedArchiveId, setState } = useEconStore();
   const { isFull, logout, actorName, role, canViewPage, userId } = useAccessRole();
   const [finishing, setFinishing] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [saveDialog, setSaveDialog] = useState<null | { mode: "overwrite" | "new"; name: string; existingId?: string }>(null);
 
   useEffect(() => { load(userId); }, [load, userId]);
+
+  // პროექტის პირდაპირი ბმული: ?project=<archiveId> — ავტომ. ჩატვირთვა.
+  // მოთხოვნის წერილში ჩასმული ლინკიდან გახსნისთვის. საწყისი load-ის შემდეგ.
+  useEffect(() => {
+    if (!loaded) return;
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get("project");
+    if (!pid) return;
+    (async () => {
+      try {
+        const s = await loadArchiveEntry(pid);
+        setState((cur) => ({ ...normalizeAppState(s), pageVisibility: cur.pageVisibility }));
+        setLoadedArchiveId(pid);
+        logActivity(actorName, role, "პროექტის გახსნა ბმულით", pid);
+        // URL-ის გასუფთავება, რომ reload-ზე თავიდან არ ჩაიტვირთოს.
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch (e) {
+        console.error("[project-link] load failed", e);
+        alert("ბმულით მითითებული პროექტი ვერ გაიხსნა (შესაძლოა წაშლილია ან წვდომა არ გაქვთ).");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   const eco = computeEconomics(state);
   // ორივე კოდით ყველა მონაცემი და ტაბი სრულად ხელმისაწვდომია (დეტალური
