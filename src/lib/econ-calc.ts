@@ -145,6 +145,18 @@ export function distributeByFactoryPrice(units: Unit[], total: number): Map<stri
   return map;
 }
 
+// ბანკის საკომისიო — თანაბრად იყოფა დანადგარებზე, თითო მინიმუმ minPerUnit ($).
+// perUnit = max(total / N, minPerUnit). ჯამი შესაბამისად იზრდება, თუ floor მოქმედებს.
+export function distributeEqualWithMin(units: Unit[], total: number, minPerUnit: number): Map<string, number> {
+  const map = new Map<string, number>();
+  const n = units.length;
+  if (n === 0) return map;
+  const perUnit = Math.max(total / n, minPerUnit);
+  const rounded = Math.round(perUnit * 100) / 100;
+  units.forEach((u) => map.set(u.id, rounded));
+  return map;
+}
+
 export interface UnitAllocations {
   bank: number;
   intTransport: number;
@@ -162,7 +174,7 @@ export function allocateProjectCosts(state: AppState): {
   const units = activeUnits(state.project.units);
   const p = state.project;
   return {
-    bank: distributeByFactoryPrice(units, p.bankCommissionTotal),
+    bank: distributeEqualWithMin(units, p.bankCommissionTotal, state.defaultRates?.bankCommissionMinPerUnit ?? 25),
     intTransport: distributeByFactoryPrice(units, p.intTransportTotal),
     terminal: distributeByFactoryPrice(units, p.terminalTotal),
     localTransport: distributeByFactoryPrice(units, p.localTransportTotal),
