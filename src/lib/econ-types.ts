@@ -199,7 +199,8 @@ export interface ManualColumns {
 // დანადგარი/პროექტი ამ მნიშვნელობებით იწყება; კონკრეტულ დანადგარზე per-unit
 // კორექტირება რჩება ("შესატანი მონაცემები" ტაბზე).
 export interface DefaultRates {
-  equipmentMarkupPct: number; // დანადგარის ფასნამატი %
+  equipmentMarkupPct: number; // დანადგარის ფასნამატი % (fallback, თუ ბრენდი უცნობია)
+  brandMarkups: Record<string, number>; // ბრენდი → ფასნამატი % (ბრენდის მიხედვით)
   installMarkupPct: number;   // მონტაჟის ფასნამატი %
   contingencyPct: number;     // გაუთვალისწინებელი ხარჯი %
   overheadPct: number;        // ზედნადები ხარჯი %
