@@ -17,6 +17,7 @@ interface StoreShape {
   updateProject: (patch: Partial<AppState["project"]>) => void;
   updateFinance: (patch: Partial<AppState["finance"]>) => void;
   updateDefaultRates: (patch: Partial<AppState["defaultRates"]>) => void;
+  setBrandMarkup: (brand: string, pct: number) => void;
   updatePayment: (patch: Partial<AppState["payment"]>) => void;
   setManualCell: (col: "finalOffer" | "factual", lineKey: string, value: number | null) => void;
   updateUnit: (id: string, patch: Partial<Unit>) => void;
@@ -124,6 +125,15 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     set((s) => ({ state: { ...s.state, defaultRates: { ...s.state.defaultRates, ...patch } } }));
     scheduleSave(get);
   },
+  setBrandMarkup: (brand, pct) => {
+    set((s) => {
+      const brandMarkups = { ...(s.state.defaultRates.brandMarkups ?? {}), [brand]: pct };
+      // ამავე ბრენდის არსებულ დანადგარებზეც განვაახლოთ ფასნამატი %.
+      const units = s.state.project.units.map((u) => (u.brand === brand ? { ...u, equipmentMarkupPct: pct } : u));
+      return { state: { ...s.state, defaultRates: { ...s.state.defaultRates, brandMarkups }, project: { ...s.state.project, units } } };
+    });
+    scheduleSave(get);
+  },
   setManualCell: (col, lineKey, value) => {
     set((s) => {
       const current = { ...(s.state.manualColumns?.[col] ?? {}) };
@@ -217,15 +227,25 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     scheduleSave(get);
   },
   updateUnit: (id, patch) => {
-    set((s) => ({
-      state: {
-        ...s.state,
-        project: {
-          ...s.state.project,
-          units: s.state.project.units.map((u) => (u.id === id ? { ...u, ...patch } : u)),
+    set((s) => {
+      const dr = s.state.defaultRates;
+      // ბრენდის შეცვლისას — ავტომ. ჩაისვას იმ ბრენდის ფასნამატი %
+      // (თუ ბრენდზე ცალკე % არ არის, რჩება ზოგადი equipmentMarkupPct).
+      let effPatch = patch;
+      if (patch.brand !== undefined && dr?.brandMarkups) {
+        const bm = dr.brandMarkups[patch.brand];
+        if (bm !== undefined) effPatch = { ...patch, equipmentMarkupPct: bm };
+      }
+      return {
+        state: {
+          ...s.state,
+          project: {
+            ...s.state.project,
+            units: s.state.project.units.map((u) => (u.id === id ? { ...u, ...effPatch } : u)),
+          },
         },
-      },
-    }));
+      };
+    });
     scheduleSave(get);
   },
   addUnit: () => {
