@@ -140,7 +140,7 @@ export const defaultAppState: AppState = {
   profitThresholds: defaultProfitThresholds,
   pageVisibility: { input: true, economics: true, payment: true, tariffs: false, analytics: false },
   manualColumns: { finalOffer: {}, factual: {} },
-  defaultRates: { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, contingencyPct: 0.03, overheadPct: 0, fxRiskPct: 0.02 },
+  defaultRates: { equipmentMarkupPct: 0.03, installMarkupPct: 0.50, contingencyPct: 0.03, overheadPct: 0, fxRiskPct: 0.02, bankCommissionMinPerUnit: 25 },
 };
 
 export const emptyUnit = mkUnit;
