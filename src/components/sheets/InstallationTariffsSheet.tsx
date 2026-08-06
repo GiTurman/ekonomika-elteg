@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { NumberInput, PercentInput, TextInput, fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 import { EQUIPMENT_CATEGORY_LABEL, type EquipmentCategory } from "@/lib/econ-types";
 import { listTariffRules, updateTariffRule, deleteTariffRule, createTariffRule, type TariffRule } from "@/lib/installTariffRules";
+import { listDropdownOptions } from "@/lib/dropdownOptions";
 import { logActivity } from "@/lib/activityLog";
 import { Loader2, RefreshCw, Trash2, Plus } from "lucide-react";
 
@@ -21,10 +22,11 @@ function rangeLabel(min: number | null, max: number | null, unit: string): strin
 
 export function InstallationTariffsSheet() {
   const { isFull, actorName, role } = useAccessRole();
-  const { state, setProfitThreshold, updateDefaultRates, updateFinance } = useEconStore();
+  const { state, setProfitThreshold, updateDefaultRates, updateFinance, setBrandMarkup } = useEconStore();
   const dr = state.defaultRates;
   const f = state.finance;
   const [rules, setRules] = useState<TariffRule[]>([]);
+  const [brandOpts, setBrandOpts] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +44,11 @@ export function InstallationTariffsSheet() {
   };
 
   useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    listDropdownOptions()
+      .then((list) => setBrandOpts(list.find((o) => o.fieldKey === "brand")?.options ?? []))
+      .catch((e) => console.error("[tariffs] brand options load failed", e));
+  }, []);
 
   const commit = async (rule: TariffRule, patch: Partial<TariffRule>, logNote?: string) => {
     setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, ...patch } : r)));
@@ -222,7 +229,20 @@ export function InstallationTariffsSheet() {
           <Table>
             <TableBody>
               <TableRow>
-                <TableCell>დანადგარის ფასნამატი %</TableCell>
+                <TableCell colSpan={2} className="font-semibold text-sm pt-4">დანადგარის ფასნამატი % — ბრენდის მიხედვით</TableCell>
+              </TableRow>
+              {brandOpts.map((brand) => (
+                <TableRow key={brand}>
+                  <TableCell className="pl-6">{brand}</TableCell>
+                  <TableCell className="text-right w-40">
+                    {isFull ? (
+                      <PercentInput value={dr.brandMarkups?.[brand] ?? dr.equipmentMarkupPct} onChange={(v) => setBrandMarkup(brand, v)} />
+                    ) : <div className={"text-right " + computedCls}>{fmtPct(dr.brandMarkups?.[brand] ?? dr.equipmentMarkupPct)}</div>}
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow>
+                <TableCell className="pl-6 text-muted-foreground">სხვა / უცნობი ბრენდი (default)</TableCell>
                 <TableCell className="text-right w-40">
                   {isFull ? (
                     <PercentInput value={dr.equipmentMarkupPct} onChange={(v) => updateDefaultRates({ equipmentMarkupPct: v })} />
