@@ -565,3 +565,43 @@ export function suggestPaymentExpenses(state: AppState, which: "A" | "B"): { lab
   });
   return out;
 }
+
+// გაყიდვების როლისთვის: დანადგარის ფასნამატის კორექტირებისას მიღებული მარჟა
+// კატეგორიის მინიმალურ მარჟაზე (profitThresholds[cat].minMarginPct) ვერ უნდა ჩამოვიდეს.
+// მარჟა მონოტონურად იზრდება ფასნამატთან ერთად, ამიტომ მინიმალურ დასაშვებ ფასნამატს
+// ვპოულობთ ბინარული ძებნით, თვითონ ძრავის (computeEconomics) გამოყენებით — ფორმულის
+// ცვლილებაზეც სწორი რჩება. აბრუნებს დასაშვებ ფასნამატს და clamped დროშას.
+export function clampEquipmentMarkup(
+  state: AppState,
+  unitId: string,
+  desiredPct: number,
+  minMarginPct: number,
+): { pct: number; clamped: boolean; minPct: number } {
+  if (!(minMarginPct > 0)) return { pct: desiredPct, clamped: false, minPct: 0 };
+
+  const marginAt = (pct: number): number => {
+    const next: AppState = {
+      ...state,
+      project: {
+        ...state.project,
+        units: state.project.units.map((u) => (u.id === unitId ? { ...u, equipmentMarkupPct: pct } : u)),
+      },
+    };
+    const ue = computeEconomics(next).units.find((x) => x.id === unitId);
+    return ue ? ue.marginPct : 1;
+  };
+
+  if (marginAt(desiredPct) >= minMarginPct) return { pct: desiredPct, clamped: false, minPct: desiredPct };
+
+  // ზედა ზღვრის მოძებნა, სადაც მარჟა უკვე აკმაყოფილებს მინიმუმს
+  let hi = Math.max(desiredPct, 0.0001);
+  let guard = 0;
+  while (marginAt(hi) < minMarginPct && guard++ < 40) hi = hi * 2 + 0.01;
+  let lo = desiredPct;
+  for (let i = 0; i < 32; i++) {
+    const mid = (lo + hi) / 2;
+    if (marginAt(mid) >= minMarginPct) hi = mid; else lo = mid;
+  }
+  const minPct = Math.ceil(hi * 10000) / 10000; // ზევით ვამრგვალებთ, რომ იატაკს არ ჩამოსცდეს
+  return { pct: minPct, clamped: true, minPct };
+}

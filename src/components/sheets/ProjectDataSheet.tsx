@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumberInput, PercentInput, TextInput, fmtUsd, fmtPct, computedCls } from "./sheet-ui";
-import { allocateProjectCosts } from "@/lib/econ-calc";
+import { allocateProjectCosts, clampEquipmentMarkup } from "@/lib/econ-calc";
 import { EQUIPMENT_CATEGORY_LABEL, EQUIPMENT_CATEGORY_PREFIX, PROJECT_STATUS_LABEL, type EquipmentCategory, type ProjectStatus, type Unit } from "@/lib/econ-types";
 import { Plus, Trash2 } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
@@ -90,6 +90,25 @@ export function ProjectDataSheet() {
   const seeDistanceFuel = canSeeField("travel.distanceFuel");
 
   const [dropdownOpts, setDropdownOpts] = useState<Record<string, string[]>>({});
+  const [markupWarn, setMarkupWarn] = useState<Record<string, number>>({});
+
+  // გაყიდვების როლი: დანადგარის ფასნამატის შემცირებისას მიღებული მარჟა ტარიფებში
+  // დადგენილ მინიმალურ მარჟაზე ვერ ჩამოვა — ავტომატურად ეყრდნობა მინ. დასაშვებ ფასნამატს.
+  // ფინანსები (full) შეზღუდვის გარეშე რედაქტირებს.
+  const handleRateChange = (u: Unit, key: keyof Unit, v: number) => {
+    if (key === "equipmentMarkupPct" && !isFull) {
+      const minM = state.profitThresholds?.[u.category]?.minMarginPct ?? 0;
+      const { pct, clamped } = clampEquipmentMarkup(state, u.id, v, minM);
+      updateUnit(u.id, { equipmentMarkupPct: pct });
+      setMarkupWarn((w) => {
+        const n = { ...w };
+        if (clamped) n[u.id] = minM; else delete n[u.id];
+        return n;
+      });
+    } else {
+      updateUnit(u.id, { [key]: v } as any);
+    }
+  };
   useEffect(() => {
     listDropdownOptions()
       .then((list) => setDropdownOpts(Object.fromEntries(list.map((o) => [o.fieldKey, o.options]))))
@@ -451,11 +470,16 @@ export function ProjectDataSheet() {
                     <TableCell key={c.key} className="p-1 min-w-[110px]">
                       {canEditField("unit." + c.key) ? (
                         c.kind === "pct"
-                          ? <PercentInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
-                          : <NumberInput value={u[c.key] as number} onChange={(v) => updateUnit(u.id, { [c.key]: v } as any)} />
+                          ? <PercentInput value={u[c.key] as number} onChange={(v) => handleRateChange(u, c.key, v)} />
+                          : <NumberInput value={u[c.key] as number} onChange={(v) => handleRateChange(u, c.key, v)} />
                       ) : (
                         <div className={"text-right " + computedCls}>
                           {c.kind === "pct" ? fmtPct(u[c.key] as number) : (u[c.key] as number)}
+                        </div>
+                      )}
+                      {c.key === "equipmentMarkupPct" && markupWarn[u.id] !== undefined && (
+                        <div className="mt-1 text-[10px] leading-tight text-destructive">
+                          მინ. მარჟა {fmtPct(markupWarn[u.id])} — ფასნამატი დაყენდა მინ. დასაშვებზე
                         </div>
                       )}
                     </TableCell>
