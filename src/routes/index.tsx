@@ -15,6 +15,7 @@ import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
 import { PlanSheet } from "@/components/sheets/PlanSheet";
 import { ComparisonSheet } from "@/components/sheets/ComparisonSheet";
 import { ArchiveSheet } from "@/components/sheets/ArchiveSheet";
+import { VsActualSheet } from "@/components/sheets/VsActualSheet";
 import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye, X, LogOut, User } from "lucide-react";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
@@ -89,6 +90,7 @@ function Index() {
   const showPlanTab = isFull || canViewPage("plan");
   const showComparisonTab = isFull || canViewPage("comparison");
   const showArchiveTab = isFull || canViewPage("archive");
+  const showVsActualTab = isFull || canViewPage("vs_actual");
 
   const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : showComparisonTab ? "comparison" : showArchiveTab ? "archive" : "analytics";
 
@@ -209,6 +211,7 @@ function Index() {
           {showEconomicsTab && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
           {showComparisonTab && <TabsTrigger value="comparison">შედარება</TabsTrigger>}
           {showArchiveTab && <TabsTrigger value="archive">არქივი</TabsTrigger>}
+          {showVsActualTab && <TabsTrigger value="vs_actual">VS ფაქტი</TabsTrigger>}
           {showPaymentTab && <TabsTrigger value="payment">გადახდის გრაფიკი</TabsTrigger>}
           {showTariffsTab && <TabsTrigger value="tariffs">ტარიფები</TabsTrigger>}
           {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
@@ -270,6 +273,7 @@ function Index() {
             {showEconomicsTab && <TabsContent value="economics"><EconomicsSheet /></TabsContent>}
             {showComparisonTab && <TabsContent value="comparison"><ComparisonSheet /></TabsContent>}
             {showArchiveTab && <TabsContent value="archive"><ArchiveSheet /></TabsContent>}
+            {showVsActualTab && <TabsContent value="vs_actual"><VsActualSheet /></TabsContent>}
             {showPaymentTab && <TabsContent value="payment"><PaymentScheduleSheet /></TabsContent>}
             {showTariffsTab && <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>}
             {showAnalyticsTab && <TabsContent value="analytics"><AnalyticsSheet mode="final" /></TabsContent>}
