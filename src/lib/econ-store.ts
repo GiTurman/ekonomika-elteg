@@ -337,7 +337,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     // ფორმა იხსნება — საერთო Supabase-ის "ცოცხალი" მდგომარეობა არასდროს იტვირთება,
     // რომ სხვის დაუმთავრებელ ნამუშევარს არასდროს ხედავდე.
     const draft = loadDraft(userId);
-    set({ state: draft ?? blankAppState(), loaded: true, loadedArchiveId: draft ? loadArchiveId(userId) : null });
+    set({ state: draft ? migrateSavedState(draft) : blankAppState(), loaded: true, loadedArchiveId: draft ? loadArchiveId(userId) : null });
   },
 
   save: async () => {
@@ -352,6 +352,18 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     }
   },
 }));
+
+function migrateSavedState(s: AppState): AppState {
+  // ძველ state-ში კვების ერთი გლობალური განაკვეთი (mealPerDay) per-group ველებში გადავიტანოთ,
+  // რომ input-ებიც და გამოთვლაც თანხმდებოდეს. Idempotent.
+  const f = s?.finance as any;
+  if (f && f.mealMechanics === undefined && typeof f.mealPerDay === "number") {
+    f.mealMechanics = f.mealPerDay;
+    f.mealElectricians = f.mealPerDay;
+    f.mealAdmin = f.mealPerDay;
+  }
+  return s;
+}
 
 function scheduleSave(get: () => StoreShape) {
   // ლოკალური დრაფტი მყისიერად (და უფასოდ) ინახება — refresh-ისას არაფერი არ

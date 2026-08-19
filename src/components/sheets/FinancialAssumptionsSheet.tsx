@@ -78,12 +78,24 @@ export function FinancialAssumptionsSheet() {
         <CardHeader><CardTitle>3. მივლინების განაკვეთები (ლარში)</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
-            {canSeeField("finance.mealPerDay") && (
-              <label className="grid gap-1"><span className="text-xs text-muted-foreground">კვების ხარჯი დღეში, ერთ კაცზე</span>
-                {canEditField("finance.mealPerDay") ? (
-                  <NumberInput value={f.mealPerDay} onChange={(v) => updateFinance({ mealPerDay: v })} />
-                ) : <div className={computedCls}>{fmtGel(f.mealPerDay)}</div>}
-              </label>
+            {canSeeField("finance.mealRates") && (
+              <>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">კვების დღიური ტარიფი — მექანიკოსები (₾/დღე, ერთ კაცზე)</span>
+                  {canEditField("finance.mealRates") ? (
+                    <NumberInput value={f.mealMechanics} onChange={(v) => updateFinance({ mealMechanics: v })} />
+                  ) : <div className={computedCls}>{fmtGel(f.mealMechanics)}</div>}
+                </label>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">კვების დღიური ტარიფი — ელექტრიკოსები (₾/დღე, ერთ კაცზე)</span>
+                  {canEditField("finance.mealRates") ? (
+                    <NumberInput value={f.mealElectricians} onChange={(v) => updateFinance({ mealElectricians: v })} />
+                  ) : <div className={computedCls}>{fmtGel(f.mealElectricians)}</div>}
+                </label>
+                <label className="grid gap-1"><span className="text-xs text-muted-foreground">კვების დღიური ტარიფი — ადმინისტრაცია (₾/დღე, ერთ კაცზე)</span>
+                  {canEditField("finance.mealRates") ? (
+                    <NumberInput value={f.mealAdmin} onChange={(v) => updateFinance({ mealAdmin: v })} />
+                  ) : <div className={computedCls}>{fmtGel(f.mealAdmin)}</div>}
+                </label>
+              </>
             )}
             {canSeeField("finance.fuelPricePerL") && (
               <label className="grid gap-1"><span className="text-xs text-muted-foreground">საწვავის ფასი, 1 ლ (დღგ-ით)</span>

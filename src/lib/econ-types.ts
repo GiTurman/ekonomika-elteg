@@ -113,7 +113,10 @@ export interface FinancialAssumptions {
   incomeTaxRate: number; // 0.20 (საშემოსავლო)
   pensionRate: number;   // 0.04 (საპენსიო)
   // Travel per-diem rates (GEL)
-  mealPerDay: number;
+  mealPerDay?: number;        // deprecated — ძველ ჩანაწერებთან თავსებადობისთვის; იყო ერთი გლობალური განაკვეთი
+  mealMechanics: number;      // კვების დღიური ტარიფი — მექანიკოსები (₾/დღე, ერთ კაცზე)
+  mealElectricians: number;   // კვების დღიური ტარიფი — ელექტრიკოსები (₾/დღე, ერთ კაცზე)
+  mealAdmin: number;          // კვების დღიური ტარიფი — ადმინისტრაცია (₾/დღე, ერთ კაცზე)
   hotelMechanics: number;   // სასტუმროს დღიური ტარიფი — მექანიკოსები (₾/დღე)
   hotelElectricians: number; // სასტუმროს დღიური ტარიფი — ელექტრიკოსები (₾/დღე)
   hotelAdmin: number;        // სასტუმროს დღიური ტარიფი — ადმინისტრაცია (₾/დღე)

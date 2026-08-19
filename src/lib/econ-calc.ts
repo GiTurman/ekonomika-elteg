@@ -188,8 +188,14 @@ export function computeTravel(state: AppState): TravelBreakdown {
 
   const fuelPerKm = (f.fuelPricePerL * t.fuelConsumption) / 100; // C24
 
-  const meal = (g: { headcount: number; days: number }) =>
-    f.mealPerDay * g.headcount * g.days;
+  // per-group meal daily rate (GEL, per person). back-compat: ძველი გლობალური mealPerDay-ზე დაცემა.
+  const mealRate = {
+    mechanics: f.mealMechanics ?? f.mealPerDay ?? 0,
+    electricians: f.mealElectricians ?? f.mealPerDay ?? 0,
+    admin: f.mealAdmin ?? f.mealPerDay ?? 0,
+  };
+  const meal = (g: { headcount: number; days: number }, rate: number) =>
+    rate * g.headcount * g.days;
   const fuel = (g: { trips: number }) =>
     t.distanceKm * 2 * g.trips * fuelPerKm;
   // "hotel" mode: daily tariff (finance.hotelX) × days. "house" mode: flat monthly total.
@@ -197,9 +203,9 @@ export function computeTravel(state: AppState): TravelBreakdown {
     g.accommodationMode === "hotel" ? dailyRate * g.days : g.houseRentTotal;
 
   const meals = {
-    mechanics: meal(t.mechanics),
-    electricians: meal(t.electricians),
-    admin: meal(t.admin),
+    mechanics: meal(t.mechanics, mealRate.mechanics),
+    electricians: meal(t.electricians, mealRate.electricians),
+    admin: meal(t.admin, mealRate.admin),
     total: 0,
   };
   meals.total = meals.mechanics + meals.electricians + meals.admin;

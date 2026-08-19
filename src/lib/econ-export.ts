@@ -110,7 +110,9 @@ export function exportToXlsx(state: AppState) {
   const pctRowEnd2 = s2.length - 1;
   s2.push([]);
   const perDiemRowStart2 = s2.length;
-  s2.push(["კვება/დღე", f.mealPerDay]);
+  s2.push(["კვების დღიური ტარიფი-მექანიკოსები", f.mealMechanics ?? f.mealPerDay ?? 0]);
+  s2.push(["კვების დღიური ტარიფი-ელექტრიკოსები", f.mealElectricians ?? f.mealPerDay ?? 0]);
+  s2.push(["კვების დღიური ტარიფი-ადმინი", f.mealAdmin ?? f.mealPerDay ?? 0]);
   s2.push(["საწვავი ₾/ლ", f.fuelPricePerL]);
   s2.push(["სასტუმროს დღიური ტარიფი-მექანიკოსები", f.hotelMechanics]);
   s2.push(["სასტუმროს დღიური ტარიფი-ელექტრიკოსები", f.hotelElectricians]);
