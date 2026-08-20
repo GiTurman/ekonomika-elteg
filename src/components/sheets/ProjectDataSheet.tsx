@@ -120,6 +120,19 @@ export function ProjectDataSheet() {
     listTariffRules().catch((e) => { console.error("[tariffs] load failed", e); return []; }).then(setTariffRules);
   }, []);
 
+  // არსებული lift-დანადგარები, რომლებსაც sales-განაკვეთი ჯერ არ აქვთ (ფუნქცია მოგვიანებით
+  // დაემატა), ავტომატურად აიღებენ მას შესაბამისი ტარიფიდან — მხოლოდ sales-ველი, რეალურ
+  // განაკვეთს არ ვცვლით. Loop-safe: ერთხელ შევსების შემდეგ აღარ ისვრება.
+  useEffect(() => {
+    if (tariffRules.length === 0) return;
+    for (const u of state.project.units) {
+      if (u.mechRateSalesGel !== undefined || u.elecRateSalesGel !== undefined) continue;
+      if (u.category !== "lift") continue;
+      const rule = findMatchingLiftRule(tariffRules, u.capacity, u.floors);
+      if (rule) updateUnit(u.id, { mechRateSalesGel: rule.mechRateSales, elecRateSalesGel: rule.elecRateSales });
+    }
+  }, [tariffRules, state.project.units]);
+
   // გამყიდველების სია (sales როლი) — პროექტის "გამყიდველი" ველისთვის
   const [salesUsers, setSalesUsers] = useState<AppUser[]>([]);
   useEffect(() => {
