@@ -55,6 +55,8 @@ const UNIT_FINANCIAL_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; l
 const UNIT_RATE_COLS: Array<{ key: keyof import("@/lib/econ-types").Unit; label: string; kind: "num" | "pct" }> = [
   { key: "mechRateGel", label: "მონტაჟი ($/სართული)", kind: "num" },
   { key: "elecRateGel", label: "ელექტრომონტაჟი ($/სართული)", kind: "num" },
+  { key: "mechRateSalesGel", label: "მონტაჟი გაყიდვ. ($/სართ.)", kind: "num" },
+  { key: "elecRateSalesGel", label: "ელ.მონტაჟი გაყიდვ. ($/სართ.)", kind: "num" },
   { key: "equipmentMarkupPct", label: "დანადგარის ფასნამატი %", kind: "pct" },
   { key: "installMarkupPct", label: "მონტაჟის ფასნამატი %", kind: "pct" },
   { key: "contingencyPct", label: "გაუთვალისწინებელი %", kind: "pct" },
@@ -75,7 +77,7 @@ export function ProjectDataSheet() {
   const canEditStartDate = isFull || !p.startDate;
   const visibleUnitCols = UNIT_COLS.filter((c) => canSeeField("unit." + c.key));
   const visibleFinCols = UNIT_FINANCIAL_COLS.filter((c) => canSeeField("unit." + c.key));
-  const visibleRateCols = UNIT_RATE_COLS.filter((c) => canSeeField("unit." + c.key));
+  const visibleRateCols = UNIT_RATE_COLS.filter((c) => canSeeField("unit." + c.key) && (isFull || (c.key !== "mechRateSalesGel" && c.key !== "elecRateSalesGel")));
   const seeCategory = canSeeField("unit.category");
   const seeBank = canSeeField("project.bankCommissionTotal");
   const seeIntTransport = canSeeField("project.intTransportTotal");
