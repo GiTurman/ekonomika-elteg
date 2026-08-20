@@ -130,7 +130,7 @@ export function ProjectDataSheet() {
   // მიხედვით) მონტაჟისა და ელექტრომონტაჟის განაკვეთები ავსებს ამ სტანდარტული
   // ტარიფიდან. ხელით შესწორება შემდეგაც შესაძლებელია.
   const applyTariff = (unitId: string, rule: TariffRule) => {
-    updateUnit(unitId, { mechRateGel: rule.mechRate, elecRateGel: rule.elecRate });
+    updateUnit(unitId, { mechRateGel: rule.mechRate, elecRateGel: rule.elecRate, mechRateSalesGel: rule.mechRateSales, elecRateSalesGel: rule.elecRateSales });
   };
 
   // "2. დანადგარების ცხრილში" კატეგორიის/ტვირთამწეობის/სართულების შევსებისას
@@ -145,7 +145,7 @@ export function ProjectDataSheet() {
       const next = { ...u, ...patch };
       if (next.category === "lift") {
         const rule = findMatchingLiftRule(tariffRules, next.capacity, next.floors);
-        if (rule) finalPatch = { ...patch, mechRateGel: rule.mechRate, elecRateGel: rule.elecRate };
+        if (rule) finalPatch = { ...patch, mechRateGel: rule.mechRate, elecRateGel: rule.elecRate, mechRateSalesGel: rule.mechRateSales, elecRateSalesGel: rule.elecRateSales };
       }
     }
     updateUnit(unitId, finalPatch);

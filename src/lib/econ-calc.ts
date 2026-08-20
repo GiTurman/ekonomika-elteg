@@ -61,6 +61,7 @@ export interface ProjectReport {
   // Extras
   contingency: number; // D62
   overhead: number; // ზედნადები ხარჯი — H × overheadPct (გაუთვალისწინებელის შემდეგ)
+  salesBuffer: number; // გაყიდვების ტარიფის ბუფერი (sales rate − real) — overhead-ში, markup-ნეიტრალური
   fxRisk: number; // D63
   otherTotal: number; // D64
   groundingTotal: number; // D65
@@ -295,6 +296,15 @@ export function computeEconomics(state: AppState): FullEconomics {
   // დაცვის მიზნით ნაგულისხმევებზე ვბრუნდებით, რომ გაანგარიშება არასდროს ავარდეს.
   const thresholds = state.profitThresholds ?? defaultProfitThresholds;
 
+  const bufGross = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
+  // გაყიდვების ტარიფის ბუფერი per unit: (sales rate − real) × სართული × დარიცხვები.
+  // მხოლოდ დადებითი (sales ≥ real); sales-განაკვეთის გარეშე default 0 → ქცევა უცვლელი.
+  const salesBufferOf = (u: Unit) =>
+    u.floors * bufGross * (
+      Math.max((u.mechRateSalesGel ?? 0) - u.mechRateGel, 0) +
+      Math.max((u.elecRateSalesGel ?? 0) - u.elecRateGel, 0)
+    );
+
   // First pass — compute everything except projectShare
   const rows: UnitEconomics[] = units.map((u) => {
     const category: EquipmentCategory = u.category ?? "lift";
@@ -307,6 +317,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     const I =
       H * u.contingencyPct +
       H * (u.overheadPct ?? 0) +
+      salesBufferOf(u) +
       (u.factoryPrice + allocated.bank) * u.fxRiskPct +
       u.otherCost +
       u.grounding +
@@ -398,12 +409,13 @@ export function computeEconomics(state: AppState): FullEconomics {
     const H = D + E + D * u.equipmentMarkupPct + E * u.installMarkupPct;
     return s + H * u.contingencyPct;
   }, 0);
+  const salesBuffer = units.reduce((s, u) => s + salesBufferOf(u), 0);
   const overhead = units.reduce((s, u) => {
     const D = purchaseCostOf(u);
     const E = installCostOf(u);
     const H = D + E + D * u.equipmentMarkupPct + E * u.installMarkupPct;
     return s + H * (u.overheadPct ?? 0);
-  }, 0);
+  }, 0) + salesBuffer;
   const fxRisk = units.reduce((s, u) => s + (u.factoryPrice + (alloc.bank.get(u.id) ?? 0)) * u.fxRiskPct, 0);
   const otherTotal = units.reduce((s, u) => s + u.otherCost, 0);
   const groundingTotal = units.reduce((s, u) => s + u.grounding, 0);
@@ -454,6 +466,7 @@ export function computeEconomics(state: AppState): FullEconomics {
     priceNoExtras: reportPriceNoExtras,
     contingency,
     overhead,
+    salesBuffer,
     fxRisk,
     otherTotal,
     groundingTotal,

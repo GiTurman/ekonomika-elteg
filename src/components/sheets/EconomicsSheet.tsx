@@ -214,7 +214,7 @@ export function EconomicsSheet() {
               ]},
               { title: "დამატებითი ხარჯები", blockKey: "extras", rows: [
                 ["გაუთვალისწინებელი ხარჯი", eco.report.contingency],
-                ["ზედნადები ხარჯი", eco.report.overhead],
+                ...(isFull ? ([["ზედნადები ხარჯი", eco.report.overhead]] as Array<[string, number, boolean?]>) : []),
                 ["საბანკო სავალუტო რისკი", eco.report.fxRisk],
                 ["სხვა ხარჯები", eco.report.otherTotal],
                 ["დამიწება/ზედამხედველობა", eco.report.groundingTotal],

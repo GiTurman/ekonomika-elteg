@@ -79,7 +79,7 @@ export function InstallationTariffsSheet() {
     if (!label || !label.trim()) return;
     const id = `${category}_${Date.now()}`;
     try {
-      await createTariffRule({ id, label: label.trim(), category, mechRate: 0, elecRate: 0, capMin: null, capMax: null, floorMin: null, floorMax: null, note: null });
+      await createTariffRule({ id, label: label.trim(), category, mechRate: 0, elecRate: 0, mechRateSales: 0, elecRateSales: 0, capMin: null, capMax: null, floorMin: null, floorMax: null, note: null });
       await refresh();
       logActivity(actorName, role, "ახალი სატარიფო ხაზის დამატება", label.trim());
     } catch (e) {
@@ -134,6 +134,8 @@ export function InstallationTariffsSheet() {
                       <TableHead>დასახელება</TableHead>
                       <TableHead className="text-right">მექ. $/სართ.</TableHead>
                       <TableHead className="text-right">ელ. $/სართ.</TableHead>
+                      <TableHead className="text-right">მექ. გაყიდვ.</TableHead>
+                      <TableHead className="text-right">ელ. გაყიდვ.</TableHead>
                       <TableHead>ტვირთამწეობა</TableHead>
                       <TableHead>სართული</TableHead>
                       {isFull && <TableHead />}
@@ -157,6 +159,20 @@ export function InstallationTariffsSheet() {
                             <NumberInput value={r.elecRate} onChange={(v) => commit(r, { elecRate: v }, "ტარიფის განახლება")} />
                           ) : (
                             <div className={"text-right " + computedCls}>{fmtUsd(r.elecRate)}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="p-1 w-28">
+                          {isFull ? (
+                            <NumberInput value={r.mechRateSales} onChange={(v) => commit(r, { mechRateSales: v }, "გაყიდვების ტარიფის განახლება")} />
+                          ) : (
+                            <div className={"text-right " + computedCls}>{fmtUsd(r.mechRateSales)}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="p-1 w-28">
+                          {isFull ? (
+                            <NumberInput value={r.elecRateSales} onChange={(v) => commit(r, { elecRateSales: v }, "გაყიდვების ტარიფის განახლება")} />
+                          ) : (
+                            <div className={"text-right " + computedCls}>{fmtUsd(r.elecRateSales)}</div>
                           )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{rangeLabel(r.capMin, r.capMax, "კგ")}</TableCell>

@@ -51,6 +51,9 @@ export interface Unit {
   // Labor rates (₾/floor, net take-home) — per unit
   mechRateGel: number;
   elecRateGel: number;
+  // გაყიდვების ტარიფი (₾/floor) — ტარიფებიდან ისხმება; real-ზე მაღალი = ბუფერი (overhead-ში).
+  mechRateSalesGel?: number;
+  elecRateSalesGel?: number;
 
   // Margin & risk parameters — per unit
   equipmentMarkupPct: number;
