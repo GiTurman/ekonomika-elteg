@@ -196,6 +196,9 @@ function PlanBlock({
                     <TableHead className="text-right">შესრულება</TableHead>
                     <TableHead className="text-right">გადახრა</TableHead>
                     <TableHead className="text-right">დანაკლისი</TableHead>
+                    <TableHead className="text-right">ნაზარდი გეგმა</TableHead>
+                    <TableHead className="text-right">ნაზარდი ფაქტი</TableHead>
+                    <TableHead className="text-right">ნაზარდი გადახრა</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -204,6 +207,10 @@ function PlanBlock({
                     const act = sumActual(scope, q);
                     const dev = act - plan;
                     const short = dev < 0 ? -dev : 0;
+                    // ნაზარდი (კუმულატიური) — Q1-დან მიმდინარე კვარტლამდე
+                    const cumPlan = [1, 2, 3, 4].filter((k) => k <= q).reduce((s, k) => s + sumPlan(scope, k), 0);
+                    const cumAct = [1, 2, 3, 4].filter((k) => k <= q).reduce((s, k) => s + sumActual(scope, k), 0);
+                    const cumDev = cumAct - cumPlan;
                     return (
                       <TableRow key={q}>
                         <TableCell>Q{q}</TableCell>
@@ -217,6 +224,9 @@ function PlanBlock({
                         <TableCell className={"text-right " + linkedCls}>{fmtUsd(act)}</TableCell>
                         <TableCell className={"text-right " + (dev < 0 ? "text-red-600" : "text-emerald-600")}>{fmtUsd(dev)}</TableCell>
                         <TableCell className="text-right text-red-600">{short ? fmtUsd(short) : "—"}</TableCell>
+                        <TableCell className={"text-right " + computedCls}>{fmtUsd(cumPlan)}</TableCell>
+                        <TableCell className={"text-right " + linkedCls}>{fmtUsd(cumAct)}</TableCell>
+                        <TableCell className={"text-right " + (cumDev < 0 ? "text-red-600" : "text-emerald-600")}>{fmtUsd(cumDev)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -226,6 +236,9 @@ function PlanBlock({
                     <TableCell className={"text-right " + linkedCls}>{fmtUsd(yearActual)}</TableCell>
                     <TableCell className={"text-right " + (yearDev < 0 ? "text-red-600" : "text-emerald-600")}>{fmtUsd(yearDev)}</TableCell>
                     <TableCell className="text-right text-red-600">{yearShort ? fmtUsd(yearShort) : "—"}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(yearPlan)}</TableCell>
+                    <TableCell className={"text-right " + linkedCls}>{fmtUsd(yearActual)}</TableCell>
+                    <TableCell className={"text-right " + (yearDev < 0 ? "text-red-600" : "text-emerald-600")}>{fmtUsd(yearDev)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
