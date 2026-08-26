@@ -16,12 +16,14 @@ import { logActivity } from "@/lib/activityLog";
 const SCOPES: PlanScope[] = ["overall", "kleemann", "hitachi"];
 
 // ბრენდის ნორმალიზება (იგივე, რაც ანალიტიკაში — Hitach→Hitachi, KLEEMANN→Kleemann)
-const BRAND_ALIASES: Record<string, string> = { hitach: "Hitachi", hitachi: "Hitachi", kleemann: "Kleemann" };
+// substring-ით ვცნობთ, რომ "kleemann china", "FUJI HITECH", "KLEEMANN/HITACHI" და მისთ. სწორად დაჯგუფდეს.
 function normBrand(raw: string): string {
   const t = (raw || "").trim();
   if (!t) return "";
-  const a = BRAND_ALIASES[t.toLowerCase()];
-  if (a) return a;
+  const low = t.toLowerCase();
+  if (low.includes("kleemann")) return "Kleemann";
+  if (low.includes("hitach")) return "Hitachi";
+  if (low.includes("fuji")) return "Fuji";
   return t.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 }
 
