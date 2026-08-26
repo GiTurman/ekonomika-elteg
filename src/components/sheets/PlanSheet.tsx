@@ -30,9 +30,11 @@ interface Actual { overall: number; kleemann: number; hitachi: number; year: num
 function projectActual(entry: ArchiveEntryFull): Actual | null {
   const st = normalizeAppState(entry.data);
   const p = st.project;
-  // შესრულებულად ითვლება მხოლოდ თუ ორივე თარიღი შევსებულია
-  if (!p.contractDate?.trim() || !p.firstTrancheDate?.trim()) return null;
-  const d = new Date(p.firstTrancheDate);
+  // შესრულებულად ითვლება თუ რომელიმე თარიღი მაინც შევსებულია.
+  // პერიოდი პირველი ტრანშის თარიღზე დგება; თუ ის ცარიელია — კონტრაქტის თარიღზე.
+  const dateStr = p.firstTrancheDate?.trim() || p.contractDate?.trim() || "";
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
   const eco = computeEconomics(st);
   let kleemann = 0, hitachi = 0;
@@ -78,7 +80,10 @@ export function PlanSheet() {
     return salesUsers.filter((u) => u.id === userId);
   }, [salesUsers, isFull, userId]);
 
-  const actuals = useMemo(() => entries.map(projectActual).filter(Boolean) as Actual[], [entries]);
+  const actuals = useMemo(
+    () => entries.filter((e) => e.include_in_analytics).map(projectActual).filter(Boolean) as Actual[],
+    [entries]
+  );
 
   const years = useMemo(() => {
     const s = new Set<number>([new Date().getFullYear()]);
