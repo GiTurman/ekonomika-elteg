@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, RefreshCw, ChevronDown, X } from "lucide-react";
-import { fmtUsd, fmtPct, computedCls } from "./sheet-ui";
+import { fmtUsd, fmtPct, computedCls, linkedCls } from "./sheet-ui";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList,
 } from "recharts";
