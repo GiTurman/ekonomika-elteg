@@ -31,18 +31,15 @@ function marginColor(pct: number): string {
 // (alias), მერე ვნორმალიზებთ ერთიან "Title Case" ფორმაში — მხოლოდ ანალიტიკის
 // ჯგუფვისა და ჩვენებისთვის. საწყისი მონაცემი (არქივი/მიმდინარე პროექტი) უცვლელი რჩება.
 //
-// ცნობილი ვარიაციები → კანონიკური სახელი (key შედარდება პატარა ასოებით, trim-ით):
-const BRAND_ALIASES: Record<string, string> = {
-  "hitach": "Hitachi",
-  "hitachi": "Hitachi",
-  "kleemann": "Kleemann",
-};
+// ცნობილი ვარიაციები → კანონიკური სახელი (substring-ით: kleemann/hitach/fuji):
 
 function normalizeBrand(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
-  const alias = BRAND_ALIASES[trimmed.toLowerCase()];
-  if (alias) return alias;
+  const low = trimmed.toLowerCase();
+  if (low.includes("kleemann")) return "Kleemann";
+  if (low.includes("hitach")) return "Hitachi";
+  if (low.includes("fuji")) return "Fuji";
   return trimmed
     .split(/\s+/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -294,6 +291,62 @@ export function AnalyticsSheet({ mode = "final" }: { mode?: "final" | "working" 
         <p className="py-8 text-center text-sm text-muted-foreground">არქივი ცარიელია — ჯერ არცერთი პროექტი არ არის დასრულებული/შენახული.</p>
       ) : (
         <>
+          {/* Summary dashboard — ჯამური KPI + ბრენდის ჭრილი */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card><CardContent className="p-3">
+              <div className="text-xs text-muted-foreground">პროექტები</div>
+              <div className="text-xl font-semibold tabular-nums">{totals.projects}</div>
+              <div className="text-xs text-muted-foreground">{totals.units} დანადგარი</div>
+            </CardContent></Card>
+            <Card><CardContent className="p-3">
+              <div className="text-xs text-muted-foreground">{isFull ? "ფასი (დღგ-ს გარეშე)" : "გასაყიდი ფასი"}</div>
+              <div className={"text-xl font-semibold " + computedCls}>{fmtUsd(totals.costNet)}</div>
+            </CardContent></Card>
+            <Card><CardContent className="p-3">
+              <div className="text-xs text-muted-foreground">ჯამური მარჟა (თანხა)</div>
+              <div className={"text-xl font-semibold " + linkedCls}>{fmtUsd(totals.markupSum)}</div>
+            </CardContent></Card>
+            <Card><CardContent className="p-3">
+              <div className="text-xs text-muted-foreground">საშ. მარჟა %</div>
+              <div className="text-xl font-semibold tabular-nums">{fmtPct(totals.marginWeighted)}</div>
+            </CardContent></Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">ბრენდის ჭრილი</CardTitle></CardHeader>
+            <CardContent className="pt-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ბრენდი</TableHead>
+                    <TableHead className="text-right">დანადგარი</TableHead>
+                    <TableHead className="text-right">{isFull ? "ფასი (დღგ-ს გარეშე)" : "ფასი"}</TableHead>
+                    <TableHead className="text-right">მარჟა (თანხა)</TableHead>
+                    <TableHead className="text-right">მარჟა %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {brandProfitability.map((b) => (
+                    <TableRow key={b.brand}>
+                      <TableCell className="font-medium">{b.brand}</TableCell>
+                      <TableCell className="text-right tabular-nums">{b.count}</TableCell>
+                      <TableCell className={"text-right " + computedCls}>{fmtUsd(b.costNet)}</TableCell>
+                      <TableCell className={"text-right " + linkedCls}>{fmtUsd(b.markup)}</TableCell>
+                      <TableCell className="text-right tabular-nums" style={{ color: marginColor(b.marginPct) }}>{fmtPct(b.marginPct)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-semibold border-t-2 bg-muted/30">
+                    <TableCell>სულ</TableCell>
+                    <TableCell className="text-right tabular-nums">{totals.units}</TableCell>
+                    <TableCell className={"text-right " + computedCls}>{fmtUsd(totals.costNet)}</TableCell>
+                    <TableCell className={"text-right " + linkedCls}>{fmtUsd(totals.markupSum)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtPct(totals.marginWeighted)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
           {/* Filters */}
           <Card>
             <CardContent className="p-3 space-y-3">

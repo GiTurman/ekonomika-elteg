@@ -13,6 +13,7 @@ import { PaymentScheduleSheet } from "@/components/sheets/PaymentScheduleSheet";
 import { InstallationTariffsSheet } from "@/components/sheets/InstallationTariffsSheet";
 import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
 import { PlanSheet } from "@/components/sheets/PlanSheet";
+import { SalesRepSheet } from "@/components/sheets/SalesRepSheet";
 import { ComparisonSheet } from "@/components/sheets/ComparisonSheet";
 import { ArchiveSheet } from "@/components/sheets/ArchiveSheet";
 import { VsActualSheet } from "@/components/sheets/VsActualSheet";
@@ -88,6 +89,7 @@ function Index() {
   const showAnalyticsTab = isFull || canViewPage("analytics");
   const showAnalyticsWorkingTab = isFull || canViewPage("analytics_working");
   const showPlanTab = isFull || canViewPage("plan");
+  const showSalesRepTab = isFull || canViewPage("sales_rep");
   const showComparisonTab = isFull || canViewPage("comparison");
   const showArchiveTab = isFull || canViewPage("archive");
   const showVsActualTab = isFull || canViewPage("vs_actual");
@@ -216,6 +218,7 @@ function Index() {
           {showTariffsTab && <TabsTrigger value="tariffs">ტარიფები</TabsTrigger>}
           {showAnalyticsTab && <TabsTrigger value="analytics">ანალიტიკა</TabsTrigger>}
           {showAnalyticsWorkingTab && <TabsTrigger value="analytics_working">ანალიტიკა მუშა</TabsTrigger>}
+          {showSalesRepTab && <TabsTrigger value="sales_rep">წარმომადგენლები</TabsTrigger>}
           {showPlanTab && <TabsTrigger value="plan">გეგმა და შესრულებები</TabsTrigger>}
           {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
         </TabsList>
@@ -278,6 +281,7 @@ function Index() {
             {showTariffsTab && <TabsContent value="tariffs"><InstallationTariffsSheet /></TabsContent>}
             {showAnalyticsTab && <TabsContent value="analytics"><AnalyticsSheet mode="final" /></TabsContent>}
             {showAnalyticsWorkingTab && <TabsContent value="analytics_working"><AnalyticsSheet mode="working" /></TabsContent>}
+            {showSalesRepTab && <TabsContent value="sales_rep"><SalesRepSheet /></TabsContent>}
             {showPlanTab && <TabsContent value="plan"><PlanSheet /></TabsContent>}
             {isFull && <TabsContent value="log"><LogSheet /></TabsContent>}
           </div>
