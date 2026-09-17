@@ -41,168 +41,6 @@ export type Database = {
         }
         Relationships: []
       }
-      page_permissions: {
-        Row: {
-          allowed_roles: string[]
-          label: string
-          page_key: string
-        }
-        Insert: {
-          allowed_roles?: string[]
-          label: string
-          page_key: string
-        }
-        Update: {
-          allowed_roles?: string[]
-          label?: string
-          page_key?: string
-        }
-        Relationships: []
-      }
-      install_tariff_rules: {
-        Row: {
-          cap_max: number | null
-          cap_min: number | null
-          category: string
-          elec_rate: number
-          floor_max: number | null
-          floor_min: number | null
-          id: string
-          label: string
-          mech_rate: number
-          note: string | null
-          sort_order: number
-        }
-        Insert: {
-          cap_max?: number | null
-          cap_min?: number | null
-          category: string
-          elec_rate?: number
-          floor_max?: number | null
-          floor_min?: number | null
-          id: string
-          label: string
-          mech_rate?: number
-          note?: string | null
-          sort_order?: number
-        }
-        Update: {
-          cap_max?: number | null
-          cap_min?: number | null
-          category?: string
-          elec_rate?: number
-          floor_max?: number | null
-          floor_min?: number | null
-          id?: string
-          label?: string
-          mech_rate?: number
-          note?: string | null
-          sort_order?: number
-        }
-        Relationships: []
-      }
-      dropdown_options: {
-        Row: {
-          field_key: string
-          label: string
-          options: string[]
-        }
-        Insert: {
-          field_key: string
-          label: string
-          options?: string[]
-        }
-        Update: {
-          field_key?: string
-          label?: string
-          options?: string[]
-        }
-        Relationships: []
-      }
-      field_visibility: {
-        Row: {
-          allowed_roles: string[]
-          field_key: string
-          label: string
-          section: string
-        }
-        Insert: {
-          allowed_roles?: string[]
-          field_key: string
-          label: string
-          section: string
-        }
-        Update: {
-          allowed_roles?: string[]
-          field_key?: string
-          label?: string
-          section?: string
-        }
-        Relationships: []
-      }
-      field_permissions: {
-        Row: {
-          allowed_roles: string[]
-          field_key: string
-          label: string
-          section: string
-        }
-        Insert: {
-          allowed_roles?: string[]
-          field_key: string
-          label: string
-          section: string
-        }
-        Update: {
-          allowed_roles?: string[]
-          field_key?: string
-          label?: string
-          section?: string
-        }
-        Relationships: []
-      }
-      app_users: {
-        Row: {
-          code: string
-          created_at: string
-          id: string
-          name: string
-          page_analytics: boolean
-          page_comparison: boolean
-          page_economics: boolean
-          page_input: boolean
-          page_payment: boolean
-          page_tariffs: boolean
-          role: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          id?: string
-          name: string
-          page_analytics?: boolean
-          page_comparison?: boolean
-          page_economics?: boolean
-          page_input?: boolean
-          page_payment?: boolean
-          page_tariffs?: boolean
-          role: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          id?: string
-          name?: string
-          page_analytics?: boolean
-          page_comparison?: boolean
-          page_economics?: boolean
-          page_input?: boolean
-          page_payment?: boolean
-          page_tariffs?: boolean
-          role?: string
-        }
-        Relationships: []
-      }
       app_backups: {
         Row: {
           created_at: string
@@ -248,6 +86,212 @@ export type Database = {
         }
         Relationships: []
       }
+      app_users: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          page_analytics: boolean
+          page_comparison: boolean
+          page_economics: boolean
+          page_input: boolean
+          page_payment: boolean
+          page_tariffs: boolean
+          role: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          page_analytics?: boolean
+          page_comparison?: boolean
+          page_economics?: boolean
+          page_input?: boolean
+          page_payment?: boolean
+          page_tariffs?: boolean
+          role: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          page_analytics?: boolean
+          page_comparison?: boolean
+          page_economics?: boolean
+          page_input?: boolean
+          page_payment?: boolean
+          page_tariffs?: boolean
+          role?: string
+        }
+        Relationships: []
+      }
+      dropdown_options: {
+        Row: {
+          field_key: string
+          label: string
+          options: string[]
+        }
+        Insert: {
+          field_key: string
+          label: string
+          options?: string[]
+        }
+        Update: {
+          field_key?: string
+          label?: string
+          options?: string[]
+        }
+        Relationships: []
+      }
+      field_permissions: {
+        Row: {
+          allowed_roles: string[]
+          field_key: string
+          label: string
+          section: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          field_key: string
+          label: string
+          section: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          field_key?: string
+          label?: string
+          section?: string
+        }
+        Relationships: []
+      }
+      field_visibility: {
+        Row: {
+          allowed_roles: string[]
+          field_key: string
+          label: string
+          section: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          field_key: string
+          label: string
+          section: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          field_key?: string
+          label?: string
+          section?: string
+        }
+        Relationships: []
+      }
+      install_tariff_rules: {
+        Row: {
+          cap_max: number | null
+          cap_min: number | null
+          category: string
+          elec_rate: number
+          elec_rate_sales: number | null
+          floor_max: number | null
+          floor_min: number | null
+          id: string
+          label: string
+          mech_rate: number
+          mech_rate_sales: number | null
+          note: string | null
+          sort_order: number
+        }
+        Insert: {
+          cap_max?: number | null
+          cap_min?: number | null
+          category: string
+          elec_rate?: number
+          elec_rate_sales?: number | null
+          floor_max?: number | null
+          floor_min?: number | null
+          id: string
+          label: string
+          mech_rate?: number
+          mech_rate_sales?: number | null
+          note?: string | null
+          sort_order?: number
+        }
+        Update: {
+          cap_max?: number | null
+          cap_min?: number | null
+          category?: string
+          elec_rate?: number
+          elec_rate_sales?: number | null
+          floor_max?: number | null
+          floor_min?: number | null
+          id?: string
+          label?: string
+          mech_rate?: number
+          mech_rate_sales?: number | null
+          note?: string | null
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      page_permissions: {
+        Row: {
+          allowed_roles: string[]
+          label: string
+          page_key: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          label: string
+          page_key: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          label?: string
+          page_key?: string
+        }
+        Relationships: []
+      }
+      sales_plans: {
+        Row: {
+          created_at: string | null
+          id: string
+          plan_usd: number
+          quarter: number
+          sales_person_id: string
+          scope: string
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          plan_usd?: number
+          quarter: number
+          sales_person_id: string
+          scope: string
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          plan_usd?: number
+          quarter?: number
+          sales_person_id?: string
+          scope?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_plans_sales_person_id_fkey"
+            columns: ["sales_person_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -272,12 +316,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -301,11 +345,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -326,11 +370,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -351,11 +395,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -368,11 +412,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
