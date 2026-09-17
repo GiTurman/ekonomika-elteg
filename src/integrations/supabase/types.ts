@@ -254,6 +254,24 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_projects: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+        }
+        Relationships: []
+      }
       sales_plans: {
         Row: {
           created_at: string | null
