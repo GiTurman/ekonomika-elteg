@@ -27,6 +27,7 @@ import { saveToArchive, findArchiveByName, updateArchiveEntry, loadArchiveEntry 
 import { normalizeAppState } from "@/lib/econ-defaults";
 import { logActivity } from "@/lib/activityLog";
 import { LogSheet } from "@/components/sheets/LogSheet";
+import { PipelineSheet } from "@/components/sheets/PipelineSheet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -93,6 +94,7 @@ function Index() {
   const showComparisonTab = isFull || canViewPage("comparison");
   const showArchiveTab = isFull || canViewPage("archive");
   const showVsActualTab = isFull || canViewPage("vs_actual");
+  const showPipelineTab = isFull || canViewPage("pipeline");
 
   const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : showComparisonTab ? "comparison" : showArchiveTab ? "archive" : "analytics";
 
@@ -220,6 +222,7 @@ function Index() {
           {showAnalyticsWorkingTab && <TabsTrigger value="analytics_working">ანალიტიკა მუშა</TabsTrigger>}
           {showSalesRepTab && <TabsTrigger value="sales_rep">წარმომადგენლები</TabsTrigger>}
           {showPlanTab && <TabsTrigger value="plan">გეგმა და შესრულებები</TabsTrigger>}
+          {showPipelineTab && <TabsTrigger value="pipeline">პაიპლაინი / ფორმა 505</TabsTrigger>}
           {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
         </TabsList>
         </div>
@@ -283,6 +286,7 @@ function Index() {
             {showAnalyticsWorkingTab && <TabsContent value="analytics_working"><AnalyticsSheet mode="working" /></TabsContent>}
             {showSalesRepTab && <TabsContent value="sales_rep"><SalesRepSheet /></TabsContent>}
             {showPlanTab && <TabsContent value="plan"><PlanSheet /></TabsContent>}
+            {showPipelineTab && <TabsContent value="pipeline"><PipelineSheet /></TabsContent>}
             {isFull && <TabsContent value="log"><LogSheet /></TabsContent>}
           </div>
       </main>
