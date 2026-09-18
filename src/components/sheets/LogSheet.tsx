@@ -143,7 +143,7 @@ function PagePermissionsPanel() {
     setPerms((prev) => prev.map((p) => (p.pageKey === perm.pageKey ? { ...p, allowedRoles: nextRoles } : p)));
     try {
       // "analytics_working" შესაძლოა ბაზაში ჯერ არ არსებობდეს — ამიტომ upsert.
-      if (perm.pageKey === "analytics_working" || perm.pageKey === "plan") {
+      if (perm.pageKey === "analytics_working" || perm.pageKey === "plan" || perm.pageKey === "pipeline") {
         await upsertPagePermission(perm.pageKey, perm.label, nextRoles);
       } else {
         await updatePagePermission(perm.pageKey, nextRoles);
