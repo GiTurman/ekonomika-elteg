@@ -123,6 +123,9 @@ function PagePermissionsPanel() {
       if (!loaded.some((p) => p.pageKey === "plan")) {
         loaded.push({ pageKey: "plan", label: "გეგმა და შესრულებები", allowedRoles: ["sales"] });
       }
+      if (!loaded.some((p) => p.pageKey === "pipeline")) {
+        loaded.push({ pageKey: "pipeline", label: "პაიპლაინი / ფორმა 505", allowedRoles: ["sales", "commercial"] });
+      }
       setPerms(loaded);
     } catch (e) {
       console.error("[permissions] page load failed", e);
