@@ -731,7 +731,7 @@ export function PipelineSheet() {
               });
 
               // Status Distribution Data
-              const statusCounts = {};
+              const statusCounts: Record<string, number> = {};
               projects.forEach(p => {
                 statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
               });
@@ -740,8 +740,8 @@ export function PipelineSheet() {
 
               // Time between statuses (Bottlenecks)
               // To calculate this, we look at the gap between historical statuses
-              const stageTimeSum = {};
-              const stageTimeCount = {};
+              const stageTimeSum: Record<string, number> = {};
+              const stageTimeCount: Record<string, number> = {};
               
               projects.forEach(p => {
                 if(p.statusHistory && p.statusHistory.length > 1) {
@@ -1026,7 +1026,7 @@ export function PipelineSheet() {
         <ProjectModal 
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)} 
-          onSave={(data) => {
+          onSave={(data: any) => {
             if (editingId) {
               setProjects(projects.map(p => p.id === editingId ? { ...data, id: editingId } : p));
             } else {
