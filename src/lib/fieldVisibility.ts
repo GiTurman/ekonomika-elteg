@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { adminWrite } from "./adminWrite";
 
 export interface FieldVisibility {
   fieldKey: string;
@@ -19,6 +20,5 @@ export async function listFieldVisibility(): Promise<FieldVisibility[]> {
 }
 
 export async function updateFieldVisibility(fieldKey: string, allowedRoles: string[]): Promise<void> {
-  const { error } = await supabase.from("field_visibility").update({ allowed_roles: allowedRoles }).eq("field_key", fieldKey);
-  if (error) throw error;
+  await adminWrite("field_visibility", "update", { allowed_roles: allowedRoles }, fieldKey);
 }

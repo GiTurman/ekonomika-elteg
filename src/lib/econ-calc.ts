@@ -251,10 +251,17 @@ export function computeTravel(state: AppState): TravelBreakdown {
 
 // Per-unit install cost (matches template E-column)
 // Note: template uses labor rates in GEL directly without USD conversion —
+// ხელფასის „გაგროსვა" (საშემოსავლო + საპენსიო). განაკვეთი ≥100% გამოიწვევდა ნულზე
+// გაყოფას (ფასი „—") — ამიტომ თითო განაკვეთი 95%-ზე იზღუდება.
+function grossOf(f: FinancialAssumptions): number {
+  const clamp = (x: number) => Math.min(Math.max(Number(x) || 0, 0), 0.95);
+  return 1 / ((1 - clamp(f.incomeTaxRate)) * (1 - clamp(f.pensionRate)));
+}
+
 // preserved verbatim for parity with the spreadsheet. mechRateGel/elecRateGel
 // are now per-unit fields (previously global assumptions).
 function unitInstallCost(u: Unit, f: FinancialAssumptions) {
-  const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
+  const grossFactor = grossOf(f);
   return u.floors * u.mechRateGel * grossFactor
     + u.floors * u.elecRateGel * grossFactor
     + u.materials
@@ -296,7 +303,7 @@ export function computeEconomics(state: AppState): FullEconomics {
   // დაცვის მიზნით ნაგულისხმევებზე ვბრუნდებით, რომ გაანგარიშება არასდროს ავარდეს.
   const thresholds = state.profitThresholds ?? defaultProfitThresholds;
 
-  const bufGross = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
+  const bufGross = grossOf(f);
   // გაყიდვების ტარიფის ბუფერი per unit: (sales rate − real) × სართული × დარიცხვები.
   // მხოლოდ დადებითი (sales ≥ real); sales-განაკვეთის გარეშე default 0 → ქცევა უცვლელი.
   const salesBufferOf = (u: Unit) =>
@@ -381,7 +388,7 @@ export function computeEconomics(state: AppState): FullEconomics {
   // project-level input fields (by construction equal to the sum of the
   // allocated per-unit amounts). Labor rates and margin/risk % are per-unit,
   // so those sub-totals are summed per unit rather than aggregate×rate.
-  const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
+  const grossFactor = grossOf(f);
 
   const factoryTotal = units.reduce((s, u) => s + u.factoryPrice, 0);
   // ბანკის საკომისიო: დანადგარებზე გადანაწილებული ჯამი (მინ. თითო დანადგარზე

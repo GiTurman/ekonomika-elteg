@@ -1,6 +1,6 @@
 import { useEffect, useState, Fragment } from "react";
 import { listActivityLog, type ActivityLogEntry } from "@/lib/activityLog";
-import { listUsers, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser, type AccessRole } from "@/lib/access";
+import { listUsersAdmin, createUser, updateUser, deleteUser, ROLE_LABEL, type AppUser, type AccessRole } from "@/lib/access";
 import { listFieldPermissions, updateFieldPermission, type FieldPermission } from "@/lib/fieldPermissions";
 import { listFieldVisibility, updateFieldVisibility, type FieldVisibility } from "@/lib/fieldVisibility";
 import { listPagePermissions, upsertPagePermission, type PagePermission } from "@/lib/pagePermissions";
@@ -402,7 +402,7 @@ function UsersPanel() {
     setLoading(true);
     setError(null);
     try {
-      setUsers(await listUsers());
+      setUsers(await listUsersAdmin());
     } catch (e) {
       console.error("[users] load failed", e);
       setError("მომხმარებლების ჩატვირთვა ვერ მოხერხდა.");

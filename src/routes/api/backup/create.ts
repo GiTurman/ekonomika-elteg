@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireFull } from "@/server/apiAuth";
 import { createClient } from "@supabase/supabase-js";
 
 const SINGLETON = "singleton";
@@ -19,6 +20,8 @@ export const Route = createFileRoute("/api/backup/create")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const denied = await requireFull(request);
+        if (denied) return denied;
         const body = (await request.json().catch(() => ({}))) as { name?: string };
         const name = (body.name || "").trim();
         const sb = admin();

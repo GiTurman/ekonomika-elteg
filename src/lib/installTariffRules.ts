@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { adminWrite } from "./adminWrite";
 import type { EquipmentCategory } from "./econ-types";
 
 export interface TariffRule {
@@ -52,24 +53,21 @@ export async function updateTariffRule(id: string, patch: Partial<Pick<TariffRul
   if (patch.capMax !== undefined) row.cap_max = patch.capMax;
   if (patch.floorMin !== undefined) row.floor_min = patch.floorMin;
   if (patch.floorMax !== undefined) row.floor_max = patch.floorMax;
-  const { error } = await supabase.from("install_tariff_rules").update(row).eq("id", id);
-  if (error) throw error;
+  await adminWrite("install_tariff_rules", "update", row, id);
 }
 
 export async function createTariffRule(rule: Omit<TariffRule, "sortOrder"> & { sortOrder?: number }): Promise<void> {
-  const { error } = await supabase.from("install_tariff_rules").insert({
+  await adminWrite("install_tariff_rules", "insert", {
     id: rule.id, label: rule.label, category: rule.category,
     mech_rate: rule.mechRate, elec_rate: rule.elecRate,
     mech_rate_sales: rule.mechRateSales ?? 0, elec_rate_sales: rule.elecRateSales ?? 0,
     cap_min: rule.capMin, cap_max: rule.capMax, floor_min: rule.floorMin, floor_max: rule.floorMax,
     sort_order: rule.sortOrder ?? 99, note: rule.note ?? null,
   });
-  if (error) throw error;
 }
 
 export async function deleteTariffRule(id: string): Promise<void> {
-  const { error } = await supabase.from("install_tariff_rules").delete().eq("id", id);
-  if (error) throw error;
+  await adminWrite("install_tariff_rules", "delete", {}, id);
 }
 
 // ლიფტისთვის ტვირთამწეობა+სართულების მიხედვით ავტომატურად პოულობს

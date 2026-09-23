@@ -79,8 +79,11 @@ export function PlanSheet() {
 
   const visibleSalesUsers = useMemo(() => {
     if (isFull) return salesUsers;
-    return salesUsers.filter((u) => u.id === userId);
-  }, [salesUsers, isFull, userId]);
+    // გაყიდვების მენეჯერი — მხოლოდ საკუთარს; სხვა როლი (რომელსაც გვერდი გაეხსნა
+    // „ლოგი"-დან) — ყველას, მხოლოდ სანახავად (რედაქტირება ფინანსებისაა).
+    if (role === "sales") return salesUsers.filter((u) => u.id === userId);
+    return salesUsers;
+  }, [salesUsers, isFull, userId, role]);
 
   const actuals = useMemo(
     () => entries.filter((e) => e.include_in_analytics).map(projectActual).filter(Boolean) as Actual[],

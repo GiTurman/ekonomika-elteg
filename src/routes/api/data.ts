@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireFull } from "@/server/apiAuth";
 import { createClient } from "@supabase/supabase-js";
 import defaultData from "@/server/default-data.json";
 
@@ -15,7 +16,9 @@ function admin() {
 export const Route = createFileRoute("/api/data")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        const denied = await requireFull(request);
+        if (denied) return denied;
         const sb = admin();
         const { data, error } = await sb
           .from("app_state")
@@ -30,6 +33,8 @@ export const Route = createFileRoute("/api/data")({
         return Response.json(data.data);
       },
       POST: async ({ request }) => {
+        const denied = await requireFull(request);
+        if (denied) return denied;
         const body = await request.json();
         const sb = admin();
         const { error } = await sb

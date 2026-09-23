@@ -148,6 +148,17 @@ export function ProjectDataSheet() {
     updateUnit(unitId, { mechRateGel: rule.mechRate, elecRateGel: rule.elecRate, mechRateSalesGel: rule.mechRateSales, elecRateSalesGel: rule.elecRateSales });
   };
 
+  // ახალი დანადგარი — ლიფტზე მონტაჟის ტარიფი მაშინვე ისმება (ტვირთამწ./სართ. მიხედვით).
+  const handleAddUnit = () => {
+    addUnit();
+    const units = useEconStore.getState().state.project.units;
+    const nu = units[units.length - 1];
+    if (nu && nu.category === "lift") {
+      const rule = findMatchingLiftRule(tariffRules, nu.capacity, nu.floors);
+      if (rule) applyTariff(nu.id, rule);
+    }
+  };
+
   // "2. დანადგარების ცხრილში" კატეგორიის/ტვირთამწეობის/სართულების შევსებისას
   // ლიფტისთვის ტარიფი ავტომატურად გამოითვლება და ერთვის იმავე patch-ში —
   // ცალკე 3.2-ში ხელით არჩევა აღარ სჭირდება (თუმცა შემდეგაც თავისუფლად
@@ -276,7 +287,7 @@ export function ProjectDataSheet() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>2. დანადგარების ცხრილი — ერთი სტრიქონი = ერთი დანადგარი</CardTitle>
-          <Button size="sm" onClick={addUnit}><Plus className="h-4 w-4 mr-1" /> ახალი დანადგარი</Button>
+          <Button size="sm" onClick={handleAddUnit}><Plus className="h-4 w-4 mr-1" /> ახალი დანადგარი</Button>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
@@ -343,6 +354,13 @@ export function ProjectDataSheet() {
       <Card>
         <CardHeader><CardTitle>3. დანადგარების ფინანსური მონაცემები — თვითღირებულების შემადგენელი მუხლები ($)</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
+          {p.units.some((u) => u.currency && u.currency !== "USD") && (
+            <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              ყურადღება: ყველა თანხა აქ <b>დოლარშია</b>. „ვალუტა" მხოლოდ მომწოდებლის ვალუტაა და გამოთვლაში არ მონაწილეობს —
+              EUR ფასი ჯერ გადაიყვანეთ $-ში (EUR/USD = {(state.finance.usdRate ? state.finance.eurRate / state.finance.usdRate : 0).toFixed(4)},
+              მაგ. €10,000 = ${Math.round(10000 * (state.finance.usdRate ? state.finance.eurRate / state.finance.usdRate : 0)).toLocaleString("en-US")}).
+            </div>
+          )}
           <Table>
             <TableHeader>
               <TableRow>

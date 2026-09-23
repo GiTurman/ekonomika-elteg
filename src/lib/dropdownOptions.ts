@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { adminWrite } from "./adminWrite";
 
 export interface DropdownOptions {
   fieldKey: string;
@@ -13,6 +14,5 @@ export async function listDropdownOptions(): Promise<DropdownOptions[]> {
 }
 
 export async function updateDropdownOptions(fieldKey: string, options: string[]): Promise<void> {
-  const { error } = await supabase.from("dropdown_options").update({ options }).eq("field_key", fieldKey);
-  if (error) throw error;
+  await adminWrite("dropdown_options", "update", { options }, fieldKey);
 }

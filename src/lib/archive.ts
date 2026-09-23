@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { adminWrite } from "./adminWrite";
 import type { AppState } from "./econ-types";
 
 export interface ArchiveEntry {
@@ -62,17 +63,12 @@ export async function loadArchiveEntry(id: string): Promise<AppState> {
 }
 
 export async function deleteArchiveEntry(id: string): Promise<void> {
-  const { error } = await supabase.from("app_backups").delete().eq("id", id);
-  if (error) throw error;
+  await adminWrite("app_backups", "delete", {}, id);
 }
 
 // წაშლის არქივის ყველა ჩანაწერს — გამოიყენება "არქივის გასუფთავება" ღილაკით.
 export async function clearArchive(): Promise<void> {
-  const { error } = await supabase
-    .from("app_backups")
-    .delete()
-    .not("id", "is", null); // matches all rows
-  if (error) throw error;
+  await adminWrite("app_backups", "delete", {}, "*"); // ყველა ჩანაწერი
 }
 
 // "ანალიტიკაში ჩართვის" checkbox — მხოლოდ ფინანსების ხელმისაწვდომობით.

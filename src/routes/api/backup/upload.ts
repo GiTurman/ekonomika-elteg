@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireFull } from "@/server/apiAuth";
 import { createClient } from "@supabase/supabase-js";
 
 const SINGLETON = "singleton";
@@ -13,6 +14,8 @@ export const Route = createFileRoute("/api/backup/upload")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const denied = await requireFull(request);
+        if (denied) return denied;
         try {
           const fd = await request.formData();
           const f = fd.get("file");

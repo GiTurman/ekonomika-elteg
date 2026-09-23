@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { adminWrite } from "./adminWrite";
 // sales_plans ცხრილი ჯერ არ არის გენერირებულ ტიპებში — cast, რომ TS არ დაბლოკოს.
 const db = supabase as any;
 
@@ -37,14 +38,11 @@ export async function listSalesPlans(): Promise<SalesPlan[]> {
 export async function setSalesPlan(
   year: number, quarter: number, salesPersonId: string, scope: PlanScope, planUsd: number
 ): Promise<void> {
-  const { error } = await db.from("sales_plans").upsert(
+  await adminWrite("sales_plans", "upsert",
     { year, quarter, sales_person_id: salesPersonId, scope, plan_usd: planUsd },
-    { onConflict: "year,quarter,sales_person_id,scope" }
-  );
-  if (error) throw error;
+    null, "year,quarter,sales_person_id,scope");
 }
 
 export async function deleteSalesPlan(id: string): Promise<void> {
-  const { error } = await db.from("sales_plans").delete().eq("id", id);
-  if (error) throw error;
+  await adminWrite("sales_plans", "delete", {}, id);
 }

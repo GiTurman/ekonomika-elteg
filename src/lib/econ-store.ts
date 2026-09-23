@@ -2,7 +2,6 @@ import { create } from "zustand";
 import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold, PaymentTranche, PaymentExpenseItem } from "./econ-types";
 import { defaultAppState, emptyUnit, blankAppState, normalizeAppState } from "./econ-defaults";
 import { suggestPaymentExpenses } from "./econ-calc";
-import { supabase } from "@/integrations/supabase/client";
 
 interface StoreShape {
   state: AppState;
@@ -38,8 +37,6 @@ interface StoreShape {
   reset: () => void;
 }
 
-const STATE_ID = "singleton";
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ბრაუზერში ლოკალურად შენახული "დაუმთავრებელი ნამუშევარი" — მომხმარებლის
 // ID-ზეა მიბმული, რომ refresh-ისას არაფერი არ იკარგებოდეს, მაგრამ სხვა
@@ -272,7 +269,11 @@ export const useEconStore = create<StoreShape>((set, get) => ({
       } else {
         // პირველი დანადგარი — "ტარიფები" ტაბზე დაყენებული სტანდარტული
         // განაკვეთებით იწყება (ფასნამატი დანადგ./მონტ., სავალუტო რისკი).
+        // სანიმუშო თანხები ($18,180 ქარხნული ფასი და ა.შ.) აღარ გადმოდის —
+        // ფინანსური ველები ნულიდან იწყება, მონტაჟი ტარიფიდან ისმება (ProjectDataSheet).
         nu = { ...emptyUnit("L1"),
+          brand: "", model: "",
+          floors: 0, factoryPrice: 0, materials: 0, grounding: 0, otherCost: 0, scaffolding: 0,
           equipmentMarkupPct: dr.equipmentMarkupPct,
           installMarkupPct: dr.installMarkupPct,
           contingencyPct: dr.contingencyPct ?? 0.03,
@@ -340,16 +341,11 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     set({ state: draft ? migrateSavedState(draft) : blankAppState(), loaded: true, loadedArchiveId: draft ? loadArchiveId(userId) : null });
   },
 
+  // საერთო app_state ჩანაწერში აღარ ვწერთ: მას ყველა მომხმარებელი ერთმანეთს
+  // უწერდა და არავინ კითხულობდა. დაუმთავრებელი ნამუშევარი ბრაუზერის დრაფტშია,
+  // საბოლოო — არქივში („დასრულება და შენახვა").
   save: async () => {
-    const s = get().state;
-    set({ saving: true });
-    try {
-      await supabase.from("app_state").upsert({ id: STATE_ID, data: s as any });
-    } catch (e) {
-      console.error("[econ-store] save failed", e);
-    } finally {
-      set({ saving: false });
-    }
+    saveDraft(get().currentUserId, get().state);
   },
 }));
 
@@ -370,6 +366,5 @@ function scheduleSave(get: () => StoreShape) {
   // დაიკარგება, თუნდაც Supabase-ის შენახვა ჯერ არ დასრულებულიყოს.
   const s = get();
   saveDraft(s.currentUserId, s.state);
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => get().save(), 600);
+
 }

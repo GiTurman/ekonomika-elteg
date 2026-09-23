@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { listPagePermissions, updatePagePermission } from "./pagePermissions";
 import { listFieldPermissions, updateFieldPermission } from "./fieldPermissions";
 import { listFieldVisibility, updateFieldVisibility } from "./fieldVisibility";
+import { adminWrite } from "./adminWrite";
 
 export type AccessRole = "full" | "commercial" | "sales" | "technical" | "accounting" | "procurement" | "administration" | "partial";
 
@@ -38,30 +39,45 @@ function rowToUser(row: any): AppUser {
 export async function checkAccessCode(code: string): Promise<AppUser | null> {
   const trimmed = code.trim();
   if (!trimmed) return null;
-  const { data, error } = await supabase.from("app_users").select("*").eq("code", trimmed).maybeSingle();
+  // სერვერული შემოწმება — კოდები ბრაუზერში აღარ იკითხება.
+  const { data, error } = await (supabase as any).rpc("app_login", { p_code: trimmed });
   if (error) {
     console.error("[access] code check failed", error);
     return null;
   }
-  return data ? rowToUser(data) : null;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? rowToUser({ ...row, code: trimmed }) : null;
 }
 
 // სესიის ქეშირებული მომხმარებლის ფონურად განახლებისთვის — რომ Finance-ის მიერ
 // შეცვლილი როლი/სახელი დაუყოვნებლივ ეცნობოს უკვე შესულ მომხმარებელს,
 // კოდის ხელახლა შეყვანის გარეშე.
-export async function getUserById(id: string): Promise<AppUser | null> {
-  const { data, error } = await supabase.from("app_users").select("*").eq("id", id).maybeSingle();
+// სესიის განახლება იმავე კოდით (id-ით აღარა — localStorage-ში id-ის ჩანაცვლებით
+// სხვის სახელით შესვლა აღარ შეიძლება). კოდი შეიცვალა/მომხმარებელი წაიშალა → null.
+// ქსელის შეცდომისას → "error" (სესია არ იშლება).
+export async function refreshSession(cached: AppUser): Promise<AppUser | null | "error"> {
+  if (!cached.code) return null; // ძველი ფორმატის სესია კოდის გარეშე — თავიდან შესვლა
+  const { data, error } = await (supabase as any).rpc("app_login", { p_code: cached.code });
   if (error) {
     console.error("[access] refresh failed", error);
-    return null;
+    return "error";
   }
-  return data ? rowToUser(data) : null;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? rowToUser({ ...row, code: cached.code }) : null;
 }
 
+// მომხმარებლების სია კოდების გარეშე (ჩამონათვალებისთვის) — ყველა როლისთვის.
 export async function listUsers(): Promise<AppUser[]> {
-  const { data, error } = await supabase.from("app_users").select("*").order("created_at", { ascending: true });
+  const { data, error } = await (supabase as any).rpc("app_users_public");
   if (error) throw error;
-  return (data ?? []).map(rowToUser);
+  return ((data ?? []) as any[]).map((r) => rowToUser({ ...r, code: "" }));
+}
+
+// სრული სია კოდებით — მხოლოდ ფინანსებისთვის („ლოგი" → მომხმარებლები და კოდები).
+export async function listUsersAdmin(): Promise<AppUser[]> {
+  const { data, error } = await (supabase as any).rpc("app_admin_list_users", { p_code: getStoredUser()?.code ?? "" });
+  if (error) throw error;
+  return ((data ?? []) as any[]).map(rowToUser);
 }
 
 // "გაყიდვები" (sales) როლის პირველად შექმნისას, მას კომერციის (commercial)
@@ -99,8 +115,7 @@ export async function createUser(name: string, code: string, role: AccessRole): 
     // შესაძლო შეცდომა seed-ში არ უნდა შეაფერხოს მომხმარებლის შექმნა
     try { await seedSalesFromCommercialIfFirstTime(); } catch (e) { console.error("sales seed failed", e); }
   }
-  const { error } = await supabase.from("app_users").insert({ name, code, role });
-  if (error) throw error;
+  await adminWrite("app_users", "insert", { name, code, role });
 }
 
 export async function updateUser(id: string, patch: Partial<{ name: string; code: string; role: AccessRole }>): Promise<void> {
@@ -108,13 +123,11 @@ export async function updateUser(id: string, patch: Partial<{ name: string; code
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.code !== undefined) row.code = patch.code;
   if (patch.role !== undefined) row.role = patch.role;
-  const { error } = await supabase.from("app_users").update(row).eq("id", id);
-  if (error) throw error;
+  await adminWrite("app_users", "update", row, id);
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  const { error } = await supabase.from("app_users").delete().eq("id", id);
-  if (error) throw error;
+  await adminWrite("app_users", "delete", {}, id);
 }
 
 // მიმდინარე სესიის cache — რომ ყოველ გვერდის გახსნაზე ხელახლა არ მოვითხოვოთ კოდი.

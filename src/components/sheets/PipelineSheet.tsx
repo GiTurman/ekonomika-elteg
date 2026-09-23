@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useAccessRole } from '@/components/AccessGate';
+import { listUsers } from '@/lib/access';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, ComposedChart
@@ -39,6 +41,14 @@ type Project = {
 // ============================================================================
 // MOCK DATA (Forma 505 / Database)
 // ============================================================================
+
+// მენეჯერის შესაბამისობა: სახელის ნებისმიერი სიტყვა (≥3 ასო) — „კვარაცხელია თ." ემთხვევა
+// „თემურ კვარაცხელია"-ს. ადრე მხოლოდ პირველი სიტყვით მოწმდებოდა და ახალი ფორმატი ცდებოდა.
+function managerMatches(manager: string | undefined, rep: string): boolean {
+  if (!manager) return false;
+  const tokens = rep.replace(/\./g, ' ').split(/\s+/).filter((t) => t.length >= 3);
+  return tokens.some((t) => manager.includes(t));
+}
 
 function enrichProjectsWithHistory(projects: Project[]) {
   return projects.map((p, i) => {
@@ -91,7 +101,7 @@ const formatPct = (val: number, total?: number) => {
 // ============================================================================
 // MODAL COMPONENT
 // ============================================================================
-function ProjectModal({ isOpen, onClose, onSave, initialData }: any) {
+function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [] }: any) {
   const [formData, setFormData] = useState<any>(initialData || {});
 
   if (!isOpen) return null;
@@ -148,10 +158,7 @@ function ProjectModal({ isOpen, onClose, onSave, initialData }: any) {
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-600">მენეჯერი</label>
               <select className="w-full border p-2 rounded text-sm" value={formData.manager || ''} onChange={e => setFormData({...formData, manager: e.target.value})}>
-                <option value="კვარაცხელია თ.">კვარაცხელია თ.</option>
-                <option value="ბიგვავა ირაკლი">ბიგვავა ირაკლი</option>
-                <option value="ჩიკვაიძე ბექა">ჩიკვაიძე ბექა</option>
-                <option value="მენეჯმენტი">მენეჯმენტი</option>
+                {(managerOptions as string[]).map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div className="space-y-1">
@@ -188,6 +195,17 @@ export function PipelineSheet() {
   const [filterQuarter, setFilterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const { projects: rawProjects, setProjects, loading } = usePipelineProjects();
+  const { isFull } = useAccessRole();
+  // მენეჯერები: არსებული ჩანაწერებიდან + „გაყიდვები" როლის მომხმარებლები (app_users)
+  const [salesNames, setSalesNames] = useState<string[]>([]);
+  useEffect(() => {
+    listUsers().then((us) => setSalesNames(us.filter((u) => u.role === 'sales').map((u) => u.name))).catch(() => {});
+  }, []);
+  const managerOptions = useMemo(() => {
+    const fromData = (rawProjects as any[]).map((p) => p.manager).filter(Boolean) as string[];
+    const extra = salesNames.filter((n) => !fromData.some((m) => managerMatches(m, n)));
+    return Array.from(new Set([...fromData, ...extra])).sort((a, b) => a.localeCompare(b));
+  }, [rawProjects, salesNames]);
   const projects = useMemo(() => enrichProjectsWithHistory(rawProjects as Project[]), [rawProjects]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -369,7 +387,7 @@ export function PipelineSheet() {
                 }
               });
 
-              const reps = ['კვარაცხელია თ.', 'ბიგვავა ირაკლი', 'ჩიკვაიძე ბექა', 'მენეჯმენტი'];
+              const reps = managerOptions;
               const repAnnualTotal = 140000;
               const repKleemannTotal = 260000;
               
@@ -489,7 +507,7 @@ export function PipelineSheet() {
                                 <tr key={rep} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors text-xs">
                                   <td className="px-4 py-2 font-medium text-slate-800 border-r">{rep}</td>
                                   {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => {
-                                    const fact = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული' && p.manager?.includes(rep.split(' ')[0])).reduce((s,p) => s+(p.revenue||0), 0));
+                                    const fact = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული' && managerMatches(p.manager, rep)).reduce((s,p) => s+(p.revenue||0), 0));
                                     if (isQActive(i + 1)) {
                                       cPlan += qPlan;
                                     }
@@ -518,7 +536,7 @@ export function PipelineSheet() {
                                        <React.Fragment>
                                          {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => {
                                            const qPlanSum = (repAnnualTotal / 4) * reps.length;
-                                           const factSum = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული' && reps.some(r => p.manager?.includes(r.split(' ')[0]))).reduce((s,p) => s+(p.revenue||0), 0));
+                                           const factSum = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული' && reps.some(r => managerMatches(p.manager, r))).reduce((s,p) => s+(p.revenue||0), 0));
                                            if (isQActive(i + 1)) {
                                              cPlanTot += qPlanSum;
                                            }
@@ -698,10 +716,10 @@ export function PipelineSheet() {
             
             {(() => {
               // DATA PREP FOR FUNNEL
-              const reps = ['კვარაცხელია თ.', 'ბიგვავა ირაკლი', 'ჩიკვაიძე ბექა', 'მენეჯმენტი'];
+              const reps = managerOptions;
               
               const funnelData = reps.map(rep => {
-                const repProj = projects.filter(p => p.manager?.includes(rep.split(' ')[0]));
+                const repProj = projects.filter(p => managerMatches(p.manager, rep));
                 
                 // Funnel counts
                 const registered = repProj.length;
@@ -897,10 +915,7 @@ export function PipelineSheet() {
                   className=" border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 text-xs rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-slate-400 appearance-none"
                 >
                   <option value="all">ყველა მენეჯერი</option>
-                  <option value="კვარაცხელია თ.">კვარაცხელია თ.</option>
-                  <option value="ბიგვავა ირაკლი">ბიგვავა ირაკლი</option>
-                  <option value="ჩიკვაიძე ბექა">ჩიკვაიძე ბექა</option>
-                  <option value="მენეჯმენტი">მენეჯმენტი</option>
+                  {managerOptions.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <select 
                   value={formaFilterQuarter} 
@@ -930,7 +945,7 @@ export function PipelineSheet() {
                     setFormData({
                       name: '', product: 'ლიფტი', brand: 'KLEEMANN', units: 1, floors: 0, contractDuration: 0,
                       location: 'თბილისი', currency: 'USD', kleemannValue: 0, hitachiValue: 0, value: 0, revenue: 0,
-                      tranche1: 35, deliveryMonth: '', probability: 50, comment: '', quarter: 'Q1', manager: 'კვარაცხელია თ.',
+                      tranche1: 35, deliveryMonth: '', probability: 50, comment: '', quarter: 'Q1', manager: managerOptions[0] ?? '',
                       statusDetail: 'აქტიური', status: 'პოტ. 60%-'
                     });
                   }}
@@ -1005,13 +1020,13 @@ export function PipelineSheet() {
                         >
                           <Table className="w-3.5 h-3.5" />
                         </button>
-                        <button 
+                        {isFull && <button 
                           onClick={() => removeRow(proj.id)}
                           className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
                           title="წაშლა"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   ))}
@@ -1024,6 +1039,7 @@ export function PipelineSheet() {
 
       {isModalOpen && (
         <ProjectModal 
+          managerOptions={managerOptions}
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)} 
           onSave={(data: any) => {

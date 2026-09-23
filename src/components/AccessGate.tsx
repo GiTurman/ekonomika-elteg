@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, getUserById, type AppUser, type AccessRole } from "@/lib/access";
+import { checkAccessCode, getStoredUser, storeUser, clearStoredUser, refreshSession, type AppUser, type AccessRole } from "@/lib/access";
 import { listFieldPermissions, type FieldPermission } from "@/lib/fieldPermissions";
 import { listFieldVisibility, type FieldVisibility } from "@/lib/fieldVisibility";
 import { listPagePermissions, type PagePermission } from "@/lib/pagePermissions";
@@ -57,7 +57,8 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       // ქეშირებული სესია მაშინვე გამოისახება (სწრაფი, მოციმციმების გარეშე),
       // ფონში კი ბაზიდან ახლდება — თუ Finance-მ როლი/სახელი შეცვალა,
       // ან მომხმარებელი წაშალა, ეს დაუყოვნებლივ აისახება ხელახლა შესვლის გარეშე.
-      getUserById(cached.id).then((fresh) => {
+      refreshSession(cached).then((fresh) => {
+        if (fresh === "error") return; // ქსელის შეცდომა — სესია რჩება
         if (fresh) {
           storeUser(fresh);
           setUser(fresh);

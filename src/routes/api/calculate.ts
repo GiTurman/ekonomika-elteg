@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireFull } from "@/server/apiAuth";
 import { createClient } from "@supabase/supabase-js";
 
 function admin() {
@@ -97,6 +98,8 @@ export const Route = createFileRoute("/api/calculate")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const denied = await requireFull(request);
+        if (denied) return denied;
         const p = (await request.json()) as { units: Unit[]; currency: Currency };
         const results = (p.units || []).map((u) => calcUnit(u, p.currency));
         return Response.json(results);

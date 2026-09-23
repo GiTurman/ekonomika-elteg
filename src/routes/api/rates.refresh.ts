@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireFull } from "@/server/apiAuth";
 import { createClient } from "@supabase/supabase-js";
 
 const SINGLETON = "singleton";
@@ -12,7 +13,9 @@ function admin() {
 export const Route = createFileRoute("/api/rates/refresh")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const denied = await requireFull(request);
+        if (denied) return denied;
         try {
           const r = await fetch(
             "https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json",

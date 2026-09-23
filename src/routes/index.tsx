@@ -120,8 +120,15 @@ function Index() {
   const handleFinish = async () => {
     setSavedMsg(null);
     // არქივიდან გახსნილი პროექტი — იმავე ჩანაწერს გადავაწერთ (სახელი/თარიღი უცვლელი).
-    if (loadedArchiveId) {
+    // გამონაკლისი: „მოგებული" (კონტრაქტი გაფორმებული) პროექტის გადაწერა მხოლოდ
+    // ფინანსებს შეუძლია — სხვა როლი ინახავს ახალ ჩანაწერად (ორიგინალი უცვლელია).
+    const lockedWon = !isFull && state.project.status === "won";
+    if (loadedArchiveId && !lockedWon) {
       setSaveDialog({ mode: "overwrite", name: state.project.projectName || "პროექტი", existingId: loadedArchiveId });
+      return;
+    }
+    if (loadedArchiveId && lockedWon) {
+      setSaveDialog({ mode: "new", name: (state.project.projectName || "პროექტი") + " (ასლი) — " + new Date().toLocaleDateString("ka-GE") });
       return;
     }
     // ახალი პროექტი — სახელი თარიღით. თუ იგივე სახელი უკვე არსებობს, გადავაწერით ვკითხავთ.
@@ -154,6 +161,7 @@ function Index() {
         logActivity(actorName, role, "პროექტის გადაწერა არქივში", saveDialog.name);
       } else {
         await saveToArchive(saveDialog.name, state);
+        setLoadedArchiveId(null); // ახალი ჩანაწერია — ძველ არქივის ჩანაწერს აღარ ვუკავშირდებით
         setSavedMsg("შენახულია არქივში: " + saveDialog.name);
         logActivity(actorName, role, "პროექტის შენახვა არქივში", saveDialog.name);
       }
@@ -183,7 +191,7 @@ function Index() {
             </span>
             <span className="flex items-center gap-1 whitespace-nowrap">
               <Cloud className="h-4 w-4" />
-              {saving ? (<><Loader2 className="h-3 w-3 animate-spin" /> ინახება…</>) : (loaded ? "შენახულია" : "იტვირთება…")}
+              {saving ? (<><Loader2 className="h-3 w-3 animate-spin" /> ინახება…</>) : (loaded ? "დრაფტი შენახულია ამ ბრაუზერში" : "იტვირთება…")}
             </span>
             <Button size="sm" variant="outline" onClick={() => exportToXlsx(state)}>
               <Download className="h-4 w-4 mr-1" /> Excel
@@ -211,6 +219,11 @@ function Index() {
             </Button>
           </div>
         </div>
+        {state.project.units.length === 0 && Math.abs(eco.report.checkDiff) >= 0.5 && (
+          <div className="container mx-auto px-4 pb-2 text-xs text-amber-700">
+            დანადგარი ჯერ არ არის დამატებული — პროექტის ხარჯები (ტრანსპორტი, მივლინება, ბანკი) ვერ ნაწილდება, ამიტომ „შემოწმება" წითელია.
+          </div>
+        )}
         {savedMsg && (
           <div className="container mx-auto px-4 pb-2 text-xs text-emerald-600">{savedMsg}</div>
         )}

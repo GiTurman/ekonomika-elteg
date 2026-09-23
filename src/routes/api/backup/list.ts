@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireFull } from "@/server/apiAuth";
 import { createClient } from "@supabase/supabase-js";
 
 function admin() {
@@ -10,7 +11,9 @@ function admin() {
 export const Route = createFileRoute("/api/backup/list")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        const denied = await requireFull(request);
+        if (denied) return denied;
         const sb = admin();
         const { data, error } = await sb
           .from("app_backups")
