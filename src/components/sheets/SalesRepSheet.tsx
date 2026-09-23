@@ -60,7 +60,9 @@ function projectRow(entry: ArchiveEntryFull): ProjectRow {
 const UNASSIGNED = "__none__";
 
 export function SalesRepSheet() {
-  const { isFull, actorName, role } = useAccessRole();
+  const { isFull, userId, actorName, role } = useAccessRole();
+  // sales როლი მხოლოდ თავის მონაცემს ხედავს — ფილტრი ჩაკეტილია მის userId-ზე.
+  const selfOnly = role === "sales";
   const [entries, setEntries] = useState<ArchiveEntryFull[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -88,10 +90,12 @@ export function SalesRepSheet() {
   const rows = useMemo(() => entries.map(projectRow), [entries]);
 
   const filtered = useMemo(() => {
+    // sales როლი — ყოველთვის მხოლოდ თავისი პროექტები, dropdown-ის მიუხედავად.
+    if (selfOnly) return rows.filter((r) => r.salesPersonId === userId);
     if (selRep === "all") return rows;
     if (selRep === UNASSIGNED) return rows.filter((r) => !r.salesPersonId);
     return rows.filter((r) => r.salesPersonId === selRep);
-  }, [rows, selRep]);
+  }, [rows, selRep, selfOnly, userId]);
 
   const totals = useMemo(() => filtered.reduce(
     (a, r) => ({ overall: a.overall + r.overall, kleemann: a.kleemann + r.kleemann, hitachi: a.hitachi + r.hitachi }),
@@ -125,14 +129,16 @@ export function SalesRepSheet() {
         <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle>გაყიდვების წარმომადგენლების ჭრილი</CardTitle>
           <div className="flex items-center gap-2">
-            <Select value={selRep} onValueChange={setSelRep}>
-              <SelectTrigger className="h-9 w-56"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ყველა წარმომადგენელი</SelectItem>
-                {salesUsers.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                <SelectItem value={UNASSIGNED}>მიუნიშნებელი</SelectItem>
-              </SelectContent>
-            </Select>
+            {!selfOnly && (
+              <Select value={selRep} onValueChange={setSelRep}>
+                <SelectTrigger className="h-9 w-56"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ყველა წარმომადგენელი</SelectItem>
+                  {salesUsers.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  <SelectItem value={UNASSIGNED}>მიუნიშნებელი</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
