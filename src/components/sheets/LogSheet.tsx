@@ -393,7 +393,7 @@ function FieldPermissionsPanel() {
 }
 
 function UsersPanel() {
-  const { actorName, role: myRole } = useAccessRole();
+  const { actorName, role: myRole, userId: myId } = useAccessRole();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -494,7 +494,7 @@ function UsersPanel() {
                   <TextInput value={u.code} onChange={(v) => handleUpdate(u, { code: v }, "მომხმარებლის კოდის შეცვლა")} />
                 </TableCell>
                 <TableCell className="p-1 min-w-[140px]">
-                  <Select value={u.role} onValueChange={(v) => handleUpdate(u, { role: v as AccessRole }, "მომხმარებლის როლის შეცვლა")}>
+                  <Select value={u.role} disabled={u.id === myId} onValueChange={(v) => handleUpdate(u, { role: v as AccessRole }, "მომხმარებლის როლის შეცვლა")}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="full">ფინანსები</SelectItem>
@@ -508,9 +508,12 @@ function UsersPanel() {
                   </Select>
                 </TableCell>
                 <TableCell className="p-1">
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(u)}>
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
+                  {/* საკუთარი ანგარიშის წაშლა/როლის შეცვლა დაბლოკილია — თავის ჩაკეტვის თავიდან ასაცილებლად */}
+                  {u.id !== myId && (
+                    <Button size="icon" variant="ghost" className="h-7 w-7" title="წაშლა" onClick={() => handleDelete(u)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

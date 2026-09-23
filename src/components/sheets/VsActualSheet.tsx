@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { NumberInput, fmtUsd, fmtPct, computedCls } from "./sheet-ui";
 import { computeEconomics, type ProjectReport } from "@/lib/econ-calc";
+import { normalizeAppState } from "@/lib/econ-defaults";
 import { listArchiveFull, updateArchiveEntry, type ArchiveEntryFull } from "@/lib/archive";
 import type { AppState } from "@/lib/econ-types";
 import { ChevronDown, ChevronRight, Loader2, Save, CheckCircle2 } from "lucide-react";
@@ -45,7 +46,7 @@ const keyOf = (title: string, label: string) => title + "|" + label;
 
 function reportOf(data: AppState): ProjectReport | null {
   try {
-    return computeEconomics(data).report;
+    return computeEconomics(normalizeAppState(data)).report;
   } catch {
     return null;
   }

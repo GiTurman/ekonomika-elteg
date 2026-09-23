@@ -17,7 +17,7 @@ import { SalesRepSheet } from "@/components/sheets/SalesRepSheet";
 import { ComparisonSheet } from "@/components/sheets/ComparisonSheet";
 import { ArchiveSheet } from "@/components/sheets/ArchiveSheet";
 import { VsActualSheet } from "@/components/sheets/VsActualSheet";
-import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye, X, LogOut, User } from "lucide-react";
+import { Cloud, Download, Loader2, CheckCircle2, KeyRound, Eye, X, LogOut, User, Home } from "lucide-react";
 import { fmtUsd, fmtPct } from "@/components/sheets/sheet-ui";
 import { useAccessRole } from "@/components/AccessGate";
 import { ROLE_LABEL } from "@/lib/access";
@@ -96,7 +96,24 @@ function Index() {
   const showVsActualTab = isFull || canViewPage("vs_actual");
   const showPipelineTab = isFull || canViewPage("pipeline");
 
-  const defaultTab = showInputTab ? "input" : showEconomicsTab ? "economics" : showPaymentTab ? "payment" : showTariffsTab ? "tariffs" : showComparisonTab ? "comparison" : showArchiveTab ? "archive" : "analytics";
+  // საწყისი გვერდი — „მთავარი" (არცერთი ტაბი არ არის გახსნილი). ტაბი
+  // კონტროლირებადია, რომ „მთავარი" ღილაკით ნებისმიერ დროს დავბრუნდეთ.
+  const [tab, setTab] = useState<string>("home");
+  const homeTiles: { value: string; title: string; desc: string; show: boolean }[] = [
+    { value: "input", title: "შესატანი მონაცემები", desc: "პროექტი, დანადგარები, ფინანსური დაშვებები", show: showInputTab },
+    { value: "economics", title: "ეკონომიკა", desc: "თვითღირებულება, ფასნამატი, საბოლოო ფასი", show: showEconomicsTab },
+    { value: "comparison", title: "შედარება", desc: "პროექტების/ვერსიების შედარება", show: showComparisonTab },
+    { value: "archive", title: "არქივი", desc: "შენახული განფასებები — გახსნა, სტატუსი", show: showArchiveTab },
+    { value: "vs_actual", title: "VS ფაქტი", desc: "ბიუჯეტი vs ფაქტიური ხარჯი", show: showVsActualTab },
+    { value: "payment", title: "გადახდის გრაფიკი", desc: "ტრანშები და ფულადი ნაკადი", show: showPaymentTab },
+    { value: "tariffs", title: "ტარიფები", desc: "მონტაჟის ტარიფები, მინ. მარჟები", show: showTariffsTab },
+    { value: "analytics", title: "ანალიტიკა", desc: "დაშბორდი და ბრენდების ჭრილი", show: showAnalyticsTab },
+    { value: "analytics_working", title: "ანალიტიკა მუშა", desc: "მიმდინარე (დაუმთავრებელი) პროექტები", show: showAnalyticsWorkingTab },
+    { value: "sales_rep", title: "წარმომადგენლები", desc: "პროექტები გაყიდვების მენეჯერის მიხედვით", show: showSalesRepTab },
+    { value: "plan", title: "გეგმა და შესრულებები", desc: "კვარტალური გეგმა vs შესრულება", show: showPlanTab },
+    { value: "pipeline", title: "პაიპლაინი / ფორმა 505", desc: "გაყიდვების პაიპლაინი და ფუნელი", show: showPipelineTab },
+    { value: "log", title: "ლოგი", desc: "აქტივობა, მომხმარებლები, უფლებები", show: isFull },
+  ];
 
   // "დასრულება და შენახვა" — ამზადებს დიალოგს (გადავაწერო?), რეალურ ჩაწერას
   // doSave აკეთებს დადასტურებაზე.
@@ -151,7 +168,7 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Tabs defaultValue={defaultTab}>
+      <Tabs value={tab} onValueChange={setTab}>
       <div className="sticky top-0 z-50 bg-background shadow-sm">
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
@@ -211,6 +228,7 @@ function Index() {
       <div className="bg-card border-b">
         <div className="container mx-auto px-4">
         <TabsList className="flex flex-wrap h-auto gap-1 justify-start">
+          <TabsTrigger value="home" title="მთავარი გვერდი"><Home className="h-4 w-4 mr-1" /> მთავარი</TabsTrigger>
           {showInputTab && <TabsTrigger value="input">შესატანი მონაცემები</TabsTrigger>}
           {showEconomicsTab && <TabsTrigger value="economics">ეკონომიკა</TabsTrigger>}
           {showComparisonTab && <TabsTrigger value="comparison">შედარება</TabsTrigger>}
@@ -267,6 +285,31 @@ function Index() {
             </div>
           )}
           <div className="mt-4">
+            <TabsContent value="home">
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold">მთავარი</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {actorName ? `გამარჯობა, ${actorName}. ` : ""}აირჩიეთ განყოფილება.
+                    {loadedArchiveId ? " ამჟამად გახსნილია არქივის პროექტი: " : " მიმდინარე სამუშაო პროექტი: "}
+                    <span className="font-medium text-foreground">{state.project.projectName || "უსახელო"}</span>
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {homeTiles.filter((t) => t.show).map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setTab(t.value)}
+                      className="text-left rounded-lg border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <div className="font-semibold">{t.title}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{t.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
             {showInputTab && (
               <TabsContent value="input" className="space-y-6">
                 <ProjectDataSheet />

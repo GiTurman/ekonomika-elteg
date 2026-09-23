@@ -106,6 +106,10 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       if (pageKey === "analytics_working") return false;
       // "გეგმა და შესრულებები" — ნაგულისხმევად მხოლოდ გაყიდვები ხედავს (+ ფინანსები).
       if (pageKey === "plan") return user.role === "sales";
+      // ფინანსური ფაქტი (VS ფაქტი) — ნაგულისხმევად მხოლოდ ფინანსები.
+      if (pageKey === "vs_actual") return false;
+      // გაყიდვების გვერდები — ნაგულისხმევად მხოლოდ გაყიდვები (+ ფინანსები).
+      if (pageKey === "sales_rep" || pageKey === "pipeline") return user.role === "sales";
       return true; // სხვა უცნობი/ჯერ არარეგისტრირებული გვერდი — ნაგულისხმევად ხილვადი
     }
     return perm.allowedRoles.includes(user.role);

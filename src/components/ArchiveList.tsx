@@ -342,15 +342,19 @@ export function ArchiveList({ onNavigateAway, autoLoad = true }: { onNavigateAwa
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={busyId === it.id}
-                        onClick={() => handleDelete(it.id)}
-                        title="წაშლა"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {/* წაშლა მხოლოდ ფინანსებს (როგორც „არქივის გასუფთავება") — სხვა როლს
+                          არქივის ისტორიის (გაყიდვების შესრულების წყარო) წაშლა არ შეუძლია. */}
+                      {isFull && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={busyId === it.id}
+                          onClick={() => handleDelete(it.id)}
+                          title="წაშლა"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

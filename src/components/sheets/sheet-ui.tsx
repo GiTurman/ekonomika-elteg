@@ -15,6 +15,8 @@ export const linkedCls = "font-mono text-sm tabular-nums text-emerald-700 dark:t
 
 export function fmtNum(n: number, digits = 2) {
   if (!isFinite(n)) return "—";
+  // "-0.00"-ის თავიდან ასაცილებლად — ნულთან ძალიან ახლო უარყოფითი რიცხვი = 0.
+  if (Math.abs(n) < 0.5 * 10 ** -digits) n = 0;
   return n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 export function fmtUsd(n: number, digits = 2) {

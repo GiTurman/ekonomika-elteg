@@ -384,7 +384,12 @@ export function computeEconomics(state: AppState): FullEconomics {
   const grossFactor = 1 / ((1 - f.incomeTaxRate) * (1 - f.pensionRate));
 
   const factoryTotal = units.reduce((s, u) => s + u.factoryPrice, 0);
-  const bankCommTotal = p.bankCommissionTotal;
+  // ბანკის საკომისიო: დანადგარებზე გადანაწილებული ჯამი (მინ. თითო დანადგარზე
+  // floor-ის ჩათვლით) — რომ ანგარიში და დანადგარების ცხრილი ერთმანეთს ემთხვეოდეს
+  // (წინათ აქ ხელით შეყვანილი ჯამი იდგა და floor-ის დროს checkDiff ≠ 0 იყო).
+  const bankCommTotal = units.length
+    ? units.reduce((s, u) => s + (alloc.bank.get(u.id) ?? 0), 0)
+    : p.bankCommissionTotal;
   const intTransportTotal = p.intTransportTotal;
   const terminalTotal = p.terminalTotal;
   const localTransportTotal = p.localTransportTotal;
