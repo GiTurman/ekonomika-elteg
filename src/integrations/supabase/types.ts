@@ -68,6 +68,24 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          data: Json
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          data?: Json
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          data?: Json
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_state: {
         Row: {
           data: Json
@@ -315,7 +333,45 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      app_admin_list_users: {
+        Args: { p_code: string }
+        Returns: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          role: string
+        }[]
+      }
+      app_admin_write: {
+        Args: {
+          p_code: string
+          p_conflict?: string
+          p_key?: string
+          p_op: string
+          p_row?: Json
+          p_table: string
+        }
+        Returns: undefined
+      }
+      app_is_full: { Args: { p_code: string }; Returns: boolean }
+      app_login: {
+        Args: { p_code: string }
+        Returns: {
+          id: string
+          name: string
+          role: string
+        }[]
+      }
+      app_users_public: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          role: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

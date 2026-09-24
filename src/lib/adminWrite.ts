@@ -6,7 +6,8 @@ import { getStoredUser } from "./access";
 // პირდაპირი INSERT/UPDATE/DELETE ანონიმურად აღარ არის ნებადართული.
 export type AdminTable =
   | "app_users" | "app_backups" | "install_tariff_rules" | "page_permissions"
-  | "field_permissions" | "field_visibility" | "dropdown_options" | "sales_plans" | "pipeline_projects";
+  | "field_permissions" | "field_visibility" | "dropdown_options" | "sales_plans" | "pipeline_projects"
+  | "app_settings";
 
 export async function adminWrite(
   table: AdminTable,
