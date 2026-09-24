@@ -9,8 +9,8 @@ import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 export function FinancialAssumptionsSheet() {
-  const { state, updateFinance } = useEconStore();
-  const { canEditField, canSeeField } = useAccessRole();
+  const { state, updateFinance, updateGlobalFinance } = useEconStore();
+  const { canEditField, canSeeField, isFull } = useAccessRole();
   const f = state.finance;
   const units = state.project.units;
   const travel = computeTravel(state);
@@ -62,14 +62,19 @@ export function FinancialAssumptionsSheet() {
         <Card>
           <CardHeader><CardTitle>2. საგადასახადო პარამეტრები</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">დანადგარის დღგ</span>
-              <PercentInput value={f.equipmentVatRate} onChange={(v) => updateFinance({ equipmentVatRate: v })} /></label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">დღგ (გარდა დანადგარისა)</span>
-              <PercentInput value={f.otherVatRate} onChange={(v) => updateFinance({ otherVatRate: v })} /></label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საშემოსავლო</span>
-              <PercentInput value={f.incomeTaxRate} onChange={(v) => updateFinance({ incomeTaxRate: v })} /></label>
-            <label className="grid gap-1"><span className="text-xs text-muted-foreground">საპენსიო</span>
-              <PercentInput value={f.pensionRate} onChange={(v) => updateFinance({ pensionRate: v })} /></label>
+            {([
+              ["equipmentVatRate", "დანადგარის დღგ"],
+              ["otherVatRate", "დღგ (გარდა დანადგარისა)"],
+              ["incomeTaxRate", "საშემოსავლო"],
+              ["pensionRate", "საპენსიო"],
+            ] as const).map(([k, label]) => (
+              <label key={k} className="grid gap-1"><span className="text-xs text-muted-foreground">{label}</span>
+                {isFull ? (
+                  <PercentInput value={f[k]} onChange={(v) => updateGlobalFinance({ [k]: v })} />
+                ) : <div className={computedCls}>{fmtPct(f[k])}</div>}
+              </label>
+            ))}
+            <p className="md:col-span-3 text-xs text-muted-foreground">გლობალური პარამეტრი — ადგენს ფინანსები («ტარიფები» ტაბიდანაც).</p>
           </CardContent>
         </Card>
       )}
@@ -258,19 +263,19 @@ export function FinancialAssumptionsSheet() {
         <CardContent className="grid gap-3 md:grid-cols-3">
           {canSeeField("finance.bankGuarantee") && (
             <>
-              <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის %, სრული თანხიდან</span>
-                {canEditField("finance.bankGuarantee") ? (
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">გარანტიის მოცულობა %, სრული თანხიდან</span>
+                {canEditField("finance.guaranteePct") ? (
                   <PercentInput value={f.guaranteePct} onChange={(v) => updateFinance({ guaranteePct: v })} />
                 ) : <div className={computedCls}>{fmtPct(f.guaranteePct)}</div>}
               </label>
               <label className="grid gap-1"><span className="text-xs text-muted-foreground">მოქმედების ვადა, დღე</span>
-                {canEditField("finance.bankGuarantee") ? (
+                {canEditField("finance.guaranteeDays") ? (
                   <NumberInput value={f.guaranteeDays} onChange={(v) => updateFinance({ guaranteeDays: v })} />
                 ) : <div className={computedCls}>{f.guaranteeDays}</div>}
               </label>
-              <label className="grid gap-1"><span className="text-xs text-muted-foreground">წლიური საკომისიო %</span>
-                {canEditField("finance.bankGuarantee") ? (
-                  <PercentInput value={f.guaranteeAnnualPct} onChange={(v) => updateFinance({ guaranteeAnnualPct: v })} />
+              <label className="grid gap-1"><span className="text-xs text-muted-foreground">წლიური საკომისიო % (ადგენს ფინანსები)</span>
+                {isFull ? (
+                  <PercentInput value={f.guaranteeAnnualPct} onChange={(v) => updateGlobalFinance({ guaranteeAnnualPct: v })} />
                 ) : <div className={computedCls}>{fmtPct(f.guaranteeAnnualPct)}</div>}
               </label>
             </>

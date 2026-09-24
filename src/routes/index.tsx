@@ -40,13 +40,13 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { state, loaded, saving, load, reset, loadedArchiveId, setLoadedArchiveId, setState } = useEconStore();
+  const { state, loaded, saving, load, reset, loadedArchiveId, setLoadedArchiveId, setState, withGlobal } = useEconStore();
   const { isFull, logout, actorName, role, canViewPage, userId } = useAccessRole();
   const [finishing, setFinishing] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [saveDialog, setSaveDialog] = useState<null | { mode: "overwrite" | "new"; name: string; existingId?: string }>(null);
 
-  useEffect(() => { load(userId); }, [load, userId]);
+  useEffect(() => { load(userId, isFull); }, [load, userId, isFull]);
 
   // პროექტის პირდაპირი ბმული: ?project=<archiveId> — ავტომ. ჩატვირთვა.
   // მოთხოვნის წერილში ჩასმული ლინკიდან გახსნისთვის. საწყისი load-ის შემდეგ.
@@ -58,7 +58,7 @@ function Index() {
     (async () => {
       try {
         const s = await loadArchiveEntry(pid);
-        setState((cur) => ({ ...normalizeAppState(s), pageVisibility: cur.pageVisibility }));
+        setState((cur) => withGlobal({ ...normalizeAppState(s), pageVisibility: cur.pageVisibility }, "archive"));
         setLoadedArchiveId(pid);
         logActivity(actorName, role, "პროექტის გახსნა ბმულით", pid);
         // URL-ის გასუფთავება, რომ reload-ზე თავიდან არ ჩაიტვირთოს.

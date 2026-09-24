@@ -22,9 +22,13 @@ function rangeLabel(min: number | null, max: number | null, unit: string): strin
 
 export function InstallationTariffsSheet() {
   const { isFull, actorName, role } = useAccessRole();
-  const { state, setProfitThreshold, updateDefaultRates, updateFinance, setBrandMarkup } = useEconStore();
+  const { state, setProfitThreshold, updateDefaultRates, updateGlobalFinance, setGlobalDefaults, globalSettings, setBrandMarkup } = useEconStore();
   const dr = state.defaultRates;
   const f = state.finance;
+  // ახალი პროექტის default-ები (გარანტიის მოცულობა %, დღეები) — გლობალური, მიმდინარე პროექტს არ ეხება
+  const gf = globalSettings?.finance ?? {};
+  const defGuaranteePct = gf.guaranteePct ?? f.guaranteePct;
+  const defGuaranteeDays = gf.guaranteeDays ?? f.guaranteeDays;
   const [rules, setRules] = useState<TariffRule[]>([]);
   const [brandOpts, setBrandOpts] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -218,10 +222,14 @@ export function InstallationTariffsSheet() {
                     <TableRow key={cat}>
                       <TableCell className="text-sm font-medium">{EQUIPMENT_CATEGORY_LABEL[cat]}</TableCell>
                       <TableCell className="p-1 w-36">
-                        <NumberInput value={th.minAmount} onChange={(v) => setProfitThreshold(cat, { minAmount: v })} />
+                        {isFull ? (
+                          <NumberInput value={th.minAmount} onChange={(v) => setProfitThreshold(cat, { minAmount: v })} />
+                        ) : <div className={"text-right " + computedCls}>{fmtUsd(th.minAmount)}</div>}
                       </TableCell>
                       <TableCell className="p-1 w-36">
-                        <PercentInput value={th.minMarginPct} onChange={(v) => setProfitThreshold(cat, { minMarginPct: v })} />
+                        {isFull ? (
+                          <PercentInput value={th.minMarginPct} onChange={(v) => setProfitThreshold(cat, { minMarginPct: v })} />
+                        ) : <div className={"text-right " + computedCls}>{fmtPct(th.minMarginPct)}</div>}
                       </TableCell>
                     </TableRow>
                   );
@@ -323,7 +331,7 @@ export function InstallationTariffsSheet() {
                 <TableCell>დანადგარის დღგ %</TableCell>
                 <TableCell className="text-right w-40">
                   {isFull ? (
-                    <PercentInput value={f.equipmentVatRate} onChange={(v) => updateFinance({ equipmentVatRate: v })} />
+                    <PercentInput value={f.equipmentVatRate} onChange={(v) => updateGlobalFinance({ equipmentVatRate: v })} />
                   ) : <div className={"text-right " + computedCls}>{fmtPct(f.equipmentVatRate)}</div>}
                 </TableCell>
               </TableRow>
@@ -331,7 +339,7 @@ export function InstallationTariffsSheet() {
                 <TableCell>დღგ % (მონტაჟი/დანარჩენი)</TableCell>
                 <TableCell className="text-right">
                   {isFull ? (
-                    <PercentInput value={f.otherVatRate} onChange={(v) => updateFinance({ otherVatRate: v })} />
+                    <PercentInput value={f.otherVatRate} onChange={(v) => updateGlobalFinance({ otherVatRate: v })} />
                   ) : <div className={"text-right " + computedCls}>{fmtPct(f.otherVatRate)}</div>}
                 </TableCell>
               </TableRow>
@@ -339,7 +347,7 @@ export function InstallationTariffsSheet() {
                 <TableCell>საშემოსავლო %</TableCell>
                 <TableCell className="text-right">
                   {isFull ? (
-                    <PercentInput value={f.incomeTaxRate} onChange={(v) => updateFinance({ incomeTaxRate: v })} />
+                    <PercentInput value={f.incomeTaxRate} onChange={(v) => updateGlobalFinance({ incomeTaxRate: v })} />
                   ) : <div className={"text-right " + computedCls}>{fmtPct(f.incomeTaxRate)}</div>}
                 </TableCell>
               </TableRow>
@@ -347,7 +355,7 @@ export function InstallationTariffsSheet() {
                 <TableCell>საპენსიო %</TableCell>
                 <TableCell className="text-right">
                   {isFull ? (
-                    <PercentInput value={f.pensionRate} onChange={(v) => updateFinance({ pensionRate: v })} />
+                    <PercentInput value={f.pensionRate} onChange={(v) => updateGlobalFinance({ pensionRate: v })} />
                   ) : <div className={"text-right " + computedCls}>{fmtPct(f.pensionRate)}</div>}
                 </TableCell>
               </TableRow>
@@ -356,37 +364,42 @@ export function InstallationTariffsSheet() {
         </CardContent>
       </Card>
 
-      {/* საბანკო გარანტია — იგივე გლობალური მნიშვნელობა, რაც «ფინანსურ დაშვებებში» */}
+      {/* საბანკო გარანტია — წლიური საკომისიო % ყველა პროექტზე (ფინანსები);
+          მოცულობა % და დღეები — ახალი პროექტის default, პროექტში გაყიდვებიც ცვლიან */}
       <Card>
         <CardHeader>
           <CardTitle>საბანკო გარანტია</CardTitle>
-          <p className="text-xs text-muted-foreground">იგივე მნიშვნელობა, რაც «ფინანსური დაშვებები» ტაბზე — ორივე ადგილას რედაქტირებადია.</p>
+          <p className="text-xs text-muted-foreground">
+            წლიური საკომისიო % ადგენს ფინანსები და ავტომატურად ისმება ყველა მომხმარებლის მიმდინარე პროექტზე.
+            გარანტიის მოცულობა % და დღეები — ახალი პროექტის საწყისი მნიშვნელობაა; კონკრეტულ პროექტში
+            გაყიდვებს შეუძლიათ შეცვლა («შესატანი მონაცემები» → «საბანკო გარანტია»).
+          </p>
         </CardHeader>
         <CardContent>
           <Table>
             <TableBody>
               <TableRow>
-                <TableCell>გარანტიის % (ბაზა ფასიდან)</TableCell>
+                <TableCell>წლიური საკომისიო % (ყველა პროექტზე)</TableCell>
                 <TableCell className="text-right w-40">
                   {isFull ? (
-                    <PercentInput value={f.guaranteePct} onChange={(v) => updateFinance({ guaranteePct: v })} />
-                  ) : <div className={"text-right " + computedCls}>{fmtPct(f.guaranteePct)}</div>}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>წლიური საკომისიო %</TableCell>
-                <TableCell className="text-right">
-                  {isFull ? (
-                    <PercentInput value={f.guaranteeAnnualPct} onChange={(v) => updateFinance({ guaranteeAnnualPct: v })} />
+                    <PercentInput value={f.guaranteeAnnualPct} onChange={(v) => updateGlobalFinance({ guaranteeAnnualPct: v })} />
                   ) : <div className={"text-right " + computedCls}>{fmtPct(f.guaranteeAnnualPct)}</div>}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>დღეების რაოდენობა</TableCell>
+                <TableCell>გარანტიის მოცულობა %, ფასიდან (default ახალი პროექტისთვის)</TableCell>
                 <TableCell className="text-right">
                   {isFull ? (
-                    <NumberInput value={f.guaranteeDays} onChange={(v) => updateFinance({ guaranteeDays: v })} />
-                  ) : <div className={"text-right " + computedCls}>{f.guaranteeDays}</div>}
+                    <PercentInput value={defGuaranteePct} onChange={(v) => setGlobalDefaults({ guaranteePct: v })} />
+                  ) : <div className={"text-right " + computedCls}>{fmtPct(defGuaranteePct)}</div>}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>დღეების რაოდენობა (default ახალი პროექტისთვის)</TableCell>
+                <TableCell className="text-right">
+                  {isFull ? (
+                    <NumberInput value={defGuaranteeDays} onChange={(v) => setGlobalDefaults({ guaranteeDays: v })} />
+                  ) : <div className={"text-right " + computedCls}>{defGuaranteeDays}</div>}
                 </TableCell>
               </TableRow>
             </TableBody>
