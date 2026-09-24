@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAccessRole } from '@/components/AccessGate';
 import { listUsers } from '@/lib/access';
 import { 
@@ -194,8 +194,20 @@ export function PipelineSheet() {
   const [filterYear, setFilterYear] = useState<string>('2026');
   const [filterQuarter, setFilterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
-  const { projects: rawProjects, setProjects, loading } = usePipelineProjects();
-  const { isFull } = useAccessRole();
+  const { projects: allProjects, setProjects: setAllProjects, loading } = usePipelineProjects();
+  const { isFull, role, actorName } = useAccessRole();
+  // გაყიდვების წარმომადგენელი ხედავს მხოლოდ საკუთარ პროექტებს (მენეჯერი = ის).
+  const isRep = !isFull && role === 'sales';
+  const rawProjects = useMemo(
+    () => (isRep ? allProjects.filter((p: any) => managerMatches(p.manager, actorName)) : allProjects),
+    [allProjects, isRep, actorName]
+  );
+  // ჩაწერისას დამალული (სხვისი) ჩანაწერები უცვლელად ბრუნდება სიაში — რომ არ წაიშალოს.
+  const setProjects = useCallback((next: any[]) => {
+    if (!isRep) { setAllProjects(next); return; }
+    const visibleIds = new Set(rawProjects.map((p: any) => p.id));
+    setAllProjects([...next, ...allProjects.filter((p: any) => !visibleIds.has(p.id))]);
+  }, [isRep, rawProjects, allProjects, setAllProjects]);
   // მენეჯერები: არსებული ჩანაწერებიდან + „გაყიდვები" როლის მომხმარებლები (app_users)
   const [salesNames, setSalesNames] = useState<string[]>([]);
   useEffect(() => {
@@ -203,9 +215,13 @@ export function PipelineSheet() {
   }, []);
   const managerOptions = useMemo(() => {
     const fromData = (rawProjects as any[]).map((p) => p.manager).filter(Boolean) as string[];
+    if (isRep) {
+      const mine = Array.from(new Set(fromData));
+      return mine.length ? mine : [actorName];
+    }
     const extra = salesNames.filter((n) => !fromData.some((m) => managerMatches(m, n)));
     return Array.from(new Set([...fromData, ...extra])).sort((a, b) => a.localeCompare(b));
-  }, [rawProjects, salesNames]);
+  }, [rawProjects, salesNames, isRep, actorName]);
   const projects = useMemo(() => enrichProjectsWithHistory(rawProjects as Project[]), [rawProjects]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
