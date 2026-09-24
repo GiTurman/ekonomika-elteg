@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AppState, Unit, InstallTariffs, EquipmentCategory, ProfitThreshold, PaymentTranche, PaymentExpenseItem } from "./econ-types";
 import { defaultAppState, emptyUnit, blankAppState, normalizeAppState } from "./econ-defaults";
 import { suggestPaymentExpenses } from "./econ-calc";
+import { loadGlobalSettings, saveGlobalSettings, applyGlobal, extractGlobal, type GlobalSettings, type GlobalFinanceKey, type DefaultFinanceKey } from "./globalSettings";
 
 interface StoreShape {
   state: AppState;
@@ -25,6 +26,15 @@ interface StoreShape {
   setTariffRow: (section: keyof InstallTariffs, index: number, usdNet: number) => void;
   setProfitThreshold: (category: EquipmentCategory, patch: Partial<ProfitThreshold>) => void;
   setPageVisibility: (patch: Partial<AppState["pageVisibility"]>) => void;
+  // გლობალური პარამეტრები (app_settings) — იხ. globalSettings.ts
+  globalSettings: GlobalSettings | null;
+  globalReady: boolean;
+  // ფინანსები: გადასახადები / გარანტიის წლიური საკომისიო % — მიმდინარე პროექტზე + ყველასთვის
+  updateGlobalFinance: (patch: Partial<Pick<AppState["finance"], GlobalFinanceKey>>) => void;
+  // ფინანსები: ახალი პროექტის default-ები (გარანტიის მოცულობა %, დღეები) — მიმდინარე პროექტს არ ეხება
+  setGlobalDefaults: (patch: Partial<Pick<AppState["finance"], DefaultFinanceKey>>) => void;
+  // არქივიდან/ბმულიდან გახსნილ state-ზე მიმდინარე ფასნამატების/ზღვრების დადება
+  withGlobal: (s: AppState, mode: "new" | "draft" | "archive") => AppState;
   addTranche: (which: "A" | "B") => void;
   removeTranche: (which: "A" | "B", index: number) => void;
   updateTranche: (which: "A" | "B", index: number, patch: Partial<PaymentTranche>) => void;
@@ -32,7 +42,7 @@ interface StoreShape {
   removeExpense: (which: "A" | "B", index: number) => void;
   updateExpense: (which: "A" | "B", index: number, patch: Partial<PaymentExpenseItem>) => void;
   applySuggestedExpenses: (which: "A" | "B") => void;
-  load: (userId: string) => Promise<void>;
+  load: (userId: string, isFull?: boolean) => Promise<void>;
   save: () => Promise<void>;
   reset: () => void;
 }
@@ -103,6 +113,8 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   saving: false,
   currentUserId: null,
   loadedArchiveId: null,
+  globalSettings: null,
+  globalReady: false,
   setLoadedArchiveId: (id) => { saveArchiveId(get().currentUserId, id); set({ loadedArchiveId: id }); },
 
   setState: (updater) => {
@@ -121,6 +133,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
   updateDefaultRates: (patch) => {
     set((s) => ({ state: { ...s.state, defaultRates: { ...s.state.defaultRates, ...patch } } }));
     scheduleSave(get);
+    syncGlobal(set, get, (g, st) => ({ ...g, defaultRates: st.defaultRates }));
   },
   setBrandMarkup: (brand, pct) => {
     set((s) => {
@@ -130,6 +143,7 @@ export const useEconStore = create<StoreShape>((set, get) => ({
       return { state: { ...s.state, defaultRates: { ...s.state.defaultRates, brandMarkups }, project: { ...s.state.project, units } } };
     });
     scheduleSave(get);
+    syncGlobal(set, get, (g, st) => ({ ...g, defaultRates: st.defaultRates }));
   },
   setManualCell: (col, lineKey, value) => {
     set((s) => {
@@ -316,7 +330,17 @@ export const useEconStore = create<StoreShape>((set, get) => ({
       },
     }));
     scheduleSave(get);
+    syncGlobal(set, get, (g, st) => ({ ...g, profitThresholds: st.profitThresholds }));
   },
+  updateGlobalFinance: (patch) => {
+    set((s) => ({ state: { ...s.state, finance: { ...s.state.finance, ...patch } } }));
+    scheduleSave(get);
+    syncGlobal(set, get, (g) => ({ ...g, finance: { ...(g.finance ?? {}), ...patch } }));
+  },
+  setGlobalDefaults: (patch) => {
+    syncGlobal(set, get, (g) => ({ ...g, finance: { ...(g.finance ?? {}), ...patch } }));
+  },
+  withGlobal: (s, mode) => applyGlobal(s, get().globalSettings, mode),
   setPageVisibility: (patch) => {
     set((s) => ({ state: { ...s.state, pageVisibility: { ...s.state.pageVisibility, ...patch } } }));
     scheduleSave(get);
@@ -326,11 +350,11 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     const userId = get().currentUserId;
     clearDraft(userId);
     saveArchiveId(userId, null);
-    set((s) => ({ state: { ...blankAppState(), pageVisibility: s.state.pageVisibility }, loadedArchiveId: null }));
+    set((s) => ({ state: applyGlobal({ ...blankAppState(), pageVisibility: s.state.pageVisibility }, s.globalSettings, "new"), loadedArchiveId: null }));
     scheduleSave(get);
   },
 
-  load: async (userId: string) => {
+  load: async (userId: string, isFull = false) => {
     set({ currentUserId: userId });
     // Refresh-ისას (იმავე ბრაუზერში, იმავე მომხმარებლის მიერ) აღდგება ლოკალურად
     // შენახული დაუმთავრებელი ნამუშევარი — არაფერი არ იკარგება. სხვა კოდით
@@ -339,6 +363,25 @@ export const useEconStore = create<StoreShape>((set, get) => ({
     // რომ სხვის დაუმთავრებელ ნამუშევარს არასდროს ხედავდე.
     const draft = loadDraft(userId);
     set({ state: draft ? migrateSavedState(draft) : blankAppState(), loaded: true, loadedArchiveId: draft ? loadArchiveId(userId) : null });
+
+    // გლობალური პარამეტრები („ტარიფები") — ყველა მომხმარებელს ერთნაირად.
+    try {
+      let g = await loadGlobalSettings();
+      if (!g && isFull) {
+        // პირველი გაშვება: ფინანსების ბრაუზერში არსებული მნიშვნელობებით ვავსებთ.
+        g = extractGlobal(get().state);
+        await saveGlobalSettings(g);
+      }
+      const archiveOpen = !!get().loadedArchiveId;
+      set((s) => ({
+        globalSettings: g,
+        globalReady: true,
+        state: applyGlobal(s.state, g, !draft ? "new" : archiveOpen ? "archive" : "draft"),
+      }));
+      scheduleSave(get);
+    } catch (e) {
+      console.error("[econ-store] global settings load failed", e);
+    }
   },
 
   // საერთო app_state ჩანაწერში აღარ ვწერთ: მას ყველა მომხმარებელი ერთმანეთს
@@ -359,6 +402,35 @@ function migrateSavedState(s: AppState): AppState {
     f.mealAdmin = f.mealPerDay;
   }
   return s;
+}
+
+// გლობალური პარამეტრების ცვლილება — მეხსიერებაში მყისიერად, ბაზაში 700ms-იანი
+// დაგვიანებით (აკრეფისას ყოველ სიმბოლოზე რომ არ ჩაიწეროს). თუ ჩატვირთვა
+// ვერ მოხერხდა (globalReady=false) — ბაზაში არ ვწერთ, რომ ძველი მნიშვნელობებით
+// არ გადავაწეროთ.
+let globalTimer: ReturnType<typeof setTimeout> | null = null;
+function syncGlobal(
+  set: (p: Partial<StoreShape>) => void,
+  get: () => StoreShape,
+  mutate: (g: GlobalSettings, st: AppState) => GlobalSettings,
+) {
+  const { globalSettings, globalReady, state } = get();
+  if (!globalReady) {
+    console.warn("[econ-store] global settings not loaded — change kept locally only");
+    return;
+  }
+  set({ globalSettings: mutate(globalSettings ?? {}, state) });
+  if (globalTimer) clearTimeout(globalTimer);
+  globalTimer = setTimeout(async () => {
+    const g = get().globalSettings;
+    if (!g) return;
+    try {
+      await saveGlobalSettings(g);
+    } catch (e) {
+      console.error("[econ-store] global settings save failed", e);
+      alert("ტარიფების შენახვა ვერ მოხერხდა — ცვლილება სხვა მომხმარებლებს არ მიუვა.");
+    }
+  }, 700);
 }
 
 function scheduleSave(get: () => StoreShape) {
