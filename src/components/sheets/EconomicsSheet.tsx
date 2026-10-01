@@ -188,59 +188,7 @@ export function EconomicsSheet() {
           {(() => {
             // ერთი წყარო — ReportBlock-ებიც აქედან ივსება და ღილაკის "გადატანა"-ც
             // ამ სიაზე მუშაობს, რომ key-ები ზუსტად ემთხვეოდეს (title|label).
-            const blocks: Array<{ title: string; blockKey: string; rows: Array<[string, number, boolean?]> }> = [
-              { title: "შესყიდვის ხარჯები", blockKey: "purchase", rows: [
-                ["ქარხნული ფასი", eco.report.factoryTotal],
-                ["საბანკო საკომისიო", eco.report.bankCommTotal],
-                ["საერთაშორისო ტრანსპორტირება", eco.report.intTransportTotal],
-                ["ტერმინალის მომსახურება", eco.report.terminalTotal],
-                ["ადგილზე ტრანსპორტირება", eco.report.localTransportTotal],
-                ["ჯამი — შესყიდვის თვითღირებულება", eco.report.purchaseTotal, true],
-              ]},
-              { title: "მონტაჟის ხარჯები", blockKey: "install", rows: [
-                ["მონტაჟის ანაზღაურება (დარიცხვებით)", eco.report.mechPayroll],
-                ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll],
-                ["მივლინების ხარჯი (სრული)", eco.report.travelTotal],
-                ["მასალები", eco.report.materialsTotal],
-                ["ხარაჩო", eco.report.scaffoldingTotal],
-                ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal, true],
-              ]},
-              { title: "ფასნამატი", blockKey: "markup", rows: [
-                ["სულ თვითღირებულება", eco.report.costTotal, true],
-                ["დანადგარის ფასნამატი", eco.report.equipmentMarkup],
-                ["მონტაჟის ფასნამატი", eco.report.installMarkup],
-                ["სულ ფასნამატი", eco.report.markupTotal, true],
-                ["ფასი დამატებითი ხარჯების გარეშე", eco.report.priceNoExtras, true],
-              ]},
-              { title: "დამატებითი ხარჯები", blockKey: "extras", rows: [
-                ["გაუთვალისწინებელი ხარჯი", eco.report.contingency],
-                ...(isFull ? ([["ზედნადები ხარჯი", eco.report.overhead]] as Array<[string, number, boolean?]>) : []),
-                ["საბანკო სავალუტო რისკი", eco.report.fxRisk],
-                ["სხვა ხარჯები", eco.report.otherTotal],
-                ["დამიწება/ზედამხედველობა", eco.report.groundingTotal],
-                ["საშუამავლო საკომისიო", eco.report.brokerTotal],
-                ["გარანტიის ხარჯი", eco.report.warrantyCost],
-                ["უფასო სერვისი", eco.report.freeServiceCost],
-                ["გარანტიის თანხა (ჯამურად)", eco.report.guaranteeAmountCost],
-                ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
-              ]},
-              isFull
-                ? { title: "საბოლოო ფასი", blockKey: "final", rows: [
-                    ["ფასი დღგ-ს გარეშე", eco.report.priceNoVat, true],
-                    ["დღგ", eco.report.vat],
-                    ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
-                    ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
-                    ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
-                    ["გასაყიდი ფასი (დღგ-ს ჩათვლით)", eco.report.finalContractPrice, true],
-                  ]}
-                : { title: "საბოლოო ფასი (დღგ-ს ჩათვლით)", blockKey: "final", rows: [
-                    ["დღგ", eco.report.vat],
-                    ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
-                    ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
-                    ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
-                    ["საბოლოო კონტრაქტის ფასი", eco.report.finalContractPrice, true],
-                  ]},
-            ];
+            const blocks = buildReportBlocks(eco, isFull);
 
             // ღილაკი — ყველა ხაზის გამოთვლილ თანხას გადაიტანს «საბოლოო შეთავაზება» სვეტში.
             const copyComputedToOffer = () => {
@@ -375,4 +323,64 @@ function ReportBlock({ title, blockKey, rows }: { title: string; blockKey: strin
       </Table>
     </div>
   );
+}
+
+export type ReportBlockDef = { title: string; blockKey: string; rows: Array<[string, number, boolean?]> };
+
+// დეტალური ანგარიშის ბლოკები — ერთი წყარო ეკრანისთვის, «საბოლოო შეთავაზებაში» გადატანისთვის
+// და «ორი ხედის» შედარებისთვის. isFull=false → ზუსტად ის, რასაც გაყიდვები ხედავს.
+export function buildReportBlocks(eco: ReturnType<typeof computeEconomics>, isFull: boolean): ReportBlockDef[] {
+  return [
+              { title: "შესყიდვის ხარჯები", blockKey: "purchase", rows: [
+                ["ქარხნული ფასი", eco.report.factoryTotal],
+                ["საბანკო საკომისიო", eco.report.bankCommTotal],
+                ["საერთაშორისო ტრანსპორტირება", eco.report.intTransportTotal],
+                ["ტერმინალის მომსახურება", eco.report.terminalTotal],
+                ["ადგილზე ტრანსპორტირება", eco.report.localTransportTotal],
+                ["ჯამი — შესყიდვის თვითღირებულება", eco.report.purchaseTotal, true],
+              ]},
+              { title: "მონტაჟის ხარჯები", blockKey: "install", rows: [
+                ["მონტაჟის ანაზღაურება (დარიცხვებით)", eco.report.mechPayroll],
+                ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll],
+                ["მივლინების ხარჯი (სრული)", eco.report.travelTotal],
+                ["მასალები", eco.report.materialsTotal],
+                ["ხარაჩო", eco.report.scaffoldingTotal],
+                ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal, true],
+              ]},
+              { title: "ფასნამატი", blockKey: "markup", rows: [
+                ["სულ თვითღირებულება", eco.report.costTotal, true],
+                ["დანადგარის ფასნამატი", eco.report.equipmentMarkup],
+                ["მონტაჟის ფასნამატი", eco.report.installMarkup],
+                ["სულ ფასნამატი", eco.report.markupTotal, true],
+                ["ფასი დამატებითი ხარჯების გარეშე", eco.report.priceNoExtras, true],
+              ]},
+              { title: "დამატებითი ხარჯები", blockKey: "extras", rows: [
+                ["გაუთვალისწინებელი ხარჯი", eco.report.contingency],
+                ...(isFull ? ([["ზედნადები ხარჯი", eco.report.overhead]] as Array<[string, number, boolean?]>) : []),
+                ["საბანკო სავალუტო რისკი", eco.report.fxRisk],
+                ["სხვა ხარჯები", eco.report.otherTotal],
+                ["დამიწება/ზედამხედველობა", eco.report.groundingTotal],
+                ["საშუამავლო საკომისიო", eco.report.brokerTotal],
+                ["გარანტიის ხარჯი", eco.report.warrantyCost],
+                ["უფასო სერვისი", eco.report.freeServiceCost],
+                ["გარანტიის თანხა (ჯამურად)", eco.report.guaranteeAmountCost],
+                ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
+              ]},
+              isFull
+                ? { title: "საბოლოო ფასი", blockKey: "final", rows: [
+                    ["ფასი დღგ-ს გარეშე", eco.report.priceNoVat, true],
+                    ["დღგ", eco.report.vat],
+                    ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
+                    ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
+                    ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
+                    ["გასაყიდი ფასი (დღგ-ს ჩათვლით)", eco.report.finalContractPrice, true],
+                  ]}
+                : { title: "საბოლოო ფასი (დღგ-ს ჩათვლით)", blockKey: "final", rows: [
+                    ["დღგ", eco.report.vat],
+                    ["ფასი დღგ-ით (გარანტიის გარეშე)", eco.report.priceWithVat],
+                    ["საბანკო გარანტიის ბაზა", eco.report.guaranteeBase],
+                    ["საბანკო გარანტიის საკომისიო", eco.report.guaranteeFee],
+                    ["საბოლოო კონტრაქტის ფასი", eco.report.finalContractPrice, true],
+                  ]},
+            ];
 }
