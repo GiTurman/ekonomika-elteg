@@ -5,7 +5,7 @@ import { useAccessRole } from "@/components/AccessGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { EconomicsSheet, buildReportBlocks } from "./EconomicsSheet";
+import { EconomicsSheet, buildReportBlocks, buildProfitLines } from "./EconomicsSheet";
 import { fmtUsd, fmtPct } from "./sheet-ui";
 import { Columns2, Square } from "lucide-react";
 
@@ -72,6 +72,8 @@ function EconomicsMirror() {
       { key: "h2", label: "ჯამური მარჟა %", mine: eco.report.totalMarginPct, sales: salesMargin, fmt: "pct", bold: true,
         kind: kindOf(eco.report.totalMarginPct, salesMargin), note: "ჩემთან ÷ ფასი დღგ-ს გარეშე, გაყიდვებთან ÷ საბოლოო ფასი" },
       { key: "h3", label: "შემოწმების ხაზი", mine: eco.report.checkDiff, sales: null, fmt: "usd", kind: "onlyMine" },
+      { key: "h5", label: "სავარაუდო მოგება (რეზერვების ჩათვლით)", mine: buildProfitLines(eco).total, sales: null, fmt: "usd", bold: true, kind: "onlyMine",
+        note: `პირდაპირი ${fmtUsd(buildProfitLines(eco).direct)} · გაშიფვრა — «ერთი ხედი»-ს ბოლოში` },
       { key: "h4", label: "ზედნადები ხარჯი %", mine: eco.report.overheadPct, sales: null, fmt: "pct", kind: "onlyMine",
         note: `ზედნადები ${fmtUsd(eco.report.overhead)}, მ.შ. გაყიდვების ტარიფის სხვაობა ${fmtUsd(eco.report.salesBuffer)}` },
     ];

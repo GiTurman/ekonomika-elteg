@@ -238,6 +238,8 @@ export function EconomicsSheet() {
         </CardContent>
       </Card>
       </ManualCtx.Provider>
+
+      {isFull && <ProfitCard eco={eco} />}
     </div>
   );
 }
@@ -398,4 +400,82 @@ export function buildReportBlocks(eco: ReturnType<typeof computeEconomics>, isFu
                     ["საბოლოო კონტრაქტის ფასი", eco.report.finalContractPrice, true],
                   ]},
             ];
+}
+
+// სავარაუდო მოგება — მხოლოდ ფინანსებისთვის. რომელი პუნქტიდან რა თანხა რჩება
+// კომპანიას. ფასნამატები და ტარიფების სხვაობა — პირდაპირი მოგება; რეზერვები
+// (გაუთვალისწინებელი, ზედნადები, სავალუტო რისკი) — მოგება, თუ არ დაიხარჯა.
+export function buildProfitLines(eco: ReturnType<typeof computeEconomics>) {
+  const r = eco.report;
+  const overheadBase = r.overhead - r.salesBuffer;
+  const lines: Array<{ label: string; amount: number; kind: "direct" | "reserve"; note: string }> = [
+    { label: "დანადგარის ფასნამატი", amount: r.equipmentMarkup, kind: "direct", note: "შესყიდვის თვითღირებულება × დანადგარის ფასნამატი %" },
+    { label: "მონტაჟის ფასნამატი", amount: r.installMarkup, kind: "direct", note: "მონტაჟის თვითღირებულება × მონტაჟის ფასნამატი %" },
+    { label: "გაყიდვების ტარიფის სხვაობა", amount: r.salesBuffer, kind: "direct", note: "(გაყიდვების ტარიფი − რეალური) × სართული × დარიცხვები" },
+    { label: "ზედნადები ხარჯი", amount: overheadBase, kind: "reserve", note: "ფასი დამატ. ხარჯების გარეშე × ზედნადები %" },
+    { label: "გაუთვალისწინებელი ხარჯი", amount: r.contingency, kind: "reserve", note: "მოგება, თუ არ დაიხარჯა" },
+    { label: "სავალუტო რისკი", amount: r.fxRisk, kind: "reserve", note: "მოგება, თუ კურსი არ შეიცვალა" },
+  ];
+  const direct = lines.filter((l) => l.kind === "direct").reduce((s, l) => s + l.amount, 0);
+  const total = lines.reduce((s, l) => s + l.amount, 0);
+  return { lines, direct, total, base: r.priceNoVat };
+}
+
+function ProfitCard({ eco }: { eco: ReturnType<typeof computeEconomics> }) {
+  const { lines, direct, total, base } = buildProfitLines(eco);
+  const pct = (v: number) => (base ? v / base : 0);
+  const share = (v: number) => (total ? v / total : 0);
+  return (
+    <Card className="border-emerald-300 dark:border-emerald-800">
+      <CardHeader>
+        <CardTitle>3. სავარაუდო მოგება (მხოლოდ ფინანსები)</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          რომელი პუნქტიდან რა თანხა რჩება კომპანიას. % — ფასიდან დღგ-ს გარეშე ({fmtUsd(base)}).
+          რეზერვები მოგებად იქცევა, თუ პროექტში არ დაიხარჯა.
+        </p>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="text-xs">
+              <TableHead>პუნქტი</TableHead>
+              <TableHead>ტიპი</TableHead>
+              <TableHead className="text-right">თანხა</TableHead>
+              <TableHead className="text-right">% ფასიდან</TableHead>
+              <TableHead className="text-right">წილი მოგებაში</TableHead>
+              <TableHead>როგორ ითვლება</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.map((l) => (
+              <TableRow key={l.label}>
+                <TableCell className="text-sm">{l.label}</TableCell>
+                <TableCell className={"text-xs " + (l.kind === "direct" ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400")}>
+                  {l.kind === "direct" ? "პირდაპირი" : "რეზერვი"}
+                </TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtUsd(l.amount)}</TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtPct(pct(l.amount))}</TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtPct(share(l.amount))}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{l.note}</TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="bg-muted/60 font-semibold">
+              <TableCell colSpan={2}>პირდაპირი მოგება</TableCell>
+              <TableCell className={"text-right " + computedCls}>{fmtUsd(direct)}</TableCell>
+              <TableCell className={"text-right " + computedCls}>{fmtPct(pct(direct))}</TableCell>
+              <TableCell className={"text-right " + computedCls}>{fmtPct(share(direct))}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">ფასნამატები + ტარიფების სხვაობა</TableCell>
+            </TableRow>
+            <TableRow className="bg-emerald-50 dark:bg-emerald-950/30 font-bold">
+              <TableCell colSpan={2}>სავარაუდო მოგება სულ (რეზერვების ჩათვლით)</TableCell>
+              <TableCell className={"text-right " + computedCls}>{fmtUsd(total)}</TableCell>
+              <TableCell className={"text-right " + computedCls}>{fmtPct(pct(total))}</TableCell>
+              <TableCell className={"text-right " + computedCls}>100.00%</TableCell>
+              <TableCell className="text-xs text-muted-foreground">თუ რეზერვები სრულად დარჩა</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
 }
