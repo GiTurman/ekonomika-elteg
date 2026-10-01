@@ -20,6 +20,7 @@ export interface UnitEconomics {
   finalPrice: number; // M_final = (J + K + L) * (1 + brokerCommissionPct)
   marginPct: number; // N = G / J
   projectShare: number; // O = M_final / total_M_final
+  salesBuffer: number; // გაყიდვების ტარიფის ბუფერი (I-ში, ზედნადებში) — გაყიდვების ხედში მონტაჟის ხარჯად ჩანს
   belowMinAmount: boolean; // G < profitThresholds[category].minAmount
   belowMinMargin: boolean; // marginPct < profitThresholds[category].minMarginPct
 }
@@ -62,6 +63,9 @@ export interface ProjectReport {
   contingency: number; // D62
   overhead: number; // ზედნადები ხარჯი — H × overheadPct (გაუთვალისწინებელის შემდეგ)
   salesBuffer: number; // გაყიდვების ტარიფის ბუფერი (sales rate − real) — overhead-ში, markup-ნეიტრალური
+  salesBufferMech: number; // ბუფერის მონტაჟის ნაწილი
+  salesBufferElec: number; // ბუფერის ელექტრომონტაჟის ნაწილი
+  overheadPct: number; // ზედნადები (ბუფერის ჩათვლით) ÷ ფასი დამატებითი ხარჯების გარეშე
   fxRisk: number; // D63
   otherTotal: number; // D64
   groundingTotal: number; // D65
@@ -359,6 +363,7 @@ export function computeEconomics(state: AppState): FullEconomics {
       finalPrice,
       marginPct,
       projectShare: 0,
+      salesBuffer: salesBufferOf(u),
       belowMinAmount: G < threshold.minAmount,
       belowMinMargin: marginPct < threshold.minMarginPct,
     };
@@ -422,6 +427,8 @@ export function computeEconomics(state: AppState): FullEconomics {
     return s + H * u.contingencyPct;
   }, 0);
   const salesBuffer = units.reduce((s, u) => s + salesBufferOf(u), 0);
+  const salesBufferMech = units.reduce((s, u) => s + u.floors * bufGross * Math.max((u.mechRateSalesGel ?? 0) - u.mechRateGel, 0), 0);
+  const salesBufferElec = units.reduce((s, u) => s + u.floors * bufGross * Math.max((u.elecRateSalesGel ?? 0) - u.elecRateGel, 0), 0);
   const overhead = units.reduce((s, u) => {
     const D = purchaseCostOf(u);
     const E = installCostOf(u);
@@ -479,6 +486,9 @@ export function computeEconomics(state: AppState): FullEconomics {
     contingency,
     overhead,
     salesBuffer,
+    salesBufferMech,
+    salesBufferElec,
+    overheadPct: reportPriceNoExtras ? overhead / reportPriceNoExtras : 0,
     fxRisk,
     otherTotal,
     groundingTotal,
