@@ -67,8 +67,10 @@ function EconomicsMirror() {
   const sections = useMemo(() => {
     const salesMargin = eco.totals.finalPrice ? eco.report.markupTotal / eco.totals.finalPrice : 0;
     const head: Line[] = [
-      { key: "h1", label: "საბოლოო ციფრი", mine: eco.totals.priceNoVat, sales: eco.totals.finalPrice, fmt: "usd", bold: true,
-        kind: "diff", note: "ჩემთან — დღგ-ს გარეშე, გაყიდვებთან — დღგ-ით" },
+      { key: "h1", label: "საბოლოო საკონტრაქტო ფასი (დღგ-ით)", mine: eco.totals.finalPrice, sales: eco.totals.finalPrice, fmt: "usd", bold: true,
+        kind: "same" },
+      { key: "h1b", label: "ფასი დღგ-ს გარეშე", mine: eco.totals.priceNoVat, sales: eco.totals.priceNoVat, fmt: "usd",
+        kind: "same", note: "ჩემს ეკრანზე ცხრილის ბოლო სვეტი ეს თანხაა, გაყიდვებთან — ფასი დღგ-ით" },
       { key: "h2", label: "ჯამური მარჟა %", mine: eco.report.totalMarginPct, sales: salesMargin, fmt: "pct", bold: true,
         kind: kindOf(eco.report.totalMarginPct, salesMargin), note: "ჩემთან ÷ ფასი დღგ-ს გარეშე, გაყიდვებთან ÷ საბოლოო ფასი" },
       { key: "h3", label: "შემოწმების ხაზი", mine: eco.report.checkDiff, sales: null, fmt: "usd", kind: "onlyMine" },
@@ -112,7 +114,7 @@ function EconomicsMirror() {
           <CardTitle>დანადგარები — ჩემი | გაყიდვები</CardTitle>
           <p className="text-xs text-muted-foreground">
             თითო დანადგარი ერთ სტრიქონზეა: მარცხნივ ის, რასაც შენ ხედავ, მარჯვნივ — რასაც გაყიდვები.
-            „—" ნიშნავს, რომ ეს სვეტი ამ ხედში არ ჩანს.
+            დღგ და საბოლოო ფასი შედარებისთვის ორივე მხარეს ჩანს.
           </p>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -158,7 +160,7 @@ function EconomicsMirror() {
                   <TableRow key={id} className={total ? "bg-muted font-semibold" : ""}>
                     <TableCell className="font-semibold">{id}</TableCell>
                     {/* ჩემი: დღგ და საბოლოო ფასი არ ჩანს */}
-                    {cell(cost, "usd", true, 0, costDiff)}{cell(mk, "usd")}{cell(pnv, "usd")}{cell(null, "usd")}{cell(null, "usd")}{cell(mMine, "pct", false, 0, mDiff)}
+                    {cell(cost, "usd", true, 0, costDiff)}{cell(mk, "usd")}{cell(pnv, "usd")}{cell(vat, "usd")}{cell(fin, "usd")}{cell(mMine, "pct", false, 0, mDiff)}
                     {/* გაყიდვები */}
                     {cell(cost + buf, "usd", true, 1, costDiff)}{cell(mk, "usd")}{cell(pnv, "usd")}{cell(vat, "usd")}{cell(fin, "usd")}{cell(mSales, "pct", false, 1, mDiff)}
                   </TableRow>
