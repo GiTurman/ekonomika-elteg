@@ -8,7 +8,7 @@ import { computeEconomics } from "@/lib/econ-calc";
 import { exportToXlsx } from "@/lib/econ-export";
 import { ProjectDataSheet } from "@/components/sheets/ProjectDataSheet";
 import { FinancialAssumptionsSheet } from "@/components/sheets/FinancialAssumptionsSheet";
-import { EconomicsSheet } from "@/components/sheets/EconomicsSheet";
+import { EconomicsTab } from "@/components/sheets/EconomicsMirror";
 import { PaymentScheduleSheet } from "@/components/sheets/PaymentScheduleSheet";
 import { InstallationTariffsSheet } from "@/components/sheets/InstallationTariffsSheet";
 import { AnalyticsSheet } from "@/components/sheets/AnalyticsSheet";
@@ -332,7 +332,7 @@ function Index() {
                 </div>
               </TabsContent>
             )}
-            {showEconomicsTab && <TabsContent value="economics"><EconomicsSheet /></TabsContent>}
+            {showEconomicsTab && <TabsContent value="economics"><EconomicsTab /></TabsContent>}
             {showComparisonTab && <TabsContent value="comparison"><ComparisonSheet /></TabsContent>}
             {showArchiveTab && <TabsContent value="archive"><ArchiveSheet /></TabsContent>}
             {showVsActualTab && <TabsContent value="vs_actual"><VsActualSheet /></TabsContent>}
