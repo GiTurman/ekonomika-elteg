@@ -22,6 +22,8 @@ interface AccessContextShape {
   // ცნობილი არაა matrix-ში, ნაგულისხმევად ხილვადია.
   canViewPage: (pageKey: string) => boolean;
   refreshPagePermissions: () => void;
+  // ველების ხედვადობის ცხრილი — RoleView-სთვის (სხვა როლის თვალით ნახვა)
+  fieldVisList?: FieldVisibility[];
 }
 
 const AccessContext = createContext<AccessContextShape | null>(null);
@@ -122,10 +124,32 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       logout, canEditField, refreshFieldPermissions: loadFieldPermissions,
       canSeeField, refreshFieldVisibility: loadFieldVisibility,
       canViewPage, refreshPagePermissions: loadPagePermissions,
+      fieldVisList: fieldVis,
     }}>
       {children}
     </AccessContext.Provider>
   );
+}
+
+// სხვა როლის თვალით ნახვა (მხოლოდ კითხვისთვის) — მაგ. ფინანსები ხედავს, რას
+// ხედავს გაყიდვები. ველების ხედვადობა ზუსტად იმ როლის წესებით ითვლება,
+// რედაქტირება კი სრულად გამორთულია.
+export function RoleView({ role, children }: { role: AccessRole; children: React.ReactNode }) {
+  const ctx = useAccessRole();
+  const vis = ctx.fieldVisList ?? [];
+  const value: AccessContextShape = {
+    ...ctx,
+    role,
+    isFull: role === "full",
+    canEditField: () => false,
+    canSeeField: (fieldKey: string) => {
+      if (role === "full") return true;
+      const v = vis.find((x) => x.fieldKey === fieldKey);
+      if (!v) return true;
+      return v.allowedRoles.includes(role);
+    },
+  };
+  return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;
 }
 
 function CodeScreen({ onSuccess }: { onSuccess: (user: AppUser) => void }) {
