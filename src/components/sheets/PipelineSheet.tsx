@@ -101,24 +101,71 @@ const formatPct = (val: number, total?: number) => {
 // ============================================================================
 // MODAL COMPONENT
 // ============================================================================
-function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [] }: any) {
+const MONTHS = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'];
+const STATUS_DETAILS = ['აქტიური','დიდი ინტერესი','სიტყვიერი დასტური','დადასტურებული','ხელმოწერილი'];
+
+// ფორმის ველები — ფორმა 505-ის სვეტების თანმიმდევრობით. ყველა ველი სავალდებულოა,
+// გარდა: კლემანი/ჰიტაჩი (მხოლოდ შესაბამისი მწარმოებლისას) და დაკონტრაქტების
+// თარიღი (მხოლოდ სტატუსი „დაკონტრაქტებული"-სას).
+type FieldDef = { key: string; label: string; type: 'text' | 'number' | 'select' | 'date' | 'textarea'; options?: string[]; list?: string; wide?: boolean };
+const FIELDS: FieldDef[] = [
+  { key: 'name', label: 'პროექტის დასახელება', type: 'text', wide: true },
+  { key: 'product', label: 'პროდუქტი', type: 'select', options: ['ლიფტი', 'ესკალატორი', 'ტრაველატორი', 'პლატფორმა', 'საპარკინგე სისტემა'] },
+  { key: 'brand', label: 'მწარმოებელი', type: 'text', list: 'pl-brands' },
+  { key: 'units', label: 'რაოდენობა (ც.)', type: 'number' },
+  { key: 'floors', label: 'სართულები (ჯამი)', type: 'number' },
+  { key: 'contractDuration', label: 'ხანგრძლივობა (კვირა)', type: 'number' },
+  { key: 'location', label: 'ადგილმდებარეობა', type: 'text', list: 'pl-locations' },
+  { key: 'currency', label: 'ვალუტა', type: 'select', options: ['USD', 'EUR', 'GEL'] },
+  { key: 'kleemannValue', label: 'კლემანი (EUR)', type: 'number' },
+  { key: 'hitachiValue', label: 'ჰიტაჩი', type: 'number' },
+  { key: 'value', label: 'სრული ღირებულება (USD)', type: 'number' },
+  { key: 'revenue', label: 'შემოსავალი (USD)', type: 'number' },
+  { key: 'tranche1', label: 'I ტრანში (%)', type: 'number' },
+  { key: 'deliveryMonth', label: 'მოწოდების პერიოდი', type: 'select', options: MONTHS },
+  { key: 'probability', label: 'ალბათობა (%)', type: 'number' },
+  { key: 'quarter', label: 'კვარტალი', type: 'select', options: ['Q1', 'Q2', 'Q3', 'Q4'] },
+  { key: 'manager', label: 'მენეჯერი', type: 'select' },
+  { key: 'statusDetail', label: 'მიმდინარე სტატუსი', type: 'select', options: STATUS_DETAILS },
+  { key: 'status', label: 'საბოლოო სტატუსი', type: 'select', options: ['დაკონტრაქტებული', 'პოტ. 60%+', 'პოტ. 60%-'] },
+  { key: 'contractDate', label: 'დაკონტრაქტების თარიღი', type: 'date' },
+  { key: 'comment', label: 'კომენტარი', type: 'textarea', wide: true },
+];
+
+function isRequired(key: string, d: any, isNew = true): boolean {
+  const brand = String(d.brand || '').toUpperCase();
+  if (key === 'kleemannValue') return brand.includes('KLEEMANN');
+  if (key === 'hitachiValue') return brand.includes('HITACHI');
+  // არსებულ ჩანაწერებს თარიღი შეიძლება არ ჰქონდეს — რედაქტირებას არ ვბლოკავთ
+  if (key === 'contractDate') return isNew && d.status === 'დაკონტრაქტებული';
+  return true;
+}
+function isEmpty(v: any) {
+  return v === undefined || v === null || (typeof v === 'string' && v.trim() === '') || (typeof v === 'number' && !isFinite(v));
+}
+
+function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [], brandOptions = [], locationOptions = [] }: any) {
   const [formData, setFormData] = useState<any>(initialData || {});
+  const [tried, setTried] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleChange = (e: any) => {
-    const { name, value } = e.target;
-    const updatedForm = { ...formData, [name]: value };
-    // Simple logic for brand total
-    if (updatedForm.brand === 'KLEEMANN') {
-      updatedForm.kleemannValue = updatedForm.value;
-      updatedForm.hitachiValue = 0;
-    } else if (updatedForm.brand === 'HITACHI') {
-      updatedForm.hitachiValue = updatedForm.value;
-      updatedForm.kleemannValue = 0;
-    }
-    setFormData(updatedForm);
+  const isNew = !initialData?.id;
+  const missing = FIELDS.filter((f) => isRequired(f.key, formData, isNew) && isEmpty(formData[f.key])).map((f) => f.key);
+  const set = (key: string, raw: string, type: FieldDef['type']) => {
+    const v = type === 'number' ? (raw === '' ? '' : Number(raw)) : raw;
+    setFormData({ ...formData, [key]: v });
   };
+  const save = () => {
+    setTried(true);
+    if (missing.length) return;
+    // ცარიელი არასავალდებულო რიცხვები → 0, რომ ცხრილი/ჯამები სწორად დაითვალოს
+    const out: any = { ...formData };
+    FIELDS.forEach((f) => { if (f.type === 'number' && isEmpty(out[f.key])) out[f.key] = 0; });
+    onSave(out);
+  };
+  const inputCls = (key: string) =>
+    'w-full border p-2 rounded text-sm ' + (tried && missing.includes(key) ? 'border-red-500 bg-red-50' : '');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -131,56 +178,56 @@ function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         <div className="p-6">
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">დასახელება</label>
-              <input type="text" className="w-full border p-2 rounded text-sm" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">სტატუსი</label>
-              <select className="w-full border p-2 rounded text-sm" value={formData.status || ''} onChange={e => setFormData({...formData, status: e.target.value})}>
-                <option value="დაკონტრაქტებული">დაკონტრაქტებული</option>
-                <option value="პოტ. 60%+">პოტ. 60%+</option>
-                <option value="პოტ. 60%-">პოტ. 60%-</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">კვარტალი</label>
-              <select className="w-full border p-2 rounded text-sm" value={formData.quarter || ''} onChange={e => setFormData({...formData, quarter: e.target.value})}>
-                <option value="Q1">Q1</option>
-                <option value="Q2">Q2</option>
-                <option value="Q3">Q3</option>
-                <option value="Q4">Q4</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">მენეჯერი</label>
-              <select className="w-full border p-2 rounded text-sm" value={formData.manager || ''} onChange={e => setFormData({...formData, manager: e.target.value})}>
-                {(managerOptions as string[]).map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">ბრენდი</label>
-              <input type="text" className="w-full border p-2 rounded text-sm" value={formData.brand || ''} onChange={e => setFormData({...formData, brand: e.target.value})} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">ღირებულება (USD)</label>
-              <input type="number" className="w-full border p-2 rounded text-sm" value={formData.value || 0} onChange={e => setFormData({...formData, value: Number(e.target.value)})} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">შემოსავალი (USD)</label>
-              <input type="number" className="w-full border p-2 rounded text-sm" value={formData.revenue || 0} onChange={e => setFormData({...formData, revenue: Number(e.target.value)})} />
-            </div>
+          <p className="text-xs text-gray-500 mb-4">
+            <span className="text-red-600">*</span> — სავალდებულო. კლემანი/ჰიტაჩი სავალდებულოა შესაბამისი მწარმოებლისას,
+            დაკონტრაქტების თარიღი — სტატუსი „დაკონტრაქტებული"-სას.
+          </p>
+          <datalist id="pl-brands">{(brandOptions as string[]).map((b) => <option key={b} value={b} />)}</datalist>
+          <datalist id="pl-locations">{(locationOptions as string[]).map((b) => <option key={b} value={b} />)}</datalist>
+          <form className="grid grid-cols-1 md:grid-cols-3 gap-4" onSubmit={(e) => e.preventDefault()}>
+            {FIELDS.map((f) => {
+              const req = isRequired(f.key, formData, isNew);
+              const val = formData[f.key] ?? '';
+              const options = f.key === 'manager' ? (managerOptions as string[]) : f.options;
+              return (
+                <div key={f.key} className={'space-y-1 ' + (f.wide ? 'md:col-span-3' : '')}>
+                  <label className="text-xs font-semibold text-gray-600">
+                    {f.label}{req && <span className="text-red-600"> *</span>}
+                  </label>
+                  {f.type === 'select' ? (
+                    <select className={inputCls(f.key)} value={val} onChange={(e) => set(f.key, e.target.value, f.type)}>
+                      <option value="">— აირჩიეთ —</option>
+                      {(options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : f.type === 'textarea' ? (
+                    <textarea rows={3} className={inputCls(f.key)} value={val} onChange={(e) => set(f.key, e.target.value, f.type)} />
+                  ) : (
+                    <input
+                      type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                      list={f.list}
+                      className={inputCls(f.key)}
+                      value={val}
+                      onChange={(e) => set(f.key, e.target.value, f.type)}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </form>
+          {tried && missing.length > 0 && (
+            <p className="mt-4 text-sm text-red-600">
+              შეავსეთ სავალდებულო ველები: {FIELDS.filter((f) => missing.includes(f.key)).map((f) => f.label).join(', ')}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50 rounded-b-xl">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             გაუქმება
           </button>
-          <button onClick={() => onSave(formData)} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+          <button onClick={save} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2">
             <Save className="w-4 h-4" /> შენახვა
           </button>
         </div>
@@ -958,12 +1005,8 @@ export function PipelineSheet() {
                   onClick={() => {
                     setIsModalOpen(true);
                     setEditingId(null);
-                    setFormData({
-                      name: '', product: 'ლიფტი', brand: 'KLEEMANN', units: 1, floors: 0, contractDuration: 0,
-                      location: 'თბილისი', currency: 'USD', kleemannValue: 0, hitachiValue: 0, value: 0, revenue: 0,
-                      tranche1: 35, deliveryMonth: '', probability: 50, comment: '', quarter: 'Q1', manager: managerOptions[0] ?? '',
-                      statusDetail: 'აქტიური', status: 'პოტ. 60%-'
-                    });
+                    // ცარიელი ფორმა — ყველა ველს შემყვანი ავსებს
+                    setFormData({});
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded text-xs flex items-center gap-1 transition-colors shrink-0"
                 >
@@ -1056,6 +1099,8 @@ export function PipelineSheet() {
       {isModalOpen && (
         <ProjectModal 
           managerOptions={managerOptions}
+          brandOptions={Array.from(new Set(projects.map((p: any) => p.brand).filter(Boolean))).sort()}
+          locationOptions={Array.from(new Set(projects.map((p: any) => p.location).filter(Boolean))).sort()}
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)} 
           onSave={(data: any) => {
