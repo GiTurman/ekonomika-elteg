@@ -193,7 +193,7 @@ function Index() {
               <Cloud className="h-4 w-4" />
               {saving ? (<><Loader2 className="h-3 w-3 animate-spin" /> ინახება…</>) : (loaded ? "დრაფტი შენახულია ამ ბრაუზერში" : "იტვირთება…")}
             </span>
-            <Button size="sm" variant="outline" onClick={() => exportToXlsx(state)}>
+            <Button size="sm" variant="outline" onClick={() => { exportToXlsx(state, { isFull }).catch((e) => { console.error("[export] failed", e); alert("Excel ფაილის შექმნა ვერ მოხერხდა."); }); }}>
               <Download className="h-4 w-4 mr-1" /> Excel
             </Button>
             <ArchiveDialog />
