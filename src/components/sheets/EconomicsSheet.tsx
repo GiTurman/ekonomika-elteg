@@ -69,6 +69,7 @@ export function EconomicsSheet() {
   //   რეალურად გადასახდელი, დღგ-ს ჩათვლით საბოლოო ფასი.
   const salesMarginPct = eco.totals.finalPrice ? eco.report.markupTotal / eco.totals.finalPrice : 0;
   const marginPct = isFull ? eco.report.totalMarginPct : salesMarginPct;
+  const salesBuf = isFull ? 0 : eco.report.salesBuffer;
   const belowThreshold = eco.units.filter((r) => r.belowMinAmount || r.belowMinMargin);
 
   return (
@@ -136,11 +137,11 @@ export function EconomicsSheet() {
                   <TableCell className="font-semibold">{r.id}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{r.floors}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.purchaseCost)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.installCost)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.totalCost)}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.installCost + (isFull ? 0 : r.salesBuffer))}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.totalCost + (isFull ? 0 : r.salesBuffer))}</TableCell>
                   <TableCell className={"text-right " + (r.belowMinAmount ? "text-destructive font-semibold " : "") + computedCls}>{fmtUsd(r.markup)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.priceNoExtras)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.extras)}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.priceNoExtras + (isFull ? 0 : r.salesBuffer))}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.extras - (isFull ? 0 : r.salesBuffer))}</TableCell>
                   <TableCell className={"text-right " + (isFull ? "font-semibold " : "") + computedCls}>{fmtUsd(r.priceNoVat)}</TableCell>
                   {!isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(r.vat)}</TableCell>}
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.bankGuarantee)}</TableCell>
@@ -153,11 +154,11 @@ export function EconomicsSheet() {
               <TableRow className="bg-muted font-semibold">
                 <TableCell colSpan={2}>სულ პროექტში</TableCell>
                 <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.purchaseCost)}</TableCell>
-                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.installCost)}</TableCell>
-                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.totalCost)}</TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.installCost + salesBuf)}</TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.totalCost + salesBuf)}</TableCell>
                 <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.markup)}</TableCell>
-                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.priceNoExtras)}</TableCell>
-                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.extras)}</TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.priceNoExtras + salesBuf)}</TableCell>
+                <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.extras - salesBuf)}</TableCell>
                 <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.priceNoVat)}</TableCell>
                 {!isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.vat)}</TableCell>}
                 <TableCell className={"text-right " + computedCls}>{fmtUsd(eco.totals.bankGuarantee)}</TableCell>
@@ -220,6 +221,14 @@ export function EconomicsSheet() {
               <span className={"font-mono " + (Math.abs(eco.report.checkDiff) < 0.5 ? "text-emerald-600" : "text-destructive")}>
                 {fmtUsd(eco.report.checkDiff)}
               </span>
+            </div>
+          )}
+          {isFull && (
+            <div className="mt-3 flex items-center justify-between rounded border p-3">
+              <span className="text-sm">
+                ზედნადები ხარჯი % <span className="text-xs text-muted-foreground">(ზედნადები {fmtUsd(eco.report.overhead)}, მ.შ. გაყიდვების ტარიფის სხვაობა {fmtUsd(eco.report.salesBuffer)} ÷ ფასი დამატ. ხარჯების გარეშე)</span>
+              </span>
+              <span className={"font-semibold " + computedCls}>{fmtPct(eco.report.overheadPct)}</span>
             </div>
           )}
           <div className="mt-3 flex items-center justify-between rounded border p-3">
@@ -330,6 +339,12 @@ export type ReportBlockDef = { title: string; blockKey: string; rows: Array<[str
 // დეტალური ანგარიშის ბლოკები — ერთი წყარო ეკრანისთვის, «საბოლოო შეთავაზებაში» გადატანისთვის
 // და «ორი ხედის» შედარებისთვის. isFull=false → ზუსტად ის, რასაც გაყიდვები ხედავს.
 export function buildReportBlocks(eco: ReturnType<typeof computeEconomics>, isFull: boolean): ReportBlockDef[] {
+  // გაყიდვების ხედი: მონტაჟი გაყიდვების ტარიფით ჩანს (რეალური + ბუფერი), ბუფერი კი
+  // დამატებით ხარჯებს აკლდება — საბოლოო ფასი ორივე ხედში ერთი და იგივეა.
+  // ჩემს (full) ხედში ბუფერი ზედნადებშია.
+  const buf = isFull ? 0 : eco.report.salesBuffer;
+  const bufM = isFull ? 0 : eco.report.salesBufferMech;
+  const bufE = isFull ? 0 : eco.report.salesBufferElec;
   return [
               { title: "შესყიდვის ხარჯები", blockKey: "purchase", rows: [
                 ["ქარხნული ფასი", eco.report.factoryTotal],
@@ -340,19 +355,19 @@ export function buildReportBlocks(eco: ReturnType<typeof computeEconomics>, isFu
                 ["ჯამი — შესყიდვის თვითღირებულება", eco.report.purchaseTotal, true],
               ]},
               { title: "მონტაჟის ხარჯები", blockKey: "install", rows: [
-                ["მონტაჟის ანაზღაურება (დარიცხვებით)", eco.report.mechPayroll],
-                ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll],
+                ["მონტაჟის ანაზღაურება (დარიცხვებით)", eco.report.mechPayroll + bufM],
+                ["ელექტრომონტაჟი (დარიცხვებით)", eco.report.elecPayroll + bufE],
                 ["მივლინების ხარჯი (სრული)", eco.report.travelTotal],
                 ["მასალები", eco.report.materialsTotal],
                 ["ხარაჩო", eco.report.scaffoldingTotal],
-                ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal, true],
+                ["ჯამი — მონტაჟის თვითღირებულება", eco.report.installTotal + buf, true],
               ]},
               { title: "ფასნამატი", blockKey: "markup", rows: [
-                ["სულ თვითღირებულება", eco.report.costTotal, true],
+                ["სულ თვითღირებულება", eco.report.costTotal + buf, true],
                 ["დანადგარის ფასნამატი", eco.report.equipmentMarkup],
                 ["მონტაჟის ფასნამატი", eco.report.installMarkup],
                 ["სულ ფასნამატი", eco.report.markupTotal, true],
-                ["ფასი დამატებითი ხარჯების გარეშე", eco.report.priceNoExtras, true],
+                ["ფასი დამატებითი ხარჯების გარეშე", eco.report.priceNoExtras + buf, true],
               ]},
               { title: "დამატებითი ხარჯები", blockKey: "extras", rows: [
                 ["გაუთვალისწინებელი ხარჯი", eco.report.contingency],
@@ -364,7 +379,7 @@ export function buildReportBlocks(eco: ReturnType<typeof computeEconomics>, isFu
                 ["გარანტიის ხარჯი", eco.report.warrantyCost],
                 ["უფასო სერვისი", eco.report.freeServiceCost],
                 ["გარანტიის თანხა (ჯამურად)", eco.report.guaranteeAmountCost],
-                ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal, true],
+                ["ჯამი — დამატებითი ხარჯები", eco.report.extrasTotal - buf, true],
               ]},
               isFull
                 ? { title: "საბოლოო ფასი", blockKey: "final", rows: [

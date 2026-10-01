@@ -72,6 +72,8 @@ function EconomicsMirror() {
       { key: "h2", label: "ჯამური მარჟა %", mine: eco.report.totalMarginPct, sales: salesMargin, fmt: "pct", bold: true,
         kind: kindOf(eco.report.totalMarginPct, salesMargin), note: "ჩემთან ÷ ფასი დღგ-ს გარეშე, გაყიდვებთან ÷ საბოლოო ფასი" },
       { key: "h3", label: "შემოწმების ხაზი", mine: eco.report.checkDiff, sales: null, fmt: "usd", kind: "onlyMine" },
+      { key: "h4", label: "ზედნადები ხარჯი %", mine: eco.report.overheadPct, sales: null, fmt: "pct", kind: "onlyMine",
+        note: `ზედნადები ${fmtUsd(eco.report.overhead)}, მ.შ. გაყიდვების ტარიფის სხვაობა ${fmtUsd(eco.report.salesBuffer)}` },
     ];
     const mine = buildReportBlocks(eco, true);
     const sales = buildReportBlocks(eco, false);
@@ -136,12 +138,14 @@ function EconomicsMirror() {
               {[...eco.units.map((r) => ({ id: r.id, r, total: false })), { id: "სულ", r: null, total: true }].map(({ id, r, total }) => {
                 const t = eco.totals;
                 const cost = total ? t.totalCost : r!.totalCost;
+                const buf = total ? eco.report.salesBuffer : r!.salesBuffer;
                 const mk = total ? t.markup : r!.markup;
                 const pnv = total ? t.priceNoVat : r!.priceNoVat;
                 const vat = total ? t.vat : r!.vat;
                 const fin = total ? t.finalPrice : r!.finalPrice;
                 const mMine = total ? eco.report.totalMarginPct : r!.marginPct;
                 const mSales = total ? (t.finalPrice ? eco.report.markupTotal / t.finalPrice : 0) : r!.marginPct;
+                const costDiff = Math.abs(buf) > 0.005;
                 const cell = (v: number | null, f: "usd" | "pct", first = false, side = 0, hl = false) => (
                   <TableCell className={"text-right font-mono text-xs whitespace-nowrap " + (first ? (side === 0 ? "border-l-2 border-blue-300 " : "border-l-2 border-emerald-300 ") : "") + (v === null ? "text-muted-foreground " : "") + (hl ? "bg-amber-50 dark:bg-amber-950/30 font-semibold " : "")}>
                     {fmt(v, f)}
@@ -152,9 +156,9 @@ function EconomicsMirror() {
                   <TableRow key={id} className={total ? "bg-muted font-semibold" : ""}>
                     <TableCell className="font-semibold">{id}</TableCell>
                     {/* ჩემი: დღგ და საბოლოო ფასი არ ჩანს */}
-                    {cell(cost, "usd", true, 0)}{cell(mk, "usd")}{cell(pnv, "usd")}{cell(null, "usd")}{cell(null, "usd")}{cell(mMine, "pct", false, 0, mDiff)}
+                    {cell(cost, "usd", true, 0, costDiff)}{cell(mk, "usd")}{cell(pnv, "usd")}{cell(null, "usd")}{cell(null, "usd")}{cell(mMine, "pct", false, 0, mDiff)}
                     {/* გაყიდვები */}
-                    {cell(cost, "usd", true, 1)}{cell(mk, "usd")}{cell(pnv, "usd")}{cell(vat, "usd")}{cell(fin, "usd")}{cell(mSales, "pct", false, 1, mDiff)}
+                    {cell(cost + buf, "usd", true, 1, costDiff)}{cell(mk, "usd")}{cell(pnv, "usd")}{cell(vat, "usd")}{cell(fin, "usd")}{cell(mSales, "pct", false, 1, mDiff)}
                   </TableRow>
                 );
               })}
