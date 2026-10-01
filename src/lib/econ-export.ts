@@ -133,6 +133,7 @@ function colLetter(n: number): string {
 export async function exportToXlsx(state: AppState, opts: { isFull?: boolean } = {}) {
   const isFull = opts.isFull ?? false;
   const ExcelJS: ExcelNS = ((await import("exceljs")) as any).default ?? (await import("exceljs"));
+  if (!isFull) return exportSalesXlsx(ExcelJS, state);
   const eco = computeEconomics(state);
   const alloc = allocateProjectCosts(state);
   const p = state.project;
@@ -669,9 +670,13 @@ export async function exportToXlsx(state: AppState, opts: { isFull?: boolean } =
   // გახსნისას აქტიური — „ეკონომიკა"
   wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 3, visibility: "visible" }];
 
+  return saveWorkbook(wb, p.projectName);
+}
+
+async function saveWorkbook(wb: import("exceljs").Workbook, projectName: string) {
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const fileName = `${(p.projectName || "პროექტი").replace(/[\\/:*?"<>|]/g, "_")}_განფასება.xlsx`;
+  const fileName = `${(projectName || "პროექტი").replace(/[\\/:*?"<>|]/g, "_")}_განფასება.xlsx`;
   if (typeof window === "undefined" || typeof document === "undefined") return { buffer: buf, fileName };
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -683,3 +688,114 @@ export async function exportToXlsx(state: AppState, opts: { isFull?: boolean } =
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return { buffer: buf, fileName };
 }
+
+// =====================================================================
+// გაყიდვების (და სხვა არა-ფინანსების) ექსპორტი — მხოლოდ ფასები და ტრანშების %.
+// თვითღირებულება, ფასნამატი, მარჟა, რისკები, დეტალური ანგარიში და ფულადი
+// ნაკადის გაშიფვრა არ გადის. ფასები — მნიშვნელობებად (შიდა გაანგარიშება არ ჩანს),
+// ჯამები და ტრანშების თანხები — ფორმულებით.
+// =====================================================================
+async function exportSalesXlsx(ExcelJS: ExcelNS, state: AppState) {
+  const eco = computeEconomics(state);
+  const p = state.project;
+  const units: Unit[] = p.units.filter((u) => u.id && u.id.trim() !== "");
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "ELTEG — განფასების სისტემა";
+  wb.created = new Date();
+  (wb as any).calcProperties = { fullCalcOnLoad: true };
+  const today = new Date().toISOString().slice(0, 10);
+  const sub = `${p.projectName || "პროექტი"} · ექსპორტი ${today}`;
+
+  // ---------- განფასება ----------
+  const ws = wb.addWorksheet("განფასება", { views: [{ state: "frozen", ySplit: 3 }] });
+  const cols = [
+    ["#", 10], ["კატეგორია", 22], ["ბრენდი", 14], ["მოდელი", 14], ["ტვირთამწ. (კგ)", 11], ["სართ.", 7],
+    ["ფასი დღგ-ს გარეშე", 16], ["დღგ", 14], ["საბანკო გარანტია", 14], ["საშუამავლო", 13], ["საბოლოო ფასი", 16], ["წილი %", 9],
+  ] as const;
+  ws.columns = cols.map(([, w]) => ({ width: w }));
+  title(ws, `${p.projectName || "პროექტი"} — ფასების შეთავაზება (USD)`, sub, cols.length);
+  let r = 4;
+  section(ws, r++, "ზოგადი ინფორმაცია", cols.length);
+  const info = (label: string, value: unknown) => {
+    ws.mergeCells(r, 1, r, 2);
+    setLabel(ws.getCell(r, 1), label);
+    ws.mergeCells(r, 3, r, 7);
+    const c = ws.getCell(r, 3);
+    c.value = (value ?? "") as any; c.font = { name: FONT }; c.border = BORDER;
+    r++;
+  };
+  info("პროექტი", p.projectName);
+  info("მისამართი", p.location);
+  info("ნაგებობის ტიპი", p.buildingType);
+  info("ჩაბარების წელი", p.completionYear);
+  info("მომუშავე პირი", p.responsiblePerson);
+  r++;
+  section(ws, r++, "დანადგარები და ფასები", cols.length);
+  header(ws, r++, cols.map(([l]) => l));
+  const u0 = r;
+  units.forEach((u, i) => {
+    const e = eco.units[i];
+    const preBroker = e.priceNoVat + e.vat + e.bankGuarantee;
+    const vals: [unknown, string | undefined][] = [
+      [u.id, undefined], [EQUIPMENT_CATEGORY_LABEL[u.category ?? "lift"], undefined], [u.brand, undefined], [u.model, undefined],
+      [u.capacity, FMT_NUM], [u.floors, FMT_NUM],
+      [round2(e.priceNoVat), FMT_USD], [round2(e.vat), FMT_USD], [round2(e.bankGuarantee), FMT_USD], [round2(e.finalPrice - preBroker), FMT_USD],
+    ];
+    vals.forEach(([v, fmt], c) => {
+      const cell = ws.getCell(r, c + 1);
+      cell.value = (v ?? "") as any; cell.font = { name: FONT }; cell.border = BORDER;
+      if (fmt) cell.numFmt = fmt;
+    });
+    setFormula(ws.getCell(r, 11), `SUM(G${r}:J${r})`, round2(e.priceNoVat) + round2(e.vat) + round2(e.bankGuarantee) + round2(e.finalPrice - preBroker), FMT_USD, C_FORMULA, true);
+    r++;
+  });
+  const uL = Math.max(r - 1, u0);
+  const tRow = r;
+  setLabel(ws.getCell(tRow, 1), "სულ", true);
+  const sumOf = (col: string) => { let s2 = 0; for (let k = u0; k <= uL; k++) { const v: any = ws.getCell(`${col}${k}`).value; s2 += typeof v === "number" ? v : (v?.result ?? 0); } return s2; };
+  setFormula(ws.getCell(`F${tRow}`), `SUM(F${u0}:F${uL})`, sumOf("F"), FMT_NUM);
+  for (const col of ["G", "H", "I", "J", "K"]) setFormula(ws.getCell(`${col}${tRow}`), `SUM(${col}${u0}:${col}${uL})`, sumOf(col), FMT_USD);
+  const totalK = sumOf("K");
+  for (let k = u0; k <= uL && units.length; k++) {
+    const v: any = ws.getCell(`K${k}`).value;
+    setFormula(ws.getCell(`L${k}`), `IF($K$${tRow}=0,0,K${k}/$K$${tRow})`, totalK ? (v?.result ?? 0) / totalK : 0, FMT_PCT);
+  }
+  setFormula(ws.getCell(`L${tRow}`), `SUM(L${u0}:L${uL})`, units.length ? 1 : 0, FMT_PCT);
+  totalStyle(ws, tRow, 1, cols.length);
+  ws.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+
+  // ---------- გადახდის გრაფიკი (მხოლოდ ტრანშების %) ----------
+  const wpay = wb.addWorksheet(S_PAY, { views: [{ state: "frozen", ySplit: 3 }] });
+  wpay.columns = [{ width: 36 }, { width: 14 }, { width: 18 }];
+  title(wpay, "გადახდის გრაფიკი", sub, 3);
+  r = 5;
+  setLabel(wpay.getCell(r, 1), "სრული საკონტრაქტო ფასი", true);
+  setLink(wpay.getCell(r, 2), `'განფასება'!K${tRow}`, totalK, FMT_USD);
+  wpay.mergeCells(r, 2, r, 3);
+  const priceAddr = `$B$${r}`;
+  r += 2;
+  for (const which of ["A", "B"] as const) {
+    const sc = which === "A" ? state.payment.scenarioA : state.payment.scenarioB;
+    if (!sc || sc.tranches.length === 0) continue;
+    section(wpay, r++, `სცენარი ${which}: ${sc.name}`, 3);
+    header(wpay, r++, ["ტრანში", "% ფასიდან", "თანხა"]);
+    const s0 = r;
+    sc.tranches.forEach((t) => {
+      setLabel(wpay.getCell(r, 1), t.label);
+      const c = wpay.getCell(r, 2); c.value = t.pct; c.numFmt = FMT_PCT; c.font = { name: FONT }; c.border = BORDER;
+      setFormula(wpay.getCell(r, 3), `B${r}*${priceAddr}`, t.pct * totalK, FMT_USD);
+      r++;
+    });
+    setLabel(wpay.getCell(r, 1), "სულ", true);
+    const pctSum = sc.tranches.reduce((a, t) => a + t.pct, 0);
+    setFormula(wpay.getCell(r, 2), `SUM(B${s0}:B${r - 1})`, pctSum, FMT_PCT);
+    setFormula(wpay.getCell(r, 3), `SUM(C${s0}:C${r - 1})`, pctSum * totalK, FMT_USD);
+    totalStyle(wpay, r, 1, 3);
+    r += 3;
+  }
+  wpay.pageSetup = { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+
+  return saveWorkbook(wb, p.projectName);
+}
+
+function round2(x: number) { return Math.round((x || 0) * 100) / 100; }
