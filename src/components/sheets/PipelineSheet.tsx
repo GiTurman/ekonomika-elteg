@@ -393,8 +393,8 @@ export function PipelineSheet() {
               // Filtering Logic
               let dashProjects = projects.filter(p => {
                 let match = true;
-                // Basic year logic: if no contractDate, assume 2024 for mock data
-                let y = '2024';
+                // თარიღი არ აქვს (ფორმა 505 — მიმდინარე წლის პაიპლაინი) → მიმდინარე წელი
+                let y = String(new Date().getFullYear());
                 let m = 'all';
                 if(p.contractDate) {
                   y = p.contractDate.substring(0, 4);
@@ -1019,7 +1019,7 @@ export function PipelineSheet() {
               <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                 <thead className="bg-slate-50/95 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200 sticky top-0 backdrop-blur-md z-10">
                   <tr>
-                    <th className="px-3 py-2 font-medium">პროექტის დასახელება</th>
+                    <th className="px-3 py-2 font-medium sticky left-0 z-20 bg-slate-50 border-r border-slate-200 min-w-[200px]">პროექტის დასახელება</th>
                     <th className="px-3 py-2 font-medium">პროდუქტი</th>
                     <th className="px-3 py-2 font-medium">მწარმოებელი</th>
                     <th className="px-3 py-2 font-medium text-center" title="დანადგარის რაოდენობა">რაოდ.</th>
@@ -1045,8 +1045,8 @@ export function PipelineSheet() {
                 </thead>
                 <tbody className="text-xs">
                   {filteredFormaProjects.map((proj) => (
-                    <tr key={proj.id} className="border-b border-slate-100 bg-white hover:bg-slate-50/80 transition-colors">
-                      <td className="px-3 py-1.5 truncate max-w-[200px]" title={proj.name}>{proj.name}</td>
+                    <tr key={proj.id} className="group border-b border-slate-100 bg-white hover:bg-slate-50/80 transition-colors">
+                      <td className="px-3 py-1.5 truncate max-w-[220px] min-w-[200px] sticky left-0 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200 font-medium" title={proj.name}>{proj.name}</td>
                       <td className="px-3 py-1.5">{proj.product || ''}</td>
                       <td className="px-3 py-1.5">{proj.brand}</td>
                       <td className="px-3 py-1.5 text-center">{proj.units}</td>
