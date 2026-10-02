@@ -18,6 +18,8 @@ interface ManualColsCtx {
   finalOffer: Record<string, number>;
   factual: Record<string, number>;
   onSet: (col: "finalOffer" | "factual", key: string, v: number | null) => void;
+  // ჯაჭვურად გადათვლილი მნიშვნელობები ყველა ხაზისთვის (key = "ბლოკი|ხაზი")
+  values: { finalOffer: Record<string, number>; factual: Record<string, number> };
 }
 const ManualCtx = createContext<ManualColsCtx | null>(null);
 
@@ -39,13 +41,14 @@ function ManualCell({
   }
   return (
     <Input
-      type="number" inputMode="decimal" step="any"
+      type="text" inputMode="decimal"
       className="h-8 text-right w-32 ml-auto"
       value={text}
       placeholder={fmtUsd(computed)}
       onFocus={(e) => { focused.current = true; e.target.select(); }}
       onChange={(e) => {
-        const v = e.target.value;
+        const v = e.target.value.replace(/,/g, ".").replace(/\s/g, "");
+        if (v !== "" && !/^-?\d*\.?\d*$/.test(v)) return;
         setText(v);
         if (v === "") { onSet(null); return; }
         if (v === "-" || v === ".") return;
@@ -175,6 +178,13 @@ export function EconomicsSheet() {
         canEditBlock: (bk) => canEditField("econ." + bk),
         canSeeBlock: (bk) => canSeeField("econ." + bk),
         finalOffer: mc.finalOffer, factual: mc.factual, onSet: setManualCell,
+        values: (() => {
+          const blocks = buildReportBlocks(eco, isFull);
+          return {
+            finalOffer: computeManualColumn(blocks, mc.finalOffer, eco, state.finance),
+            factual: computeManualColumn(blocks, mc.factual, eco, state.finance),
+          };
+        })(),
       }}>
       <Card>
         <CardHeader>
@@ -254,32 +264,13 @@ function ReportBlock({ title, blockKey, rows }: { title: string; blockKey: strin
 
   const keyOf = (label: string) => title + "|" + label;
 
-  // bold ხაზი = ბლოკის ჯამური სტრიქონი. მას ხელით არ ავსებენ — ავტომატურად
-  // დაითვლება. "ჯამი — " პრეფიქსის ხაზი = მის წინა არა-bold ხაზების ჯამი
-  // (ცალკეული input-ების ან, თუ ცარიელია, გამოთვლილის ჯამი). დანარჩენი bold
-  // ხაზები (მაგ. "სულ ფასნამატი", "ფასი დღგ-ს გარეშე") ჯაჭვურ გამოთვლას
-  // ეყრდნობა — მათ «საბოლოო»/«ფაქტი» სვეტში პირდაპირ გამოთვლილი value ჩნდება.
-  const isSimpleSum = (label: string) => label.startsWith("ჯამი —") || label.startsWith("ჯამი (");
-
-  // მოცემული ხაზისთვის, ხელით სვეტის (col) მნიშვნელობა:
-  //   - bold "ჯამი —" ხაზი → მის წინა არა-bold ხაზების ჯამი (input-ი ან val)
-  //   - bold სხვა ხაზი → გამოთვლილი val (ჯაჭვური, არა მარტივი ჯამი)
-  //   - ჩვეულებრივი ხაზი → input-ი თუ არსებობს, თუ არა — val
+  // ყველა ხაზის მნიშვნელობა (ჩვეულებრივიც და ჯამურიც) ჯაჭვურად ითვლება
+  // computeManualColumn-ში: ხელით შეყვანილი ცვლილება ყველა ქვემოთ მდგომ ჯამსა და
+  // საბოლოო ფასში გადადის (თვითღირებულება → ფასნამატი → დამატებითი → დღგ → გარანტია).
   const colValue = (col: "finalOffer" | "factual", idx: number): number => {
     if (!mc) return rows[idx][1];
-    const [label, val, bold] = rows[idx];
-    if (!bold) return mc[col][keyOf(label)] ?? val;
-    if (isSimpleSum(label)) {
-      // წინა არა-bold ხაზების ჯამი ამ ბლოკში (ბოლო bold-მდე)
-      let s = 0;
-      for (let i = 0; i < idx; i++) {
-        const [l2, v2, b2] = rows[i];
-        if (b2) continue;
-        s += mc[col][keyOf(l2)] ?? v2;
-      }
-      return s;
-    }
-    return val; // ჯაჭვური bold — გამოთვლილივე
+    const k = keyOf(rows[idx][0]);
+    return mc.values[col][k] ?? rows[idx][1];
   };
 
   return (
@@ -310,7 +301,7 @@ function ReportBlock({ title, blockKey, rows }: { title: string; blockKey: strin
                         <span className={"text-right " + linkedCls}>{fmtUsd(colValue("finalOffer", idx))}</span>
                       ) : (
                         <ManualCell
-                          saved={mc!.finalOffer[k]} computed={val} editable={canEdit}
+                          saved={mc!.finalOffer[k]} computed={mc!.values.finalOffer[k] ?? val} editable={canEdit}
                           onSet={(v) => mc!.onSet("finalOffer", k, v)}
                         />
                       )}
@@ -320,7 +311,7 @@ function ReportBlock({ title, blockKey, rows }: { title: string; blockKey: strin
                         <span className={"text-right " + linkedCls}>{fmtUsd(colValue("factual", idx))}</span>
                       ) : (
                         <ManualCell
-                          saved={mc!.factual[k]} computed={val} editable={canEdit}
+                          saved={mc!.factual[k]} computed={mc!.values.factual[k] ?? val} editable={canEdit}
                           onSet={(v) => mc!.onSet("factual", k, v)}
                         />
                       )}
@@ -334,6 +325,141 @@ function ReportBlock({ title, blockKey, rows }: { title: string; blockKey: strin
       </Table>
     </div>
   );
+}
+
+// «საბოლოო შეთავაზება» / «ფაქტი» სვეტის ჯაჭვური გადათვლა — იგივე ფორმულები, რაც econ-calc-ში.
+// ხელით შეყვანილი ხაზი = შეყვანილი თანხა; შეუვსებელი ხაზი = ფორმულით ხელახლა ითვლება
+// შეყვანილი თანხების გათვალისწინებით:
+//   დანადგარის / მონტაჟის ფასნამატი = შესყიდვის / მონტაჟის თვითღირებულება × % ;
+//   სულ თვითღირ. = შესყიდვა + მონტაჟი;  H (ფასი დამ. ხარჯ. გარეშე) = თვითღირ. + ფასნამატი;
+//   გაუთვალისწინებელი / ზედნადები = H × % ;  სავალუტო რისკი = (ქარხნული + ბანკი) × % ;
+//   გარანტიის ხარჯი = ქარხნული × % ;  ფასი დღგ-ს გარეშე = H + დამატებითი (საშუამავლოს გარდა);
+//   დღგ = დანადგარის ნაწილი × დანადგ. დღგ% + დანარჩენი × დღგ% ;  ფასი დღგ-ით = P + დღგ;
+//   გარანტიის ბაზა = ფასი დღგ-ით × % ;  საკომისიო = ბაზა × წლიური% × დღე/365;
+//   M = ფასი დღგ-ით + საკომისიო × (1 + დღგ%);  საშუამავლო = M × % ;  საბოლოო = M + საშუამავლო.
+// %-ები აიღება გამოთვლილი თანხების ფარდობიდან (ეფექტური განაკვეთი), ამიტომ ცარიელი
+// სვეტი ყოველთვის ზუსტად «გამოთვლილს» უდრის. დამალული ნაწილი (გაყიდვების ხედში
+// ზედნადები) ჯამებში რჩება და H-თან ერთად იცვლება.
+const LBL_BROKER = "საშუამავლო საკომისიო";
+const LBL_EQ_MARKUP = "დანადგარის ფასნამატი";
+const LBL_FACTORY = "ქარხნული ფასი";
+const LBL_BANK = "საბანკო საკომისიო";
+const ratio = (a: number, b: number) => (Math.abs(b) > 1e-9 ? a / b : 1);
+export function computeManualColumn(
+  blocks: ReportBlockDef[],
+  manual: Record<string, number>,
+  eco: ReturnType<typeof computeEconomics>,
+  f: { equipmentVatRate: number; otherVatRate: number; guaranteePct: number; guaranteeAnnualPct: number; guaranteeDays: number },
+): Record<string, number> {
+  const r = eco.report;
+  const out: Record<string, number> = {};
+  const d = { purchase: 0, install: 0, markup: 0, eqMarkup: 0, factory: 0, bank: 0 };
+  const K = (b: ReportBlockDef, label: string) => b.title + "|" + label;
+  const byKey = (bk: string) => blocks.find((b) => b.blockKey === bk);
+
+  // 1) შესყიდვა / მონტაჟი — ჩვეულებრივი ხაზები
+  for (const bk of ["purchase", "install"]) {
+    const b = byKey(bk);
+    if (!b) continue;
+    for (const [label, val, bold] of b.rows) {
+      if (bold) continue;
+      const v = manual[K(b, label)] ?? val;
+      out[K(b, label)] = v;
+      const delta = v - val;
+      if (bk === "purchase") {
+        d.purchase += delta;
+        if (label === LBL_FACTORY) d.factory += delta;
+        if (label === LBL_BANK) d.bank += delta;
+      } else d.install += delta;
+    }
+  }
+  // ფასნამატი = თვითღირებულება × % (თუ ხელით არ შეიყვანე)
+  const kPurchase = ratio(r.purchaseTotal + d.purchase, r.purchaseTotal);
+  const kInstall = ratio(r.installTotal + d.install, r.installTotal);
+  const mk = byKey("markup");
+  if (mk) {
+    for (const [label, val, bold] of mk.rows) {
+      if (bold) continue;
+      const derived = label === LBL_EQ_MARKUP ? r.equipmentMarkup * kPurchase
+        : label === "მონტაჟის ფასნამატი" ? r.installMarkup * kInstall : val;
+      const v = manual[K(mk, label)] ?? derived;
+      out[K(mk, label)] = v;
+      d.markup += v - val;
+      if (label === LBL_EQ_MARKUP) d.eqMarkup += v - val;
+    }
+  }
+  const H0 = r.priceNoExtras;
+  const H1 = H0 + d.purchase + d.install + d.markup;
+  const kH = ratio(H1, H0);
+  const kFx = ratio(r.factoryTotal + r.bankCommTotal + d.factory + d.bank, r.factoryTotal + r.bankCommTotal);
+  const kFactory = ratio(r.factoryTotal + d.factory, r.factoryTotal);
+
+  // 2) დამატებითი ხარჯები
+  const ext = byKey("extras");
+  let extrasShown0 = 0, extrasShown1 = 0, extrasBold0 = 0;
+  let brokerKey: string | null = null;
+  if (ext) {
+    for (const [label, val, bold] of ext.rows) {
+      const k = K(ext, label);
+      if (bold) { extrasBold0 = val; continue; }
+      if (label === LBL_BROKER) { brokerKey = k; continue; }
+      let derived = val;
+      if (label === "გაუთვალისწინებელი ხარჯი") derived = r.contingency * kH;
+      else if (label === "ზედნადები ხარჯი") derived = r.salesBuffer + (r.overhead - r.salesBuffer) * kH;
+      else if (label === "საბანკო სავალუტო რისკი") derived = r.fxRisk * kFx;
+      else if (label === "გარანტიის ხარჯი") derived = r.warrantyCost * kFactory;
+      const v = manual[k] ?? derived;
+      out[k] = v;
+      extrasShown0 += val;
+      extrasShown1 += v;
+    }
+  }
+  const hidden0 = extrasBold0 - extrasShown0; // გაყიდვების ხედში — ზედნადების დამალული ნაწილი
+  const extrasBold1 = extrasShown1 + hidden0 * kH;
+  const dExtras = extrasBold1 - extrasBold0;
+
+  // 3) ჯამური ხაზები (საბოლოო ბლოკამდე)
+  for (const b of blocks) {
+    if (b.blockKey === "final") continue;
+    for (const [label, val, bold] of b.rows) {
+      if (!bold) continue;
+      let v = val;
+      if (b.blockKey === "purchase") v = val + d.purchase;
+      else if (b.blockKey === "install") v = val + d.install;
+      else if (b.blockKey === "extras") v = extrasBold1;
+      else if (b.blockKey === "markup") {
+        if (label === "სულ თვითღირებულება") v = val + d.purchase + d.install;
+        else if (label === "სულ ფასნამატი") v = val + d.markup;
+        else v = val + d.purchase + d.install + d.markup; // ფასი დამატებითი ხარჯების გარეშე
+      }
+      out[K(b, label)] = v;
+    }
+  }
+
+  // 4) საბოლოო ბლოკი
+  const P = r.priceNoVat + (H1 - H0) + dExtras;
+  const er = f.equipmentVatRate, or = f.otherVatRate;
+  const eq0 = Math.abs(er - or) > 1e-9 ? (r.vat - r.priceNoVat * or) / (er - or) : 0; // დანადგარის ნაწილი
+  const eq = eq0 + d.purchase + d.eqMarkup;
+  const gPct = r.priceWithVat ? r.guaranteeBase / r.priceWithVat : f.guaranteePct;
+  const feeRate = r.guaranteeBase ? r.guaranteeFee / r.guaranteeBase : (f.guaranteeAnnualPct * f.guaranteeDays) / 365;
+  const M0 = r.finalContractPrice - r.brokerTotal;
+  const brokerRate = M0 ? r.brokerTotal / M0 : 0;
+  const fin = byKey("final");
+  const pick = (k: string, derived: number) => { const v = manual[k] ?? derived; out[k] = v; return v; };
+  const fk = (label: string) => (fin ? K(fin, label) : "__" + label);
+  if (fin) out[fk("ფასი დღგ-ს გარეშე")] = P;
+  const vat = pick(fk("დღგ"), eq * er + (P - eq) * or);
+  const pwv = pick(fk("ფასი დღგ-ით (გარანტიის გარეშე)"), P + vat);
+  const base = pick(fk("საბანკო გარანტიის ბაზა"), pwv * gPct);
+  const fee = pick(fk("საბანკო გარანტიის საკომისიო"), base * feeRate);
+  const M = pwv + fee * (1 + or);
+  const broker = brokerKey ? pick(brokerKey, M * brokerRate) : M * brokerRate;
+  if (fin) {
+    out[fk("გასაყიდი ფასი (დღგ-ს ჩათვლით)")] = M + broker;
+    out[fk("საბოლოო კონტრაქტის ფასი")] = M + broker;
+  }
+  return out;
 }
 
 export type ReportBlockDef = { title: string; blockKey: string; rows: Array<[string, number, boolean?]> };
