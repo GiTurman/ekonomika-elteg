@@ -28,6 +28,7 @@ import { normalizeAppState } from "@/lib/econ-defaults";
 import { logActivity } from "@/lib/activityLog";
 import { LogSheet } from "@/components/sheets/LogSheet";
 import { PipelineSheet } from "@/components/sheets/PipelineSheet";
+import { TrashSheet } from "@/components/sheets/TrashSheet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -113,6 +114,7 @@ function Index() {
     { value: "plan", title: "გეგმა და შესრულებები", desc: "კვარტალური გეგმა vs შესრულება", show: showPlanTab },
     { value: "pipeline", title: "პაიპლაინი / ფორმა 505", desc: "გაყიდვების პაიპლაინი და ფუნელი", show: showPipelineTab },
     { value: "log", title: "ლოგი", desc: "აქტივობა, მომხმარებლები, უფლებები", show: isFull },
+    { value: "trash", title: "სანაგვე", desc: "წაშლილი ჩანაწერები — აღდგენა", show: isFull },
   ];
 
   // "დასრულება და შენახვა" — ამზადებს დიალოგს (გადავაწერო?), რეალურ ჩაწერას
@@ -255,6 +257,7 @@ function Index() {
           {showPlanTab && <TabsTrigger value="plan">გეგმა და შესრულებები</TabsTrigger>}
           {showPipelineTab && <TabsTrigger value="pipeline">პაიპლაინი / ფორმა 505</TabsTrigger>}
           {isFull && <TabsTrigger value="log">ლოგი</TabsTrigger>}
+          {isFull && <TabsTrigger value="trash">სანაგვე</TabsTrigger>}
         </TabsList>
         </div>
       </div>
@@ -344,6 +347,7 @@ function Index() {
             {showPlanTab && <TabsContent value="plan"><PlanSheet /></TabsContent>}
             {showPipelineTab && <TabsContent value="pipeline"><PipelineSheet /></TabsContent>}
             {isFull && <TabsContent value="log"><LogSheet /></TabsContent>}
+            {isFull && <TabsContent value="trash"><TrashSheet /></TabsContent>}
           </div>
       </main>
       </Tabs>
