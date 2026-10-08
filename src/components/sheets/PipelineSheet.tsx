@@ -1056,7 +1056,7 @@ export function PipelineSheet() {
                       <td className="px-3 py-1.5">{proj.currency || ''}</td>
                       <td className="px-3 py-1.5 text-right font-mono text-slate-500">{proj.kleemannValue ? proj.kleemannValue.toLocaleString() : ''}</td>
                       <td className="px-3 py-1.5 text-right font-mono text-slate-500">{proj.hitachiValue ? proj.hitachiValue.toLocaleString() : ''}</td>
-                      <td className="px-3 py-1.5 text-right font-mono text-emerald-600">{proj.value.toLocaleString()}</td>
+                      <td className="px-3 py-1.5 text-right font-mono text-emerald-600">{proj.value ? proj.value.toLocaleString() : ''}</td>
                       <td className="px-3 py-1.5 text-right font-mono text-emerald-600">{proj.revenue ? proj.revenue.toLocaleString() : ''}</td>
                       <td className="px-3 py-1.5 text-center">{proj.tranche1 ? proj.tranche1 + '%' : ''}</td>
                       <td className="px-3 py-1.5">{proj.deliveryMonth || ''}</td>
