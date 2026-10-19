@@ -75,7 +75,7 @@ function enrichProjectsWithHistory(projects: Project[]) {
       history.push({ status: "მოლაპარაკება", date: new Date(currDate).toISOString() });
       currDate.setDate(currDate.getDate() + randDays(3));
       history.push({ status: "დაკონტრაქტებული", date: new Date(currDate).toISOString() });
-    } else if (p.status.includes("60%+")) {
+    } else if (PLUS_STATUSES.includes(p.status)) {
       currDate.setDate(currDate.getDate() + randDays(1));
       history.push({ status: "პროექტის დამუშავება", date: new Date(currDate).toISOString() });
       currDate.setDate(currDate.getDate() + randDays(2));
@@ -102,7 +102,16 @@ const formatPct = (val: number, total?: number) => {
 // MODAL COMPONENT
 // ============================================================================
 const MONTHS = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'];
-const STATUS_DETAILS = ['აქტიური','დიდი ინტერესი','სიტყვიერი დასტური','დადასტურებული','ხელმოწერილი'];
+const STATUS_DETAILS = ['აქტიური','დიდი ინტერესი','სიტყვიერი დასტური','დადასტურებული','ხელმოწერილი','წაგებული'];
+
+// საბოლოო სტატუსი — ალბათობის საფეხურებით. 60%-ზე მეტი/ტოლი = „პოტ. 60%+" ჯგუფი,
+// 50% და <50% = „პოტ. 60%-" ჯგუფი (ძველი მნიშვნელობებიც ამავე ჯგუფებში ითვლება).
+const FINAL_STATUSES = ['დაკონტრაქტებული', '90%', '80%', '70%', '60%', '50%', '<50%'];
+const PLUS_STATUSES = ['90%', '80%', '70%', '60%', 'პოტ. 60%+'];
+const MINUS_STATUSES = ['50%', '<50%', 'პოტ. 60%-'];
+const isLost = (p: { statusDetail?: string }) => p.statusDetail === 'წაგებული';
+const isPlus = (p: { status: string; statusDetail?: string }) => PLUS_STATUSES.includes(p.status) && !isLost(p);
+const isMinus = (p: { status: string; statusDetail?: string }) => MINUS_STATUSES.includes(p.status) && !isLost(p);
 
 // ფორმის ველები — ფორმა 505-ის სვეტების თანმიმდევრობით. ყველა ველი სავალდებულოა,
 // გარდა: კლემანი/ჰიტაჩი (მხოლოდ შესაბამისი მწარმოებლისას) და დაკონტრაქტების
@@ -127,7 +136,7 @@ const FIELDS: FieldDef[] = [
   { key: 'quarter', label: 'კვარტალი', type: 'select', options: ['Q1', 'Q2', 'Q3', 'Q4'] },
   { key: 'manager', label: 'მენეჯერი', type: 'select' },
   { key: 'statusDetail', label: 'მიმდინარე სტატუსი', type: 'select', options: STATUS_DETAILS },
-  { key: 'status', label: 'საბოლოო სტატუსი', type: 'select', options: ['დაკონტრაქტებული', 'პოტ. 60%+', 'პოტ. 60%-'] },
+  { key: 'status', label: 'საბოლოო სტატუსი', type: 'select', options: FINAL_STATUSES },
   { key: 'contractDate', label: 'დაკონტრაქტების თარიღი', type: 'date' },
   { key: 'comment', label: 'კომენტარი', type: 'textarea', wide: true },
 ];
@@ -283,7 +292,10 @@ export function PipelineSheet() {
       let match = true;
       if (formaFilterManager !== 'all' && proj.manager !== formaFilterManager) match = false;
       if (formaFilterQuarter !== 'all' && proj.quarter !== formaFilterQuarter) match = false;
-      if (formaFilterStatus !== 'all' && proj.status !== formaFilterStatus) match = false;
+      if (formaFilterStatus === 'grp_plus') { if (!isPlus(proj)) match = false; }
+      else if (formaFilterStatus === 'grp_minus') { if (!isMinus(proj)) match = false; }
+      else if (formaFilterStatus === 'lost') { if (!isLost(proj)) match = false; }
+      else if (formaFilterStatus !== 'all' && proj.status !== formaFilterStatus) match = false;
       if (formaSearch.trim() !== '') {
         const lowerSearch = formaSearch.toLowerCase();
         const searchString = `${proj.name} ${proj.location} ${proj.comment} ${proj.brand} ${proj.product}`.toLowerCase();
@@ -421,7 +433,7 @@ export function PipelineSheet() {
               const targetKleemann = 1040000;
               const kleemannPct = totalKleemann / targetKleemann;
 
-              const totalPot60Plus = dashProjects.filter(p => p.status === 'პოტ. 60%+').reduce((sum, p) => sum + (p.revenue || 0), 0);
+              const totalPot60Plus = dashProjects.filter(p => isPlus(p)).reduce((sum, p) => sum + (p.revenue || 0), 0);
               
               const formatDol = (num: number) => num.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
               const formatCol = (val: number) => <span className={val >= 0 ? "text-emerald-600 font-medium" : "text-rose-500 font-medium"}>{val > 0 ? '+' : ''}{formatDol(val)}</span>;
@@ -786,7 +798,7 @@ export function PipelineSheet() {
                 
                 // Funnel counts
                 const registered = repProj.length;
-                const inProgress = repProj.filter(p => p.status.includes('60') || p.statusDetail === 'წარმოება').length;
+                const inProgress = repProj.filter(p => isPlus(p) || isMinus(p) || p.statusDetail === 'წარმოება').length;
                 const contracted = repProj.filter(p => p.status === 'დაკონტრაქტებული').length;
                 
                 // Average days to contract for this rep
@@ -814,7 +826,8 @@ export function PipelineSheet() {
               // Status Distribution Data
               const statusCounts: Record<string, number> = {};
               projects.forEach(p => {
-                statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
+                const sk = isLost(p) ? "წაგებული" : p.status;
+                statusCounts[sk] = (statusCounts[sk] || 0) + 1;
               });
               const pieData = Object.keys(statusCounts).map(k => ({ name: k, value: statusCounts[k] }));
               const COLORS = ['#10b981', '#f59e0b', '#64748b', '#3b82f6'];
@@ -997,9 +1010,10 @@ export function PipelineSheet() {
                   className=" border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 text-xs rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-slate-400 appearance-none"
                 >
                   <option value="all">ყველა სტატუსი</option>
-                  <option value="დაკონტრაქტებული">დაკონტრაქტებული</option>
-                  <option value="პოტ. 60%+">პოტ. 60%+</option>
-                  <option value="პოტ. 60%-">პოტ. 60%-</option>
+                  <option value="grp_plus">პოტ. 60%+ (ჯამი)</option>
+                  <option value="grp_minus">პოტ. 60%- (ჯამი)</option>
+                  <option value="lost">წაგებული</option>
+                  {FINAL_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
                 </select>
                 <button 
                   onClick={() => {
@@ -1045,7 +1059,7 @@ export function PipelineSheet() {
                 </thead>
                 <tbody className="text-xs">
                   {filteredFormaProjects.map((proj) => (
-                    <tr key={proj.id} className="group border-b border-slate-100 bg-white hover:bg-slate-50/80 transition-colors">
+                    <tr key={proj.id} className={"group border-b border-slate-100 bg-white hover:bg-slate-50/80 transition-colors" + (isLost(proj) ? " opacity-50 line-through" : "")}>
                       <td className="px-3 py-1.5 truncate max-w-[220px] min-w-[200px] sticky left-0 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200 font-medium" title={proj.name}>{proj.name}</td>
                       <td className="px-3 py-1.5">{proj.product || ''}</td>
                       <td className="px-3 py-1.5">{proj.brand}</td>
