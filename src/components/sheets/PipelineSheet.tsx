@@ -490,6 +490,259 @@ function WorkingBySizeTable({ projects, reps, norms }: { projects: Project[]; re
   );
 }
 
+
+// ============================================================================
+// დაშბორდი 2 — წარმომადგენლების პაიპლაინი: ზომა, ბრენდი, თანხა, ალბათობა vs გეგმა
+// ============================================================================
+const PROB_BUCKETS = ['დაკონტრაქტებული', '90%', '80%', '70%', '60%', '50%', '<50%'] as const;
+type ProbBucket = (typeof PROB_BUCKETS)[number];
+const BUCKET_COLOR: Record<ProbBucket, string> = {
+  'დაკონტრაქტებული': '#047857', '90%': '#16a34a', '80%': '#65a30d', '70%': '#ca8a04',
+  '60%': '#ea580c', '50%': '#dc2626', '<50%': '#94a3b8',
+};
+const BUCKET_WEIGHT: Record<ProbBucket, number> = {
+  'დაკონტრაქტებული': 1, '90%': 0.9, '80%': 0.8, '70%': 0.7, '60%': 0.6, '50%': 0.5, '<50%': 0.3,
+};
+const bucketOf = (p: Project): ProbBucket => {
+  if ((PROB_BUCKETS as readonly string[]).includes(p.status)) return p.status as ProbBucket;
+  if (p.status === 'პოტ. 60%+') return '60%';
+  if (p.status === 'პოტ. 60%-') return '50%';
+  return '<50%';
+};
+// ალბათობა: ჯერ ფორმის „ალბათობა (%)" ველი, თუ შევსებულია; თორემ საბოლოო სტატუსის საფეხური
+const probOf = (p: Project) => {
+  if (bucketOf(p) === 'დაკონტრაქტებული') return 1;
+  const v = Number(p.probability);
+  return Number.isFinite(v) && v > 0 ? Math.min(v, 100) / 100 : BUCKET_WEIGHT[bucketOf(p)];
+};
+const BRAND_GROUPS = ['Kleemann', 'Hitachi', 'Fuji', 'სხვა'] as const;
+const brandGroupOf = (b?: string) => {
+  const x = String(b || '').toLowerCase();
+  if (x.includes('kleemann')) return 'Kleemann';
+  if (x.includes('hitach')) return 'Hitachi';
+  if (x.includes('fuji')) return 'Fuji';
+  return 'სხვა';
+};
+type Metric = 'overall' | 'kleemann' | 'hitachi';
+const METRIC_LABEL: Record<Metric, string> = {
+  overall: 'შემოსავალი (მარჟა) ↔ საერთო გეგმა',
+  kleemann: 'კლემანი ↔ კლემანის გეგმა',
+  hitachi: 'ჰიტაჩი ↔ ჰიტაჩის გეგმა',
+};
+
+function RepPipelineDashboard({ projects, managers, planUsers, plans, year }: {
+  projects: Project[]; managers: string[]; planUsers: RepRef[]; plans: SalesPlan[]; year: number;
+}) {
+  const [selected, setSelected] = useState<Set<ProbBucket>>(new Set(PROB_BUCKETS));
+  const [metric, setMetric] = useState<Metric>('overall');
+  const [weighted, setWeighted] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+
+  const toggle = (b: ProbBucket) => {
+    const n = new Set(selected);
+    if (n.has(b)) n.delete(b); else n.add(b);
+    setSelected(n);
+  };
+  const live = projects.filter((p) => !isLost(p));
+  const inScope = live.filter((p) => selected.has(bucketOf(p)));
+  // შედარების თანხა: არჩეული მეტრიკა × გეგმაში გათვალისწინების % × (შეწონვისას) ალბათობა
+  const amountOf = (p: Project) => factOf(p, metric) * shareOf(p) * (weighted ? probOf(p) : 1);
+  const revOf = (p: Project) => (p.revenue || 0) * (weighted ? probOf(p) : 1);
+
+  const planOf = (manager: string) => {
+    const ids = planUsers.filter((u) => managerMatches(manager, u.name)).map((u) => u.id);
+    return plans.filter((pl) => pl.year === year && pl.scope === metric && ids.includes(pl.salesPersonId))
+      .reduce((a, pl) => a + pl.planUsd, 0);
+  };
+
+  const rows = managers.map((m) => {
+    const list = inScope.filter((p) => p.manager === m);
+    const bySize = [...PROJECT_SIZES, '—'].map((sz) => list.filter((p) => (sz === '—' ? !PROJECT_SIZES.includes(p.size as any) : p.size === sz)).length);
+    const byBrand = BRAND_GROUPS.map((g) => list.filter((p) => brandGroupOf(p.brand) === g).reduce((a, p) => a + revOf(p), 0));
+    const byBucket = Object.fromEntries(PROB_BUCKETS.map((b) => [b, list.filter((p) => bucketOf(p) === b).reduce((a, p) => a + amountOf(p), 0)]));
+    const potential = list.reduce((a, p) => a + amountOf(p), 0);
+    const plan = planOf(m);
+    return { m, list, n: list.length, bySize, byBrand, byBucket, value: list.reduce((a, p) => a + (p.value || 0), 0), potential, plan };
+  }).filter((r) => r.n > 0 || r.plan > 0);
+
+  const tot = {
+    n: rows.reduce((a, r) => a + r.n, 0),
+    bySize: [0, 1, 2, 3].map((i) => rows.reduce((a, r) => a + r.bySize[i], 0)),
+    byBrand: BRAND_GROUPS.map((_, i) => rows.reduce((a, r) => a + r.byBrand[i], 0)),
+    value: rows.reduce((a, r) => a + r.value, 0),
+    potential: rows.reduce((a, r) => a + r.potential, 0),
+    plan: rows.reduce((a, r) => a + r.plan, 0),
+  };
+  const chartData = rows.map((r) => ({ name: r.m, 'გეგმა': Math.round(r.plan), ...Object.fromEntries(PROB_BUCKETS.map((b) => [b, Math.round(r.byBucket[b] as number)])) }));
+  const th = 'px-2 py-2 font-medium text-right';
+  const cov = (pot: number, plan: number) => plan > 0
+    ? <span className={pot >= plan ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-semibold'}>{((pot / plan) * 100).toFixed(0)}%</span>
+    : <span className="text-slate-300">—</span>;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 space-y-3">
+        <div>
+          <h3 className="font-bold text-base text-slate-800 tracking-tight">წარმომადგენლების პაიპლაინი — პროექტები, ბრენდები, ალბათობა და გეგმა ({year})</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            წაგებული პროექტები არ ითვლება. გეგმასთან შედარება იყენებს „გეგმაში გათვალისწინების %"-ს. ალბათობა — ველი „ალბათობა (%)",
+            ცარიელის შემთხვევაში საბოლოო სტატუსის საფეხური (&lt;50% = 30%).
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 mr-1">ალბათობა:</span>
+          {PROB_BUCKETS.map((b) => (
+            <button key={b} onClick={() => toggle(b)}
+              className={'px-2.5 py-1 rounded-full text-xs border transition-colors ' + (selected.has(b) ? 'text-white border-transparent' : 'bg-white text-slate-400 border-slate-200')}
+              style={selected.has(b) ? { backgroundColor: BUCKET_COLOR[b] } : undefined}>
+              {b}
+            </button>
+          ))}
+          <button onClick={() => setSelected(new Set(PROB_BUCKETS))} className="text-xs text-blue-600 hover:underline ml-1">ყველა</button>
+          <button onClick={() => setSelected(new Set(['დაკონტრაქტებული', '90%', '80%', '70%', '60%'] as ProbBucket[]))} className="text-xs text-blue-600 hover:underline">60%+</button>
+          <button onClick={() => setSelected(new Set(['90%', '80%', '70%', '60%', '50%', '<50%'] as ProbBucket[]))} className="text-xs text-blue-600 hover:underline">მხოლოდ პაიპლაინი</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <span className="font-semibold text-slate-500">შედარება გეგმასთან:</span>
+          <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
+            {(['overall', 'kleemann', 'hitachi'] as Metric[]).map((mt) => (
+              <button key={mt} onClick={() => setMetric(mt)}
+                className={'px-3 py-1 rounded-md ' + (metric === mt ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500')}>{METRIC_LABEL[mt]}</button>
+            ))}
+          </div>
+          <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
+            <button onClick={() => setWeighted(false)} className={'px-3 py-1 rounded-md ' + (!weighted ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500')}>სრული თანხა</button>
+            <button onClick={() => setWeighted(true)} className={'px-3 py-1 rounded-md ' + (weighted ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500')}>ალბათობით შეწონილი</button>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4 border-b border-slate-100">
+        <div><div className="text-xs text-slate-500">პროექტები</div><div className="text-2xl font-bold text-slate-800">{tot.n}</div></div>
+        <div><div className="text-xs text-slate-500">სრული ღირებულება</div><div className="text-2xl font-bold text-slate-800">{usd0(tot.value)}</div></div>
+        <div><div className="text-xs text-slate-500">პოტენციალი ({weighted ? 'შეწონილი' : 'სრული'})</div><div className="text-2xl font-bold text-amber-600">{usd0(tot.potential)}</div></div>
+        <div><div className="text-xs text-slate-500">წლიური გეგმა · დაფარვა</div><div className="text-2xl font-bold text-slate-800">{usd0(tot.plan)} <span className="text-base">{cov(tot.potential, tot.plan)}</span></div></div>
+      </div>
+
+      {/* CHART */}
+      <div className="px-6 pt-4 h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} />
+            <Tooltip formatter={(v: any) => usd0(Number(v))} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="გეგმა" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+            {PROB_BUCKETS.filter((b) => selected.has(b)).map((b) => (
+              <Bar key={b} dataKey={b} stackId="pot" fill={BUCKET_COLOR[b]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* TABLE */}
+      <div className="overflow-x-auto mt-2">
+        <table className="w-full text-left text-xs whitespace-nowrap">
+          <thead className="bg-slate-50/80 text-slate-500 border-y border-slate-200 font-semibold">
+            <tr>
+              <th className="px-4 py-2 font-medium" rowSpan={2}>წარმომადგენელი</th>
+              <th className="px-2 py-2 font-medium text-center border-l border-slate-200" colSpan={5}>პროექტები (ც.)</th>
+              <th className="px-2 py-2 font-medium text-center border-l border-slate-200" colSpan={4}>შემოსავალი (მარჟა) ბრენდებით{weighted ? ' — შეწონილი' : ''}</th>
+              <th className={th + ' border-l border-slate-200'} rowSpan={2}>სრული ღირებულება</th>
+              <th className="px-2 py-2 font-medium text-center border-l border-slate-200 bg-blue-50/60" colSpan={4}>გეგმასთან შედარება</th>
+            </tr>
+            <tr>
+              <th className={th + ' border-l border-slate-200'}>სულ</th>
+              {PROJECT_SIZES.map((sz) => <th key={sz} className={th}>{sz}</th>)}
+              <th className={th}>—</th>
+              {BRAND_GROUPS.map((g, i) => <th key={g} className={th + (i === 0 ? ' border-l border-slate-200' : '')}>{g}</th>)}
+              <th className={th + ' border-l border-slate-200 bg-blue-50/60'}>პოტენციალი</th>
+              <th className={th + ' bg-blue-50/60'}>წლიური გეგმა</th>
+              <th className={th + ' bg-blue-50/60'}>სხვაობა</th>
+              <th className={th + ' bg-blue-50/60'}>დაფარვა</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <React.Fragment key={r.m}>
+                <tr className="border-b border-slate-100 hover:bg-slate-50/80 cursor-pointer" onClick={() => setOpen(open === r.m ? null : r.m)}>
+                  <td className="px-4 py-2 font-medium text-slate-800 border-r border-slate-200">
+                    <span className="inline-block w-3 text-slate-400">{open === r.m ? '▾' : '▸'}</span> {r.m}
+                  </td>
+                  <td className="px-2 py-2 text-right font-semibold">{r.n}</td>
+                  {r.bySize.map((c, i) => <td key={i} className={'px-2 py-2 text-right ' + (i === 3 && c ? 'text-amber-600' : '')}>{c}</td>)}
+                  {r.byBrand.map((v, i) => <td key={i} className={'px-2 py-2 text-right font-mono' + (i === 0 ? ' border-l border-slate-200' : '')}>{v ? usd0(v) : <span className="text-slate-300">—</span>}</td>)}
+                  <td className="px-2 py-2 text-right font-mono border-l border-slate-200">{usd0(r.value)}</td>
+                  <td className="px-2 py-2 text-right font-mono border-l border-slate-200 bg-blue-50/40 font-semibold">{usd0(r.potential)}</td>
+                  <td className="px-2 py-2 text-right font-mono bg-blue-50/40 text-slate-500">{r.plan ? usd0(r.plan) : '—'}</td>
+                  <td className="px-2 py-2 text-right font-mono bg-blue-50/40">{r.plan ? devCell(r.potential - r.plan) : '—'}</td>
+                  <td className="px-2 py-2 text-right font-mono bg-blue-50/40">{cov(r.potential, r.plan)}</td>
+                </tr>
+                {open === r.m && (
+                  <tr className="bg-slate-50/60">
+                    <td colSpan={15} className="px-6 py-3">
+                      <table className="w-full text-xs">
+                        <thead className="text-slate-500">
+                          <tr>
+                            <th className="text-left py-1 pr-3 font-medium">პროექტი</th>
+                            <th className="text-left py-1 pr-3 font-medium">ზომა</th>
+                            <th className="text-left py-1 pr-3 font-medium">ბრენდი</th>
+                            <th className="text-left py-1 pr-3 font-medium">სტატუსი</th>
+                            <th className="text-right py-1 pr-3 font-medium">ალბათობა</th>
+                            <th className="text-right py-1 pr-3 font-medium">სრული ღირებულება</th>
+                            <th className="text-right py-1 pr-3 font-medium">შემოსავალი</th>
+                            <th className="text-right py-1 pr-3 font-medium">გეგმაში %</th>
+                            <th className="text-right py-1 pr-3 font-medium">გეგმასთან შედარების თანხა</th>
+                            <th className="text-left py-1 font-medium">კვ.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...r.list].sort((a, b) => amountOf(b) - amountOf(a)).map((p) => (
+                            <tr key={p.id} className="border-t border-slate-200/60">
+                              <td className="py-1 pr-3 font-medium text-slate-800 max-w-[260px] truncate" title={p.name}>{p.name}</td>
+                              <td className="py-1 pr-3">{p.size || <span className="text-amber-500">—</span>}</td>
+                              <td className="py-1 pr-3">{p.brand}</td>
+                              <td className="py-1 pr-3">
+                                <span className="px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: BUCKET_COLOR[bucketOf(p)] }}>{bucketOf(p)}</span>
+                              </td>
+                              <td className="py-1 pr-3 text-right">{Math.round(probOf(p) * 100)}%</td>
+                              <td className="py-1 pr-3 text-right font-mono">{usd0(p.value || 0)}</td>
+                              <td className="py-1 pr-3 text-right font-mono">{usd0(p.revenue || 0)}</td>
+                              <td className="py-1 pr-3 text-right">{Math.round(shareOf(p) * 100)}%</td>
+                              <td className="py-1 pr-3 text-right font-mono font-semibold">{usd0(amountOf(p))}</td>
+                              <td className="py-1">{p.quarter}</td>
+                            </tr>
+                          ))}
+                          {r.list.length === 0 && <tr><td colSpan={10} className="py-2 text-slate-400">არჩეული ალბათობებით პროექტი არ არის.</td></tr>}
+                        </tbody>
+                      </table>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+            {rows.length > 1 && (
+              <tr className="bg-blue-100/50 font-bold text-slate-900 border-t-2 border-slate-200">
+                <td className="px-4 py-2 border-r border-slate-200">ჯამი</td>
+                <td className="px-2 py-2 text-right">{tot.n}</td>
+                {tot.bySize.map((c, i) => <td key={i} className="px-2 py-2 text-right">{c}</td>)}
+                {tot.byBrand.map((v, i) => <td key={i} className={'px-2 py-2 text-right font-mono' + (i === 0 ? ' border-l border-slate-200' : '')}>{usd0(v)}</td>)}
+                <td className="px-2 py-2 text-right font-mono border-l border-slate-200">{usd0(tot.value)}</td>
+                <td className="px-2 py-2 text-right font-mono border-l border-slate-200">{usd0(tot.potential)}</td>
+                <td className="px-2 py-2 text-right font-mono">{usd0(tot.plan)}</td>
+                <td className="px-2 py-2 text-right font-mono">{devCell(tot.potential - tot.plan)}</td>
+                <td className="px-2 py-2 text-right font-mono">{cov(tot.potential, tot.plan)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function PipelineSheet() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'dashboard2' | 'forma505'>('dashboard');
   const [filterYear, setFilterYear] = useState<string>('2026');
@@ -979,6 +1232,15 @@ export function PipelineSheet() {
                 მომხმარებელთა ძაბრი & ლოჯისტიკა (Sales Funnel & Bottlenecks)
               </h2>
             </div>
+
+            {/* წარმომადგენლების პაიპლაინი — ზომა / ბრენდი / ალბათობა vs გეგმა */}
+            <RepPipelineDashboard
+              projects={projects}
+              managers={managerOptions}
+              planUsers={planReps}
+              plans={plans}
+              year={new Date().getFullYear()}
+            />
             
             {(() => {
               // DATA PREP FOR FUNNEL
