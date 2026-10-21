@@ -77,7 +77,7 @@ function EconomicsMirror() {
       { key: "h5", label: "სავარაუდო მოგება (რეზერვების ჩათვლით)", mine: buildProfitLines(eco).total, sales: null, fmt: "usd", bold: true, kind: "onlyMine",
         note: `პირდაპირი ${fmtUsd(buildProfitLines(eco).direct)} · გაშიფვრა — «ერთი ხედი»-ს ბოლოში` },
       { key: "h4", label: "ზედნადები ხარჯი %", mine: eco.report.overheadPct, sales: null, fmt: "pct", kind: "onlyMine",
-        note: `ზედნადები ${fmtUsd(eco.report.overhead)}, მ.შ. გაყიდვების ტარიფის სხვაობა ${fmtUsd(eco.report.salesBuffer)}` },
+        note: `ზედნადები ${fmtUsd(eco.report.overhead)}, მ.შ. გაყიდვების ტარიფის სხვაობა ${fmtUsd(eco.report.salesBuffer)}${eco.report.salesGapNegative < -0.5 ? ` · გაყიდვების ტარიფი რეალურზე დაბალია: ${fmtUsd(eco.report.salesGapNegative)} (ფასში არ ითვლება)` : ""}` },
     ];
     const mine = buildReportBlocks(eco, true);
     const sales = buildReportBlocks(eco, false);
@@ -142,7 +142,7 @@ function EconomicsMirror() {
               {[...eco.units.map((r) => ({ id: r.id, r, total: false })), { id: "სულ", r: null, total: true }].map(({ id, r, total }) => {
                 const t = eco.totals;
                 const cost = total ? t.totalCost : r!.totalCost;
-                const buf = total ? eco.report.salesBuffer : r!.salesBuffer;
+                const buf = total ? eco.report.salesGap : r!.salesGap;
                 const mk = total ? t.markup : r!.markup;
                 const pnv = total ? t.priceNoVat : r!.priceNoVat;
                 const vat = total ? t.vat : r!.vat;

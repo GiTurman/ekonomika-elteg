@@ -72,7 +72,7 @@ export function EconomicsSheet() {
   //   რეალურად გადასახდელი, დღგ-ს ჩათვლით საბოლოო ფასი.
   const salesMarginPct = eco.totals.finalPrice ? eco.report.markupTotal / eco.totals.finalPrice : 0;
   const marginPct = isFull ? eco.report.totalMarginPct : salesMarginPct;
-  const salesBuf = isFull ? 0 : eco.report.salesBuffer;
+  const salesBuf = isFull ? 0 : eco.report.salesGap;
   const belowThreshold = eco.units.filter((r) => r.belowMinAmount || r.belowMinMargin);
 
   return (
@@ -140,11 +140,11 @@ export function EconomicsSheet() {
                   <TableCell className="font-semibold">{r.id}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{r.floors}</TableCell>
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.purchaseCost)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.installCost + (isFull ? 0 : r.salesBuffer))}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.totalCost + (isFull ? 0 : r.salesBuffer))}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.installCost + (isFull ? 0 : r.salesGap))}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.totalCost + (isFull ? 0 : r.salesGap))}</TableCell>
                   <TableCell className={"text-right " + (r.belowMinAmount ? "text-destructive font-semibold " : "") + computedCls}>{fmtUsd(r.markup)}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.priceNoExtras + (isFull ? 0 : r.salesBuffer))}</TableCell>
-                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.extras - (isFull ? 0 : r.salesBuffer))}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.priceNoExtras + (isFull ? 0 : r.salesGap))}</TableCell>
+                  <TableCell className={"text-right " + computedCls}>{fmtUsd(r.extras - (isFull ? 0 : r.salesGap))}</TableCell>
                   <TableCell className={"text-right " + (isFull ? "font-semibold " : "") + computedCls}>{fmtUsd(r.priceNoVat)}</TableCell>
                   {!isFull && <TableCell className={"text-right " + computedCls}>{fmtUsd(r.vat)}</TableCell>}
                   <TableCell className={"text-right " + computedCls}>{fmtUsd(r.bankGuarantee)}</TableCell>
@@ -239,6 +239,14 @@ export function EconomicsSheet() {
                 ზედნადები ხარჯი % <span className="text-xs text-muted-foreground">(ზედნადები {fmtUsd(eco.report.overhead)}, მ.შ. გაყიდვების ტარიფის სხვაობა {fmtUsd(eco.report.salesBuffer)} ÷ ფასი დამატ. ხარჯების გარეშე)</span>
               </span>
               <span className={"font-semibold " + computedCls}>{fmtPct(eco.report.overheadPct)}</span>
+            </div>
+          )}
+          {isFull && eco.report.salesGapNegative < -0.5 && (
+            <div className="mt-3 flex items-center justify-between rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3">
+              <span className="text-sm">
+                გაყიდვების ტარიფი რეალურზე დაბალია <span className="text-xs text-muted-foreground">(ფასი რეალური ტარიფით ითვლება; გამყიდველი მონტაჟს თავისი ტარიფით ხედავს, სხვაობა მის ხედში დამატებით ხარჯებშია)</span>
+              </span>
+              <span className="font-semibold text-amber-700 dark:text-amber-400">{fmtUsd(eco.report.salesGapNegative)}</span>
             </div>
           )}
           <div className="mt-3 flex items-center justify-between rounded border p-3">
@@ -470,9 +478,11 @@ export function buildReportBlocks(eco: ReturnType<typeof computeEconomics>, isFu
   // გაყიდვების ხედი: მონტაჟი გაყიდვების ტარიფით ჩანს (რეალური + ბუფერი), ბუფერი კი
   // დამატებით ხარჯებს აკლდება — საბოლოო ფასი ორივე ხედში ერთი და იგივეა.
   // ჩემს (full) ხედში ბუფერი ზედნადებშია.
-  const buf = isFull ? 0 : eco.report.salesBuffer;
-  const bufM = isFull ? 0 : eco.report.salesBufferMech;
-  const bufE = isFull ? 0 : eco.report.salesBufferElec;
+  // ნიშნიანი სხვაობა: გაყიდვების ტარიფი რეალურზე დაბალიც რომ იყოს, გამყიდველი მონტაჟს
+  // თავისი ტარიფით ხედავს, სხვაობა კი დამატებით ხარჯებში ინაცვლებს (ფასი უცვლელია).
+  const buf = isFull ? 0 : eco.report.salesGap;
+  const bufM = isFull ? 0 : eco.report.salesGapMech;
+  const bufE = isFull ? 0 : eco.report.salesGapElec;
   return [
               { title: "შესყიდვის ხარჯები", blockKey: "purchase", rows: [
                 ["ქარხნული ფასი", eco.report.factoryTotal],
