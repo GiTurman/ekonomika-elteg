@@ -37,6 +37,7 @@ type Project = {
   manager: string;
   statusDetail?: string;
   source?: string;
+  planShare?: number;
   status: string;
   registrationDate?: string;
   statusHistory?: {status: string, date: string}[];
@@ -108,6 +109,13 @@ const formatPct = (val: number, total?: number) => {
 const MONTHS = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'];
 // პროექტის წყარო — ბონუსების დასათვლელად: ვინ მოიძია პროექტი.
 const SOURCES = ['საკუთარი მოძიება', 'მენეჯმენტის გადაცემული'];
+// გეგმაში გათვალისწინების % — რა წილი ეთვლება წარმომადგენელს შესრულებაში
+// (მაგ. სხვისი მოტანილი პროექტი — 50%). ცარიელი = 100%.
+const PLAN_SHARES = ['100', '50', '30', '10'];
+const shareOf = (p: { planShare?: number | string }) => {
+  const v = Number(p.planShare);
+  return Number.isFinite(v) && v > 0 ? v / 100 : 1;
+};
 const STATUS_DETAILS = ['აქტიური','დიდი ინტერესი','სიტყვიერი დასტური','დადასტურებული','ხელმოწერილი','წაგებული'];
 
 // საბოლოო სტატუსი — ალბათობის საფეხურებით. 60%-ზე მეტი/ტოლი = „პოტ. 60%+" ჯგუფი,
@@ -143,6 +151,7 @@ const FIELDS: FieldDef[] = [
   { key: 'quarter', label: 'კვარტალი', type: 'select', options: ['Q1', 'Q2', 'Q3', 'Q4'] },
   { key: 'manager', label: 'მენეჯერი', type: 'select' },
   { key: 'source', label: 'წყარო', type: 'select', options: SOURCES },
+  { key: 'planShare', label: 'გეგმაში გათვალისწინება (%)', type: 'select', options: PLAN_SHARES },
   { key: 'statusDetail', label: 'მიმდინარე სტატუსი', type: 'select', options: STATUS_DETAILS },
   { key: 'status', label: 'საბოლოო სტატუსი', type: 'select', options: FINAL_STATUSES },
   { key: 'contractDate', label: 'დაკონტრაქტების თარიღი', type: 'date' },
@@ -156,7 +165,7 @@ function isRequired(key: string, d: any, isNew = true): boolean {
   // არსებულ ჩანაწერებს თარიღი შეიძლება არ ჰქონდეს — რედაქტირებას არ ვბლოკავთ
   if (key === 'contractDate') return isNew && d.status === 'დაკონტრაქტებული';
   // წყაროს მენეჯმენტი/ფინანსები ავსებს — სავალდებულო არ არის
-  if (key === 'source') return false;
+  if (key === 'source' || key === 'planShare') return false;
   // ზომა სავალდებულოა ახალ ჩანაწერზე; არსებულებს რედაქტირებისას არ ვბლოკავთ
   if (key === 'size') return isNew;
   return true;
@@ -174,7 +183,7 @@ function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [
   const isNew = !initialData?.id;
   const missing = FIELDS.filter((f) => isRequired(f.key, formData, isNew) && isEmpty(formData[f.key])).map((f) => f.key);
   const set = (key: string, raw: string, type: FieldDef['type']) => {
-    const v = type === 'number' ? (raw === '' ? '' : Number(raw)) : raw;
+    const v = type === 'number' || key === 'planShare' ? (raw === '' ? '' : Number(raw)) : raw;
     setFormData({ ...formData, [key]: v });
   };
   const save = () => {
@@ -291,10 +300,10 @@ function RepPlanTable({ projects, plans, plansError, reps, year }: {
       .reduce((a, pl) => a + pl.planUsd, 0);
   const factFor = (names: string[], q: string) =>
     yearProjects.filter((p) => p.quarter === q && names.some((n) => managerMatches(p.manager, n)))
-      .reduce((a, p) => a + factOf(p, scope), 0);
+      .reduce((a, p) => a + factOf(p, scope) * shareOf(p), 0);
 
   const unmatched = yearProjects.filter((p) => !reps.some((r) => managerMatches(p.manager, r.name)));
-  const unmatchedSum = unmatched.reduce((a, p) => a + factOf(p, scope), 0);
+  const unmatchedSum = unmatched.reduce((a, p) => a + factOf(p, scope) * shareOf(p), 0);
   const unmatchedNames = Array.from(new Set(unmatched.map((p) => p.manager).filter(Boolean)));
 
   const groups: { key: string; label: string; ids: string[]; names: string[]; total?: boolean }[] =
@@ -309,7 +318,8 @@ function RepPlanTable({ projects, plans, plansError, reps, year }: {
           <h3 className="font-bold text-base text-slate-800 tracking-tight">წარმომადგენლების გეგმა და შესრულება — {year}</h3>
           <p className="text-xs text-slate-500 mt-0.5">
             გეგმა — „გეგმა და შესრულებები" ტაბიდან; ფაქტი — ფორმა 505-ის დაკონტრაქტებული პროექტები
-            ({scope === 'overall' ? 'შემოსავალი / მარჟა' : scope === 'kleemann' ? 'სვეტი „კლემანი"' : 'სვეტი „ჰიტაჩი"'}).
+            ({scope === 'overall' ? 'შემოსავალი / მარჟა' : scope === 'kleemann' ? 'სვეტი „კლემანი"' : 'სვეტი „ჰიტაჩი"'}),
+            გამრავლებული „გეგმაში გათვალისწინების %"-ზე (ცარიელი = 100%).
           </p>
         </div>
         <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200 text-xs">
@@ -1252,6 +1262,7 @@ export function PipelineSheet() {
                     <th className="px-3 py-2 font-medium">კვარტალი</th>
                     <th className="px-3 py-2 font-medium">მენეჯერი</th>
                     <th className="px-3 py-2 font-medium">წყარო</th>
+                    <th className="px-3 py-2 font-medium text-center" title="გეგმაში გათვალისწინების %">გეგმაში %</th>
                     <th className="px-3 py-2 font-medium">მიმდინარე სტატუსი</th>
                     <th className="px-3 py-2 font-medium">საბოლოო სტატუსი</th>
                     <th className="px-3 py-2 font-medium">დაკონტრაქტების თარიღი</th>
@@ -1286,6 +1297,11 @@ export function PipelineSheet() {
                           : proj.source
                             ? <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">{proj.source}</span>
                             : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-3 py-1.5 text-center">
+                        {Number(proj.planShare) > 0 && Number(proj.planShare) < 100
+                          ? <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-800">{proj.planShare}%</span>
+                          : <span className="text-slate-400">100%</span>}
                       </td>
                       <td className="px-3 py-1.5">{proj.statusDetail || ''}</td>
                       <td className="px-3 py-1.5">{proj.status}</td>
@@ -1322,7 +1338,7 @@ export function PipelineSheet() {
       {isModalOpen && (
         <ProjectModal 
           managerOptions={managerOptions}
-          lockedKeys={canManage ? [] : ['source']}
+          lockedKeys={canManage ? [] : ['source', 'planShare']}
           brandOptions={Array.from(new Set(projects.map((p: any) => p.brand).filter(Boolean))).sort()}
           locationOptions={Array.from(new Set(projects.map((p: any) => p.location).filter(Boolean))).sort()}
           isOpen={isModalOpen} 
