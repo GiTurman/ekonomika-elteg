@@ -33,6 +33,7 @@ type Project = {
   quarter: string;
   manager: string;
   statusDetail?: string;
+  source?: string;
   status: string;
   registrationDate?: string;
   statusHistory?: {status: string, date: string}[];
@@ -102,6 +103,8 @@ const formatPct = (val: number, total?: number) => {
 // MODAL COMPONENT
 // ============================================================================
 const MONTHS = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'];
+// პროექტის წყარო — ბონუსების დასათვლელად: ვინ მოიძია პროექტი.
+const SOURCES = ['საკუთარი მოძიება', 'მენეჯმენტის გადაცემული'];
 const STATUS_DETAILS = ['აქტიური','დიდი ინტერესი','სიტყვიერი დასტური','დადასტურებული','ხელმოწერილი','წაგებული'];
 
 // საბოლოო სტატუსი — ალბათობის საფეხურებით. 60%-ზე მეტი/ტოლი = „პოტ. 60%+" ჯგუფი,
@@ -135,6 +138,7 @@ const FIELDS: FieldDef[] = [
   { key: 'probability', label: 'ალბათობა (%)', type: 'number' },
   { key: 'quarter', label: 'კვარტალი', type: 'select', options: ['Q1', 'Q2', 'Q3', 'Q4'] },
   { key: 'manager', label: 'მენეჯერი', type: 'select' },
+  { key: 'source', label: 'წყარო', type: 'select', options: SOURCES },
   { key: 'statusDetail', label: 'მიმდინარე სტატუსი', type: 'select', options: STATUS_DETAILS },
   { key: 'status', label: 'საბოლოო სტატუსი', type: 'select', options: FINAL_STATUSES },
   { key: 'contractDate', label: 'დაკონტრაქტების თარიღი', type: 'date' },
@@ -147,13 +151,15 @@ function isRequired(key: string, d: any, isNew = true): boolean {
   if (key === 'hitachiValue') return brand.includes('HITACHI');
   // არსებულ ჩანაწერებს თარიღი შეიძლება არ ჰქონდეს — რედაქტირებას არ ვბლოკავთ
   if (key === 'contractDate') return isNew && d.status === 'დაკონტრაქტებული';
+  // წყაროს მენეჯმენტი/ფინანსები ავსებს — სავალდებულო არ არის
+  if (key === 'source') return false;
   return true;
 }
 function isEmpty(v: any) {
   return v === undefined || v === null || (typeof v === 'string' && v.trim() === '') || (typeof v === 'number' && !isFinite(v));
 }
 
-function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [], brandOptions = [], locationOptions = [] }: any) {
+function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [], brandOptions = [], locationOptions = [], lockedKeys = [] }: any) {
   const [formData, setFormData] = useState<any>(initialData || {});
   const [tried, setTried] = useState(false);
 
@@ -200,12 +206,15 @@ function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [
               const req = isRequired(f.key, formData, isNew);
               const val = formData[f.key] ?? '';
               const options = f.key === 'manager' ? (managerOptions as string[]) : f.options;
+              const locked = (lockedKeys as string[]).includes(f.key);
               return (
                 <div key={f.key} className={'space-y-1 ' + (f.wide ? 'md:col-span-3' : '')}>
                   <label className="text-xs font-semibold text-gray-600">
                     {f.label}{req && <span className="text-red-600"> *</span>}
                   </label>
-                  {f.type === 'select' ? (
+                  {locked ? (
+                    <div className="w-full border p-2 rounded text-sm bg-slate-50 text-slate-500" title="ამ ველს ავსებს მენეჯმენტი">{val || '—'}</div>
+                  ) : f.type === 'select' ? (
                     <select className={inputCls(f.key)} value={val} onChange={(e) => set(f.key, e.target.value, f.type)}>
                       <option value="">— აირჩიეთ —</option>
                       {(options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
@@ -254,6 +263,8 @@ export function PipelineSheet() {
   const { isFull, role, actorName } = useAccessRole();
   // გაყიდვების წარმომადგენელი ხედავს მხოლოდ საკუთარ პროექტებს (მენეჯერი = ის).
   const isRep = !isFull && role === 'sales';
+  // წაშლა და „წყაროს" მითითება — ფინანსები და კომერცია (მენეჯმენტი)
+  const canManage = isFull || role === 'commercial';
   const rawProjects = useMemo(
     () => (isRep ? allProjects.filter((p: any) => managerMatches(p.manager, actorName)) : allProjects),
     [allProjects, isRep, actorName]
@@ -286,6 +297,7 @@ export function PipelineSheet() {
   const [formaFilterManager, setFormaFilterManager] = useState('all');
   const [formaFilterQuarter, setFormaFilterQuarter] = useState('all');
   const [formaFilterStatus, setFormaFilterStatus] = useState('all');
+  const [formaFilterSource, setFormaFilterSource] = useState('all');
 
   const filteredFormaProjects = useMemo(() => {
     return projects.filter(proj => {
@@ -296,6 +308,8 @@ export function PipelineSheet() {
       else if (formaFilterStatus === 'grp_minus') { if (!isMinus(proj)) match = false; }
       else if (formaFilterStatus === 'lost') { if (!isLost(proj)) match = false; }
       else if (formaFilterStatus !== 'all' && proj.status !== formaFilterStatus) match = false;
+      if (formaFilterSource === 'none') { if (proj.source) match = false; }
+      else if (formaFilterSource !== 'all' && proj.source !== formaFilterSource) match = false;
       if (formaSearch.trim() !== '') {
         const lowerSearch = formaSearch.toLowerCase();
         const searchString = `${proj.name} ${proj.location} ${proj.comment} ${proj.brand} ${proj.product}`.toLowerCase();
@@ -303,10 +317,10 @@ export function PipelineSheet() {
       }
       return match;
     });
-  }, [projects, formaSearch, formaFilterManager, formaFilterQuarter, formaFilterStatus]);
+  }, [projects, formaSearch, formaFilterManager, formaFilterQuarter, formaFilterStatus, formaFilterSource]);
 
   const removeRow = (id: string) => {
-    if(window.confirm('ნამდვილად გსურთ წაშლა?')) {
+    if(window.confirm('ნამდვილად გსურთ წაშლა? ჩანაწერი სანაგვეში გადავა.')) {
       setProjects(projects.filter(p => p.id !== id));
     }
   }
@@ -1015,6 +1029,15 @@ export function PipelineSheet() {
                   <option value="lost">წაგებული</option>
                   {FINAL_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
                 </select>
+                <select 
+                  value={formaFilterSource} 
+                  onChange={(e) => setFormaFilterSource(e.target.value)}
+                  className=" border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 text-xs rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-slate-400 appearance-none"
+                >
+                  <option value="all">ყველა წყარო</option>
+                  {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  <option value="none">მიუთითებელი</option>
+                </select>
                 <button 
                   onClick={() => {
                     setIsModalOpen(true);
@@ -1051,6 +1074,7 @@ export function PipelineSheet() {
                     <th className="px-3 py-2 font-medium">კომენტარი</th>
                     <th className="px-3 py-2 font-medium">კვარტალი</th>
                     <th className="px-3 py-2 font-medium">მენეჯერი</th>
+                    <th className="px-3 py-2 font-medium">წყარო</th>
                     <th className="px-3 py-2 font-medium">მიმდინარე სტატუსი</th>
                     <th className="px-3 py-2 font-medium">საბოლოო სტატუსი</th>
                     <th className="px-3 py-2 font-medium">დაკონტრაქტების თარიღი</th>
@@ -1078,6 +1102,13 @@ export function PipelineSheet() {
                       <td className="px-3 py-1.5 truncate max-w-[150px]" title={proj.comment}>{proj.comment || ''}</td>
                       <td className="px-3 py-1.5">{proj.quarter}</td>
                       <td className="px-3 py-1.5">{proj.manager}</td>
+                      <td className="px-3 py-1.5">
+                        {proj.source === 'მენეჯმენტის გადაცემული'
+                          ? <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">{proj.source}</span>
+                          : proj.source
+                            ? <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">{proj.source}</span>
+                            : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-3 py-1.5">{proj.statusDetail || ''}</td>
                       <td className="px-3 py-1.5">{proj.status}</td>
                       <td className="px-3 py-1.5">{proj.contractDate || ''}</td>
@@ -1093,7 +1124,7 @@ export function PipelineSheet() {
                         >
                           <Table className="w-3.5 h-3.5" />
                         </button>
-                        {isFull && <button 
+                        {canManage && <button 
                           onClick={() => removeRow(proj.id)}
                           className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
                           title="წაშლა"
@@ -1113,6 +1144,7 @@ export function PipelineSheet() {
       {isModalOpen && (
         <ProjectModal 
           managerOptions={managerOptions}
+          lockedKeys={canManage ? [] : ['source']}
           brandOptions={Array.from(new Set(projects.map((p: any) => p.brand).filter(Boolean))).sort()}
           locationOptions={Array.from(new Set(projects.map((p: any) => p.location).filter(Boolean))).sort()}
           isOpen={isModalOpen} 
