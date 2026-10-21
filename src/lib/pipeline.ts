@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { adminWrite } from "./adminWrite";
+import { getStoredUser } from "./access";
 
 // გაყიდვების პაიპლაინის (ფორმა 505) ჩანაწერები — ინახება Lovable Cloud-ის
 // pipeline_projects ცხრილში: id + data (JSON). ცვლილება დაუყოვნებლივ იწერება.
@@ -26,8 +26,12 @@ export async function upsertPipelineProject(p: PipelineProject): Promise<void> {
   if (error) throw error;
 }
 
+// წაშლა — ფინანსები და კომერცია. ჩანაწერი სანაგვეში (deleted_items) გადადის,
+// აღდგენა მხოლოდ ფინანსებს შეუძლია.
 export async function deletePipelineProject(id: string): Promise<void> {
-  await adminWrite("pipeline_projects", "delete", {}, id);
+  const code = getStoredUser()?.code ?? "";
+  const { error } = await (supabase as any).rpc("app_pipeline_delete", { p_code: code, p_id: id });
+  if (error) throw error;
 }
 
 // ჰუკი — მასივის სახით აბრუნებს ჩანაწერებს და setProjects-ს, რომელიც
