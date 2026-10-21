@@ -7,6 +7,8 @@ import {
 } from 'recharts';
 import { LayoutDashboard, Table, Plus, Search, CheckCircle2, TrendingUp, AlertCircle, BarChart2, Activity, Trash2, Save, X, Database, Loader2 } from 'lucide-react';
 import { usePipelineProjects } from '@/lib/pipeline';
+import { listSalesPlans, PLAN_SCOPE_LABEL, type SalesPlan, type PlanScope } from '@/lib/salesPlans';
+import { usePipelineNorms, PROJECT_SIZES, type PipelineNorms } from '@/lib/pipelineNorms';
 
 // ============================================================================
 // TYPES
@@ -16,6 +18,7 @@ type Project = {
   name: string;
   contractDate?: string;
   product?: string;
+  size?: string;
   brand: string;
   units: number;
   floors?: number;
@@ -123,6 +126,7 @@ type FieldDef = { key: string; label: string; type: 'text' | 'number' | 'select'
 const FIELDS: FieldDef[] = [
   { key: 'name', label: 'პროექტის დასახელება', type: 'text', wide: true },
   { key: 'product', label: 'პროდუქტი', type: 'select', options: ['ლიფტი', 'ესკალატორი', 'ტრაველატორი', 'პლატფორმა', 'საპარკინგე სისტემა'] },
+  { key: 'size', label: 'პროექტის ზომა', type: 'select', options: [...PROJECT_SIZES] },
   { key: 'brand', label: 'მწარმოებელი', type: 'text', list: 'pl-brands' },
   { key: 'units', label: 'რაოდენობა (ც.)', type: 'number' },
   { key: 'floors', label: 'სართულები (ჯამი)', type: 'number' },
@@ -153,6 +157,8 @@ function isRequired(key: string, d: any, isNew = true): boolean {
   if (key === 'contractDate') return isNew && d.status === 'დაკონტრაქტებული';
   // წყაროს მენეჯმენტი/ფინანსები ავსებს — სავალდებულო არ არის
   if (key === 'source') return false;
+  // ზომა სავალდებულოა ახალ ჩანაწერზე; არსებულებს რედაქტირებისას არ ვბლოკავთ
+  if (key === 'size') return isNew;
   return true;
 }
 function isEmpty(v: any) {
@@ -254,6 +260,226 @@ function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [
   );
 }
 
+
+// ============================================================================
+// წარმომადგენლების გეგმა / შესრულება (კვარტალური + ნაზარდი) — sales_plans-იდან
+// ============================================================================
+const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
+const isContracted = (p: Project) => p.status === 'დაკონტრაქტებული' && !isLost(p);
+const projYear = (p: Project) => (p.contractDate ? p.contractDate.substring(0, 4) : String(new Date().getFullYear()));
+const factOf = (p: Project, scope: PlanScope) =>
+  scope === 'overall' ? (p.revenue || 0) : scope === 'kleemann' ? (p.kleemannValue || 0) : (p.hitachiValue || 0);
+const usd0 = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const devCell = (v: number) => (
+  <span className={v >= 0 ? 'text-emerald-600 font-medium' : 'text-rose-500 font-medium'}>{v > 0 ? '+' : ''}{usd0(v)}</span>
+);
+const pctCell = (fact: number, plan: number) =>
+  plan > 0
+    ? <span className={fact >= plan ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>{((fact / plan) * 100).toFixed(1)}%</span>
+    : <span className="text-slate-300">—</span>;
+
+type RepRef = { id: string; name: string };
+
+function RepPlanTable({ projects, plans, plansError, reps, year }: {
+  projects: Project[]; plans: SalesPlan[]; plansError: boolean; reps: RepRef[]; year: number;
+}) {
+  const [scope, setScope] = useState<PlanScope>('overall');
+  const yearProjects = projects.filter((p) => isContracted(p) && projYear(p) === String(year));
+
+  const planFor = (repIds: string[], qi: number) =>
+    plans.filter((pl) => pl.year === year && pl.quarter === qi && pl.scope === scope && repIds.includes(pl.salesPersonId))
+      .reduce((a, pl) => a + pl.planUsd, 0);
+  const factFor = (names: string[], q: string) =>
+    yearProjects.filter((p) => p.quarter === q && names.some((n) => managerMatches(p.manager, n)))
+      .reduce((a, p) => a + factOf(p, scope), 0);
+
+  const unmatched = yearProjects.filter((p) => !reps.some((r) => managerMatches(p.manager, r.name)));
+  const unmatchedSum = unmatched.reduce((a, p) => a + factOf(p, scope), 0);
+  const unmatchedNames = Array.from(new Set(unmatched.map((p) => p.manager).filter(Boolean)));
+
+  const groups: { key: string; label: string; ids: string[]; names: string[]; total?: boolean }[] =
+    reps.map((r) => ({ key: r.id, label: r.name, ids: [r.id], names: [r.name] }));
+  if (reps.length > 1) groups.push({ key: '__total', label: 'ჯამი', ids: reps.map((r) => r.id), names: reps.map((r) => r.name), total: true });
+
+  const th = 'px-2 py-2 font-medium text-right';
+  return (
+    <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+      <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-base text-slate-800 tracking-tight">წარმომადგენლების გეგმა და შესრულება — {year}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            გეგმა — „გეგმა და შესრულებები" ტაბიდან; ფაქტი — ფორმა 505-ის დაკონტრაქტებული პროექტები
+            ({scope === 'overall' ? 'შემოსავალი / მარჟა' : scope === 'kleemann' ? 'სვეტი „კლემანი"' : 'სვეტი „ჰიტაჩი"'}).
+          </p>
+        </div>
+        <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200 text-xs">
+          {(['overall', 'kleemann', 'hitachi'] as PlanScope[]).map((sc) => (
+            <button key={sc} onClick={() => setScope(sc)}
+              className={'px-3 py-1 rounded-md ' + (scope === sc ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500')}>
+              {PLAN_SCOPE_LABEL[sc]}
+            </button>
+          ))}
+        </div>
+      </div>
+      {plansError && (
+        <p className="px-6 py-2 text-xs text-rose-600 bg-rose-50">გეგმების ჩატვირთვა ვერ მოხერხდა — ნაჩვენებია მხოლოდ ფაქტი.</p>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs whitespace-nowrap">
+          <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-200 font-semibold">
+            <tr>
+              <th className="px-4 py-2 font-medium" rowSpan={2}>წარმომადგენელი</th>
+              <th className="px-3 py-2 font-medium" rowSpan={2}>პერიოდი</th>
+              <th className="px-2 py-2 font-medium text-center border-l border-slate-200" colSpan={4}>კვარტალი</th>
+              <th className="px-2 py-2 font-medium text-center border-l border-slate-200 bg-blue-50/60" colSpan={4}>ნაზარდი ჯამი</th>
+            </tr>
+            <tr>
+              <th className={th + ' border-l border-slate-200'}>გეგმა</th><th className={th}>ფაქტი</th><th className={th}>გადახრა</th><th className={th}>%</th>
+              <th className={th + ' border-l border-slate-200 bg-blue-50/60'}>გეგმა</th><th className={th + ' bg-blue-50/60'}>ფაქტი</th>
+              <th className={th + ' bg-blue-50/60'}>გადახრა</th><th className={th + ' bg-blue-50/60'}>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((g) => {
+              let cPlan = 0, cFact = 0;
+              const rows = QUARTERS.map((q, i) => {
+                const plan = planFor(g.ids, i + 1);
+                const fact = factFor(g.names, q);
+                cPlan += plan; cFact += fact;
+                return { q, plan, fact, cPlan, cFact };
+              });
+              const rowCls = g.total ? 'bg-slate-100/70 font-semibold text-slate-900' : 'text-slate-700';
+              return (
+                <React.Fragment key={g.key}>
+                  {rows.map((r, i) => (
+                    <tr key={r.q} className={'border-b border-slate-100 ' + rowCls}>
+                      {i === 0 && (
+                        <td rowSpan={5} className={'px-4 py-2 align-top border-r border-slate-200 font-semibold ' + (g.total ? 'text-slate-900' : 'text-slate-800')}>
+                          {g.label}
+                        </td>
+                      )}
+                      <td className="px-3 py-1.5">{r.q}</td>
+                      <td className="px-2 py-1.5 text-right border-l border-slate-200 text-slate-500">{usd0(r.plan)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono">{usd0(r.fact)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono">{devCell(r.fact - r.plan)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono">{pctCell(r.fact, r.plan)}</td>
+                      <td className="px-2 py-1.5 text-right border-l border-slate-200 bg-blue-50/40 text-slate-500">{usd0(r.cPlan)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono bg-blue-50/40">{usd0(r.cFact)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono bg-blue-50/40">{devCell(r.cFact - r.cPlan)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono bg-blue-50/40">{pctCell(r.cFact, r.cPlan)}</td>
+                    </tr>
+                  ))}
+                  <tr className={'border-b-2 border-slate-200 font-bold ' + (g.total ? 'bg-blue-100/60 text-slate-900' : 'bg-slate-50 text-slate-800')}>
+                    <td className="px-3 py-1.5">წელი</td>
+                    <td className="px-2 py-1.5 text-right border-l border-slate-200">{usd0(cPlan)}</td>
+                    <td className="px-2 py-1.5 text-right font-mono">{usd0(cFact)}</td>
+                    <td className="px-2 py-1.5 text-right font-mono">{devCell(cFact - cPlan)}</td>
+                    <td className="px-2 py-1.5 text-right font-mono">{pctCell(cFact, cPlan)}</td>
+                    <td className="px-2 py-1.5 border-l border-slate-200" colSpan={4}></td>
+                  </tr>
+                </React.Fragment>
+              );
+            })}
+            {groups.length === 0 && (
+              <tr><td colSpan={10} className="px-4 py-6 text-center text-slate-400">წარმომადგენლები ვერ მოიძებნა.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {unmatchedSum > 0 && (
+        <p className="px-6 py-2 text-xs text-slate-500 border-t border-slate-100">
+          გეგმის გარეშე მენეჯერების დაკონტრაქტებული ფაქტი (ჯამში არ შედის): {usd0(unmatchedSum)}
+          {unmatchedNames.length > 0 && ` — ${unmatchedNames.join(', ')}`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// მუშა პროექტები ზომის მიხედვით — რაოდენობა vs ნორმატივი, ჯამური ღირებულება
+// ============================================================================
+function WorkingBySizeTable({ projects, reps, norms }: { projects: Project[]; reps: string[]; norms: PipelineNorms }) {
+  const active = projects.filter((p) => !isContracted(p) && !isLost(p));
+  const sizes = [...PROJECT_SIZES];
+  const cellsFor = (list: Project[]) => {
+    const by = (sz?: string) => list.filter((p) => (sz ? p.size === sz : !sizes.includes(p.size as any)));
+    return {
+      sizes: sizes.map((sz) => { const l = by(sz); return { n: l.length, sum: l.reduce((a, p) => a + (p.value || 0), 0) }; }),
+      none: (() => { const l = by(); return { n: l.length, sum: l.reduce((a, p) => a + (p.value || 0), 0) }; })(),
+      total: { n: list.length, sum: list.reduce((a, p) => a + (p.value || 0), 0) },
+    };
+  };
+  const rows = reps.map((r) => ({ rep: r, c: cellsFor(active.filter((p) => p.manager === r)) }));
+  const totalNorm = (sz: (typeof PROJECT_SIZES)[number]) => norms.sizeCounts[sz] * reps.length;
+  const tot = cellsFor(active.filter((p) => reps.includes(p.manager)));
+  const devBadge = (n: number, norm: number) => {
+    const d = n - norm;
+    return <span className={'font-mono ' + (d >= 0 ? 'text-emerald-600' : 'text-rose-500')}>{d > 0 ? '+' : ''}{d}</span>;
+  };
+  const th = 'px-2 py-2 font-medium text-right';
+  return (
+    <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+      <div className="px-6 py-4 border-b border-slate-100">
+        <h3 className="font-bold text-base text-slate-800 tracking-tight">მუშა პროექტები ზომის მიხედვით</h3>
+        <p className="text-xs text-slate-500 mt-0.5">
+          მუშა = არც დაკონტრაქტებული, არც წაგებული (ფილტრები არ მოქმედებს). ნორმატივი ერთ წარმომადგენელზე:
+          {' '}{sizes.map((sz) => `${sz} ${norms.sizeCounts[sz]}`).join(' · ')}. თანხა — სრული ღირებულება (USD).
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs whitespace-nowrap">
+          <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-200 font-semibold">
+            <tr>
+              <th className="px-4 py-2 font-medium" rowSpan={2}>წარმომადგენელი</th>
+              {sizes.map((sz) => (
+                <th key={sz} className="px-2 py-2 font-medium text-center border-l border-slate-200" colSpan={4}>{sz}</th>
+              ))}
+              <th className="px-2 py-2 font-medium text-center border-l border-slate-200" colSpan={2}>ზომა მიუთითებელი</th>
+              <th className="px-2 py-2 font-medium text-center border-l border-slate-200 bg-blue-50/60" colSpan={2}>სულ</th>
+            </tr>
+            <tr>
+              {sizes.map((sz) => (
+                <React.Fragment key={sz}>
+                  <th className={th + ' border-l border-slate-200'}>ფაქტი</th><th className={th}>ნორმა</th>
+                  <th className={th}>გადახრა</th><th className={th}>თანხა</th>
+                </React.Fragment>
+              ))}
+              <th className={th + ' border-l border-slate-200'}>რაოდ.</th><th className={th}>თანხა</th>
+              <th className={th + ' border-l border-slate-200 bg-blue-50/60'}>რაოდ.</th><th className={th + ' bg-blue-50/60'}>თანხა</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...rows, ...(reps.length > 1 ? [{ rep: '__total', c: tot }] : [])].map(({ rep, c }) => {
+              const isTot = rep === '__total';
+              return (
+                <tr key={rep} className={'border-b border-slate-100 ' + (isTot ? 'bg-blue-100/50 font-bold text-slate-900' : 'text-slate-700 hover:bg-slate-50/80')}>
+                  <td className="px-4 py-2 font-medium border-r border-slate-200">{isTot ? 'ჯამი' : rep}</td>
+                  {sizes.map((sz, i) => {
+                    const norm = isTot ? totalNorm(sz) : norms.sizeCounts[sz];
+                    return (
+                      <React.Fragment key={sz}>
+                        <td className="px-2 py-2 text-right border-l border-slate-200 font-semibold">{c.sizes[i].n}</td>
+                        <td className="px-2 py-2 text-right text-slate-400">{norm}</td>
+                        <td className="px-2 py-2 text-right">{devBadge(c.sizes[i].n, norm)}</td>
+                        <td className="px-2 py-2 text-right font-mono">{usd0(c.sizes[i].sum)}</td>
+                      </React.Fragment>
+                    );
+                  })}
+                  <td className={'px-2 py-2 text-right border-l border-slate-200 ' + (c.none.n ? 'text-amber-600 font-semibold' : 'text-slate-300')}>{c.none.n}</td>
+                  <td className="px-2 py-2 text-right font-mono text-slate-500">{usd0(c.none.sum)}</td>
+                  <td className="px-2 py-2 text-right border-l border-slate-200 bg-blue-50/40 font-semibold">{c.total.n}</td>
+                  <td className="px-2 py-2 text-right font-mono bg-blue-50/40">{usd0(c.total.sum)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function PipelineSheet() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'dashboard2' | 'forma505'>('dashboard');
   const [filterYear, setFilterYear] = useState<string>('2026');
@@ -276,10 +502,26 @@ export function PipelineSheet() {
     setAllProjects([...next, ...allProjects.filter((p: any) => !visibleIds.has(p.id))]);
   }, [isRep, rawProjects, allProjects, setAllProjects]);
   // მენეჯერები: არსებული ჩანაწერებიდან + „გაყიდვები" როლის მომხმარებლები (app_users)
-  const [salesNames, setSalesNames] = useState<string[]>([]);
+  const [salesUsers, setSalesUsers] = useState<RepRef[]>([]);
+  const salesNames = useMemo(() => salesUsers.map((u) => u.name), [salesUsers]);
   useEffect(() => {
-    listUsers().then((us) => setSalesNames(us.filter((u) => u.role === 'sales').map((u) => u.name))).catch(() => {});
+    listUsers().then((us) => setSalesUsers(us.filter((u) => u.role === 'sales').map((u) => ({ id: u.id, name: u.name })))).catch(() => {});
   }, []);
+  // გაყიდვების გეგმები (sales_plans) — წარმომადგენელი ხედავს მხოლოდ საკუთარს
+  const [allPlans, setAllPlans] = useState<SalesPlan[]>([]);
+  const [plansError, setPlansError] = useState(false);
+  useEffect(() => {
+    listSalesPlans().then(setAllPlans).catch((e) => { console.error('[pipeline] plans load failed', e); setPlansError(true); });
+  }, []);
+  const planReps = useMemo(
+    () => (isRep ? salesUsers.filter((u) => u.name === actorName || managerMatches(actorName, u.name)) : salesUsers),
+    [salesUsers, isRep, actorName]
+  );
+  const plans = useMemo(() => {
+    const ids = new Set(planReps.map((r) => r.id));
+    return allPlans.filter((p) => ids.has(p.salesPersonId));
+  }, [allPlans, planReps]);
+  const norms = usePipelineNorms();
   const managerOptions = useMemo(() => {
     const fromData = (rawProjects as any[]).map((p) => p.manager).filter(Boolean) as string[];
     if (isRep) {
@@ -298,6 +540,7 @@ export function PipelineSheet() {
   const [formaFilterQuarter, setFormaFilterQuarter] = useState('all');
   const [formaFilterStatus, setFormaFilterStatus] = useState('all');
   const [formaFilterSource, setFormaFilterSource] = useState('all');
+  const [formaFilterSize, setFormaFilterSize] = useState('all');
 
   const filteredFormaProjects = useMemo(() => {
     return projects.filter(proj => {
@@ -310,6 +553,8 @@ export function PipelineSheet() {
       else if (formaFilterStatus !== 'all' && proj.status !== formaFilterStatus) match = false;
       if (formaFilterSource === 'none') { if (proj.source) match = false; }
       else if (formaFilterSource !== 'all' && proj.source !== formaFilterSource) match = false;
+      if (formaFilterSize === 'none') { if (proj.size) match = false; }
+      else if (formaFilterSize !== 'all' && proj.size !== formaFilterSize) match = false;
       if (formaSearch.trim() !== '') {
         const lowerSearch = formaSearch.toLowerCase();
         const searchString = `${proj.name} ${proj.location} ${proj.comment} ${proj.brand} ${proj.product}`.toLowerCase();
@@ -317,7 +562,7 @@ export function PipelineSheet() {
       }
       return match;
     });
-  }, [projects, formaSearch, formaFilterManager, formaFilterQuarter, formaFilterStatus, formaFilterSource]);
+  }, [projects, formaSearch, formaFilterManager, formaFilterQuarter, formaFilterStatus, formaFilterSource, formaFilterSize]);
 
   const removeRow = (id: string) => {
     if(window.confirm('ნამდვილად გსურთ წაშლა? ჩანაწერი სანაგვეში გადავა.')) {
@@ -439,13 +684,23 @@ export function PipelineSheet() {
               const annualProjects = projects;
 
               // Top KPIs
+              // გეგმა — sales_plans-იდან (არჩეული წლის); თუ გეგმა არ არის შეყვანილი, ძველი ნორმატივი
+              const planYear = filterYear === 'all' ? new Date().getFullYear() : Number(filterYear);
+              const planQ = (qi: number, scope: PlanScope) =>
+                plans.filter((pl) => pl.year === planYear && pl.quarter === qi && pl.scope === scope).reduce((a, pl) => a + pl.planUsd, 0);
+              const hasPlanOverall = [1, 2, 3, 4].some((qi) => planQ(qi, 'overall') > 0);
+              const hasPlanKlee = [1, 2, 3, 4].some((qi) => planQ(qi, 'kleemann') > 0);
+              const qPlanOverall = (qi: number) => (hasPlanOverall ? planQ(qi, 'overall') : 140000);
+              const qPlanKlee = (qi: number) => (hasPlanKlee ? planQ(qi, 'kleemann') : 260000);
+              const qSel = filterQuarter === 'all' ? [1, 2, 3, 4] : [Number(filterQuarter.slice(1))];
+
               const totalRevenue = dashProjects.filter(p => p.status === 'დაკონტრაქტებული').reduce((sum, p) => sum + (p.revenue || 0), 0);
-              const targetRevenue = 560000;
-              const revenuePct = totalRevenue / targetRevenue;
+              const targetRevenue = qSel.reduce((a, qi) => a + qPlanOverall(qi), 0);
+              const revenuePct = targetRevenue ? totalRevenue / targetRevenue : 0;
 
               const totalKleemann = dashProjects.filter(p => p.status === 'დაკონტრაქტებული').reduce((sum, p) => sum + (p.kleemannValue || 0), 0);
-              const targetKleemann = 1040000;
-              const kleemannPct = totalKleemann / targetKleemann;
+              const targetKleemann = qSel.reduce((a, qi) => a + qPlanKlee(qi), 0);
+              const kleemannPct = targetKleemann ? totalKleemann / targetKleemann : 0;
 
               const totalPot60Plus = dashProjects.filter(p => isPlus(p)).reduce((sum, p) => sum + (p.revenue || 0), 0);
               
@@ -457,7 +712,8 @@ export function PipelineSheet() {
               const trendData = ['Q1', 'Q2', 'Q3', 'Q4'].map(q => {
                  let fact = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული').reduce((s, p) => s + (p.revenue || 0), 0));
                  let kleeFact = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული').reduce((s, p) => s + (p.kleemannValue || 0), 0));
-                 return { name: q, 'საერთო ფაქტი': fact, 'კლემანი ფაქტი': kleeFact, 'საერთო გეგმა': 140000, 'კლემანი გეგმა': 260000 };
+                 const qi = Number(q.slice(1));
+                 return { name: q, 'საერთო ფაქტი': fact, 'კლემანი ფაქტი': kleeFact, 'საერთო გეგმა': qPlanOverall(qi), 'კლემანი გეგმა': qPlanKlee(qi) };
               });
               
               // Accumulate trend data
@@ -476,9 +732,6 @@ export function PipelineSheet() {
                 }
               });
 
-              const reps = managerOptions;
-              const repAnnualTotal = 140000;
-              const repKleemannTotal = 260000;
               
               const isQActive = (qIndex: number) => {
                 if (filterQuarter !== 'all') return filterQuarter === `Q${qIndex}`;
@@ -559,104 +812,18 @@ export function PipelineSheet() {
                   {/* TABLES SECTION */}
                   <div className="space-y-6">
                     
-                    {/* Reps Quarterly/YTD Breakdown */}
-                    <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
-                      <h3 className="bg-white px-6 py-5 font-bold text-base border-b border-slate-100 text-slate-800 tracking-tight">აგენტების დეტალური შესრულება (კვარტალური და YTD)</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm whitespace-nowrap">
-                          <thead className="bg-slate-50/80 text-slate-500 text-xs tracking-wider border-b border-slate-200 uppercase font-semibold">
-                            <tr>
-                              <th className="px-4 py-3 font-medium">აგენტი</th>
-                              <th className="px-4 py-3 font-medium text-center " colSpan={3}>Q1 (საერთო)</th>
-                              <th className="px-4 py-3 font-medium text-center " colSpan={3}>Q2 (საერთო)</th>
-                              <th className="px-4 py-3 font-medium text-center " colSpan={3}>Q3 (საერთო)</th>
-                              <th className="px-4 py-3 font-medium text-center " colSpan={3}>Q4 (საერთო)</th>
-                              <th className="px-4 py-3 font-medium text-center " colSpan={3}>YTD ნაზარდი (საერთო)</th>
-                            </tr>
-                            <tr className="text-xs text-slate-500">
-                              <th className="px-4 py-1 "></th>
-                              {/* Q1 */}
-                              <th className="px-2 py-1 ">გეგმა</th><th className="px-2 py-1 ">ფაქტი</th><th className="px-2 py-1  ">%</th>
-                              {/* Q2 */}
-                              <th className="px-2 py-1">გეგმა</th><th className="px-2 py-1">ფაქტი</th><th className="px-2 py-1 ">%</th>
-                              {/* Q3 */}
-                              <th className="px-2 py-1 ">გეგმა</th><th className="px-2 py-1 ">ფაქტი</th><th className="px-2 py-1  ">%</th>
-                              {/* Q4 */}
-                              <th className="px-2 py-1">გეგმა</th><th className="px-2 py-1">ფაქტი</th><th className="px-2 py-1 ">%</th>
-                              {/* YTD */}
-                              <th className="px-2 py-1 ">გეგმა</th><th className="px-2 py-1 ">ფაქტი</th><th className="px-2 py-1 ">%</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {reps.map(rep => {
-                              const qPlan = repAnnualTotal / 4;
-                              let cPlan = 0;
-                              let cFact = 0;
-                              return (
-                                <tr key={rep} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors text-xs">
-                                  <td className="px-4 py-2 font-medium text-slate-800 border-r">{rep}</td>
-                                  {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => {
-                                    const fact = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული' && managerMatches(p.manager, rep)).reduce((s,p) => s+(p.revenue||0), 0));
-                                    if (isQActive(i + 1)) {
-                                      cPlan += qPlan;
-                                    }
-                                    cFact += fact;
-                                    const bg = i % 2 === 0 ? 'bg-slate-50/50' : '';
-                                    return (
-                                      <React.Fragment key={q}>
-                                        <td className={`px-2 py-2 text-right text-slate-600 ${bg}`}>{formatDol(qPlan)}</td>
-                                        <td className={`px-2 py-2 text-right font-mono text-emerald-600 ${bg}`}>{formatDol(fact)}</td>
-                                        <td className={`px-2 py-2 text-right font-mono border-r border-slate-200/50 ${bg}`}>{formatColPct(fact/qPlan)}</td>
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                  <td className="px-2 py-2 text-right text-slate-500 ">{formatDol(cPlan)}</td>
-                                  <td className="px-2 py-2 text-right font-mono text-slate-500 font-bold ">{formatDol(cFact)}</td>
-                                  <td className="px-2 py-2 text-right font-mono ">{formatColPct(cFact/cPlan)}</td>
-                                </tr>
-                              );
-                            })}
-                            <tr className="border-b-2 border-slate-200 bg-blue-100/50 transition-colors text-xs font-bold text-slate-900">
-                                  <td className="px-4 py-2 border-r border-slate-200/50">ჯამი:</td>
-                                  {(() => {
-                                     let cPlanTot = 0;
-                                     let cFactTot = 0;
-                                     return (
-                                       <React.Fragment>
-                                         {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => {
-                                           const qPlanSum = (repAnnualTotal / 4) * reps.length;
-                                           const factSum = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული' && reps.some(r => managerMatches(p.manager, r))).reduce((s,p) => s+(p.revenue||0), 0));
-                                           if (isQActive(i + 1)) {
-                                             cPlanTot += qPlanSum;
-                                           }
-                                           cFactTot += factSum;
-                                           const bg = i % 2 === 0 ? 'bg-slate-50/50' : '';
-                                           return (
-                                             <React.Fragment key={q}>
-                                               <td className={`px-2 py-2 text-right text-slate-600 ${bg}`}>{formatDol(qPlanSum)}</td>
-                                               <td className={`px-2 py-2 text-right font-mono text-emerald-600 ${bg}`}>{formatDol(factSum)}</td>
-                                               <td className={`px-2 py-2 text-right font-mono border-r border-slate-200/50 ${bg}`}>{formatColPct(factSum/qPlanSum)}</td>
-                                             </React.Fragment>
-                                           );
-                                         })}
-                                         <td className="px-2 py-2 text-right text-slate-800 ">{formatDol(cPlanTot)}</td>
-                                         <td className="px-2 py-2 text-right font-mono text-slate-600 ">{formatDol(cFactTot)}</td>
-                                         <td className="px-2 py-2 text-right font-mono ">{formatColPct(cFactTot/cPlanTot)}</td>
-                                       </React.Fragment>
-                                     )
-                                  })()}
-                                </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
+                    {/* წარმომადგენლების გეგმა/შესრულება — კვარტალური და ნაზარდი */}
+                    <RepPlanTable projects={projects} plans={plans} plansError={plansError} reps={planReps} year={planYear} />
+
+                    {/* მუშა პროექტები ზომის მიხედვით */}
+                    <WorkingBySizeTable projects={projects} reps={managerOptions} norms={norms} />
 
                     {/* Quarterly Overalls */}
                     {(() => {
                       const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
                       const qData = quarters.map((q) => {
-                        const planTotal = 140000;
-                        const planKleemann = 260000;
+                        const planTotal = qPlanOverall(Number(q.slice(1)));
+                        const planKleemann = qPlanKlee(Number(q.slice(1)));
                         const factTotal = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული').reduce((s, p) => s + (p.revenue || 0), 0));
                         const factKleemann = Math.round(annualProjects.filter(p => p.quarter === q && p.status === 'დაკონტრაქტებული').reduce((s, p) => s + (p.kleemannValue || 0), 0));
                         return { 
@@ -1038,6 +1205,15 @@ export function PipelineSheet() {
                   {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
                   <option value="none">მიუთითებელი</option>
                 </select>
+                <select 
+                  value={formaFilterSize} 
+                  onChange={(e) => setFormaFilterSize(e.target.value)}
+                  className=" border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 text-xs rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-slate-400 appearance-none"
+                >
+                  <option value="all">ყველა ზომა</option>
+                  {PROJECT_SIZES.map((sz) => <option key={sz} value={sz}>{sz}</option>)}
+                  <option value="none">ზომა მიუთითებელი</option>
+                </select>
                 <button 
                   onClick={() => {
                     setIsModalOpen(true);
@@ -1058,6 +1234,7 @@ export function PipelineSheet() {
                   <tr>
                     <th className="px-3 py-2 font-medium sticky left-0 z-20 bg-slate-50 border-r border-slate-200 min-w-[200px]">პროექტის დასახელება</th>
                     <th className="px-3 py-2 font-medium">პროდუქტი</th>
+                    <th className="px-3 py-2 font-medium">ზომა</th>
                     <th className="px-3 py-2 font-medium">მწარმოებელი</th>
                     <th className="px-3 py-2 font-medium text-center" title="დანადგარის რაოდენობა">რაოდ.</th>
                     <th className="px-3 py-2 font-medium text-center" title="სართულების საერთო რაოდენობა">სართ.</th>
@@ -1086,6 +1263,7 @@ export function PipelineSheet() {
                     <tr key={proj.id} className={"group border-b border-slate-100 bg-white hover:bg-slate-50/80 transition-colors" + (isLost(proj) ? " opacity-50 line-through" : "")}>
                       <td className="px-3 py-1.5 truncate max-w-[220px] min-w-[200px] sticky left-0 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200 font-medium" title={proj.name}>{proj.name}</td>
                       <td className="px-3 py-1.5">{proj.product || ''}</td>
+                      <td className="px-3 py-1.5">{proj.size || <span className="text-amber-500">—</span>}</td>
                       <td className="px-3 py-1.5">{proj.brand}</td>
                       <td className="px-3 py-1.5 text-center">{proj.units}</td>
                       <td className="px-3 py-1.5 text-center">{proj.floors || ''}</td>

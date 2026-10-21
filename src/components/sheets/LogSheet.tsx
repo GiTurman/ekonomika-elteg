@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { TextInput } from "./sheet-ui";
 import { Loader2, RefreshCw, Plus, Trash2, X } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
+import { loadPipelineNorms, savePipelineNorms, PROJECT_SIZES, DEFAULT_PIPELINE_NORMS, type PipelineNorms } from "@/lib/pipelineNorms";
 
 const NON_FULL_ROLES: AccessRole[] = ["commercial", "sales", "technical", "accounting", "procurement", "administration"];
 
@@ -527,6 +528,98 @@ function UsersPanel() {
   );
 }
 
+// პაიპლაინის ნორმატივი — რამდენ პატარა/საშუალო/დიდ პროექტზე უნდა მუშაობდეს
+// თითოეული წარმომადგენელი. გამოიყენება პაიპლაინის დაშბორდში (ნორმა vs ფაქტი).
+function PipelineNormsPanel() {
+  const { actorName, role: myRole } = useAccessRole();
+  const [norms, setNorms] = useState<PipelineNorms>(DEFAULT_PIPELINE_NORMS);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    setMsg(null);
+    try {
+      const n = await loadPipelineNorms();
+      setNorms(n);
+      setDraft(Object.fromEntries(PROJECT_SIZES.map((s) => [s, String(n.sizeCounts[s])])));
+    } catch (e) {
+      console.error("[pipeline-norms] load failed", e);
+      setMsg("ჩატვირთვა ვერ მოხერხდა.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const parsed = PROJECT_SIZES.map((s) => Number(String(draft[s] ?? "").replace(",", ".")));
+  const valid = parsed.every((v) => Number.isFinite(v) && v >= 0 && Number.isInteger(v));
+  const dirty = PROJECT_SIZES.some((s, i) => parsed[i] !== norms.sizeCounts[s]);
+
+  const save = async () => {
+    if (!valid) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const next: PipelineNorms = { sizeCounts: { ...norms.sizeCounts } };
+      PROJECT_SIZES.forEach((s, i) => { next.sizeCounts[s] = parsed[i]; });
+      await savePipelineNorms(next);
+      setNorms(next);
+      setMsg("შენახულია.");
+      logActivity(actorName, myRole, "პაიპლაინის ნორმატივის ცვლილება",
+        PROJECT_SIZES.map((s) => `${s}: ${next.sizeCounts[s]}`).join(", "));
+    } catch (e) {
+      console.error("[pipeline-norms] save failed", e);
+      setMsg("შენახვა ვერ მოხერხდა.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>პაიპლაინის ნორმატივი — მუშა პროექტები ერთ წარმომადგენელზე</CardTitle>
+        <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+          განახლება
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          რამდენ პროექტზე უნდა მუშაობდეს ერთდროულად თითოეული წარმომადგენელი, ზომის მიხედვით. მუშა პროექტი =
+          არც დაკონტრაქტებული და არც წაგებული. პროექტის ზომას წარმომადგენელი ფორმა 505-ში უთითებს.
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
+          {PROJECT_SIZES.map((s) => (
+            <label key={s} className="flex flex-col gap-1 text-sm">
+              <span className="text-xs font-semibold text-muted-foreground">{s} (ც.)</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="w-24 border rounded px-2 py-1 text-right"
+                value={draft[s] ?? ""}
+                onChange={(e) => setDraft({ ...draft, [s]: e.target.value })}
+              />
+            </label>
+          ))}
+          <div className="text-sm text-muted-foreground pb-1">
+            სულ: <b>{valid ? parsed.reduce((a, b) => a + b, 0) : "—"}</b> პროექტი
+          </div>
+          <Button size="sm" onClick={save} disabled={!valid || !dirty || saving}>
+            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            შენახვა
+          </Button>
+        </div>
+        {!valid && <p className="text-xs text-destructive">შეიყვანეთ მთელი, არაუარყოფითი რიცხვები.</p>}
+        {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function LogSheet() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -552,6 +645,7 @@ export function LogSheet() {
       <UsersPanel />
       <PagePermissionsPanel />
       <DropdownOptionsPanel />
+      <PipelineNormsPanel />
       <FieldVisibilityPanel />
       <FieldPermissionsPanel />
 
