@@ -21,6 +21,7 @@ export interface UnitEconomics {
   marginPct: number; // N = G / J
   projectShare: number; // O = M_final / total_M_final
   salesBuffer: number; // გაყიდვების ტარიფის ბუფერი (I-ში, ზედნადებში) — გაყიდვების ხედში მონტაჟის ხარჯად ჩანს
+  salesGap: number; // ნიშნიანი სხვაობა (sales − real) × სართ. × დარიცხვები — მხოლოდ ჩვენებისთვის; ფასზე გავლენა მხოლოდ დადებით ნაწილს (salesBuffer) აქვს
   belowMinAmount: boolean; // G < profitThresholds[category].minAmount
   belowMinMargin: boolean; // marginPct < profitThresholds[category].minMarginPct
 }
@@ -65,6 +66,10 @@ export interface ProjectReport {
   salesBuffer: number; // გაყიდვების ტარიფის ბუფერი (sales rate − real) — overhead-ში, markup-ნეიტრალური
   salesBufferMech: number; // ბუფერის მონტაჟის ნაწილი
   salesBufferElec: number; // ბუფერის ელექტრომონტაჟის ნაწილი
+  salesGap: number; // ნიშნიანი სხვაობა (sales − real) — გაყიდვების ხედში მონტაჟი ამ თანხით ჩანს; ფასს არ ცვლის, თუ უარყოფითია
+  salesGapMech: number;
+  salesGapElec: number;
+  salesGapNegative: number; // უარყოფითი ნაწილი (≤ 0): გაყიდვების ტარიფი რეალურზე დაბალია — ფასი რეალურზე რჩება
   overheadPct: number; // ზედნადები (ბუფერის ჩათვლით) ÷ ფასი დამატებითი ხარჯების გარეშე
   fxRisk: number; // D63
   otherTotal: number; // D64
@@ -316,6 +321,13 @@ export function computeEconomics(state: AppState): FullEconomics {
       Math.max((u.elecRateSalesGel ?? 0) - u.elecRateGel, 0)
     );
 
+  // ნიშნიანი სხვაობა — გაყიდვების ხედისთვის (მონტაჟი ყოველთვის გაყიდვების ტარიფით ჩანს).
+  // უარყოფითი ნაწილი ფასს არ ამცირებს: ფასი რეალურ ტარიფზე რჩება, სხვაობა გაყიდვების
+  // ხედში დამატებით ხარჯებში „ინაცვლებს", ჩემს ხედში კი ცალკე ჩანს.
+  const gapMechOf = (u: Unit) => u.floors * bufGross * (u.mechRateSalesGel === undefined || u.mechRateSalesGel === null ? 0 : u.mechRateSalesGel - u.mechRateGel);
+  const gapElecOf = (u: Unit) => u.floors * bufGross * (u.elecRateSalesGel === undefined || u.elecRateSalesGel === null ? 0 : u.elecRateSalesGel - u.elecRateGel);
+  const salesGapOf = (u: Unit) => gapMechOf(u) + gapElecOf(u);
+
   // First pass — compute everything except projectShare
   const rows: UnitEconomics[] = units.map((u) => {
     const category: EquipmentCategory = u.category ?? "lift";
@@ -364,6 +376,7 @@ export function computeEconomics(state: AppState): FullEconomics {
       marginPct,
       projectShare: 0,
       salesBuffer: salesBufferOf(u),
+      salesGap: salesGapOf(u),
       belowMinAmount: G < threshold.minAmount,
       belowMinMargin: marginPct < threshold.minMarginPct,
     };
@@ -488,6 +501,10 @@ export function computeEconomics(state: AppState): FullEconomics {
     salesBuffer,
     salesBufferMech,
     salesBufferElec,
+    salesGap: units.reduce((s, u) => s + salesGapOf(u), 0),
+    salesGapMech: units.reduce((s, u) => s + gapMechOf(u), 0),
+    salesGapElec: units.reduce((s, u) => s + gapElecOf(u), 0),
+    salesGapNegative: units.reduce((s, u) => s + salesGapOf(u), 0) - salesBuffer,
     overheadPct: reportPriceNoExtras ? overhead / reportPriceNoExtras : 0,
     fxRisk,
     otherTotal,
