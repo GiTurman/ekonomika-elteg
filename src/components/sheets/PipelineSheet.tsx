@@ -33,6 +33,7 @@ type Project = {
   deliveryMonth?: string;
   probability?: number;
   comment?: string;
+  year?: number | string; // წელი (კვარტალის წინ) — ცარიელი = დაკონტრაქტების თარიღის წელი, თორემ მიმდინარე
   quarter: string;
   manager: string;
   statusDetail?: string;
@@ -106,6 +107,14 @@ const formatPct = (val: number, total?: number) => {
 // ============================================================================
 // MODAL COMPONENT
 // ============================================================================
+// წლის არჩევანი ფორმაში: გასული წელი … +3 წელი
+const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 1 + i));
+// პროექტის წელი: ჯერ ველი „წელი", თორემ დაკონტრაქტების თარიღის წელი, თორემ მიმდინარე წელი
+const projYear = (p: { year?: number | string; contractDate?: string }) => {
+  const y = String(p.year ?? '').trim();
+  if (/^\d{4}$/.test(y)) return y;
+  return p.contractDate ? p.contractDate.substring(0, 4) : String(new Date().getFullYear());
+};
 const MONTHS = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'];
 // პროექტის წყარო — ბონუსების დასათვლელად: ვინ მოიძია პროექტი.
 const SOURCES = ['საკუთარი მოძიება', 'მენეჯმენტის გადაცემული'];
@@ -148,6 +157,7 @@ const FIELDS: FieldDef[] = [
   { key: 'tranche1', label: 'I ტრანში (%)', type: 'number' },
   { key: 'deliveryMonth', label: 'მოწოდების პერიოდი', type: 'select', options: MONTHS },
   { key: 'probability', label: 'ალბათობა (%)', type: 'number' },
+  { key: 'year', label: 'წელი', type: 'select', options: YEAR_OPTIONS },
   { key: 'quarter', label: 'კვარტალი', type: 'select', options: ['Q1', 'Q2', 'Q3', 'Q4'] },
   { key: 'manager', label: 'მენეჯერი', type: 'select' },
   { key: 'source', label: 'წყარო', type: 'select', options: SOURCES },
@@ -168,6 +178,8 @@ function isRequired(key: string, d: any, isNew = true): boolean {
   if (key === 'source' || key === 'planShare') return false;
   // ზომა სავალდებულოა ახალ ჩანაწერზე; არსებულებს რედაქტირებისას არ ვბლოკავთ
   if (key === 'size') return isNew;
+  // წელი სავალდებულოა ახალ ჩანაწერზე; არსებულებს რედაქტირებისას არ ვბლოკავთ
+  if (key === 'year') return isNew;
   return true;
 }
 function isEmpty(v: any) {
@@ -183,7 +195,7 @@ function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [
   const isNew = !initialData?.id;
   const missing = FIELDS.filter((f) => isRequired(f.key, formData, isNew) && isEmpty(formData[f.key])).map((f) => f.key);
   const set = (key: string, raw: string, type: FieldDef['type']) => {
-    const v = type === 'number' || key === 'planShare' ? (raw === '' ? '' : Number(raw)) : raw;
+    const v = type === 'number' || key === 'planShare' || key === 'year' ? (raw === '' ? '' : Number(raw)) : raw;
     setFormData({ ...formData, [key]: v });
   };
   const save = () => {
@@ -275,7 +287,6 @@ function ProjectModal({ isOpen, onClose, onSave, initialData, managerOptions = [
 // ============================================================================
 const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
 const isContracted = (p: Project) => p.status === 'დაკონტრაქტებული' && !isLost(p);
-const projYear = (p: Project) => (p.contractDate ? p.contractDate.substring(0, 4) : String(new Date().getFullYear()));
 const factOf = (p: Project, scope: PlanScope) =>
   scope === 'overall' ? (p.revenue || 0) : scope === 'kleemann' ? (p.kleemannValue || 0) : (p.hitachiValue || 0);
 const usd0 = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -543,7 +554,8 @@ function RepPipelineDashboard({ projects, managers, planUsers, plans, year }: {
     if (n.has(b)) n.delete(b); else n.add(b);
     setSelected(n);
   };
-  const live = projects.filter((p) => !isLost(p));
+  // გეგმა წლიურია — პაიპლაინიდან მხოლოდ არჩეული წლის პროექტები (ველი „წელი")
+  const live = projects.filter((p) => !isLost(p) && projYear(p) === String(year));
   const inScope = live.filter((p) => selected.has(bucketOf(p)));
   // შედარების თანხა: არჩეული მეტრიკა × გეგმაში გათვალისწინების % × (შეწონვისას) ალბათობა
   const amountOf = (p: Project) => factOf(p, metric) * shareOf(p) * (weighted ? probOf(p) : 1);
@@ -585,7 +597,7 @@ function RepPipelineDashboard({ projects, managers, planUsers, plans, year }: {
         <div>
           <h3 className="font-bold text-base text-slate-800 tracking-tight">წარმომადგენლების პაიპლაინი — პროექტები, ბრენდები, ალბათობა და გეგმა ({year})</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            წაგებული პროექტები არ ითვლება. გეგმასთან შედარება იყენებს „გეგმაში გათვალისწინების %"-ს. ალბათობა — ველი „ალბათობა (%)",
+            წაგებული პროექტები არ ითვლება, მხოლოდ არჩეული წლის პროექტები (ველი „წელი"). გეგმასთან შედარება იყენებს „გეგმაში გათვალისწინების %"-ს. ალბათობა — ველი „ალბათობა (%)",
             ცარიელის შემთხვევაში საბოლოო სტატუსის საფეხური (&lt;50% = 30%).
           </p>
         </div>
@@ -712,7 +724,7 @@ function RepPipelineDashboard({ projects, managers, planUsers, plans, year }: {
                               <td className="py-1 pr-3 text-right font-mono">{usd0(p.revenue || 0)}</td>
                               <td className="py-1 pr-3 text-right">{Math.round(shareOf(p) * 100)}%</td>
                               <td className="py-1 pr-3 text-right font-mono font-semibold">{usd0(amountOf(p))}</td>
-                              <td className="py-1">{p.quarter}</td>
+                              <td className="py-1">{projYear(p)} {p.quarter}</td>
                             </tr>
                           ))}
                           {r.list.length === 0 && <tr><td colSpan={10} className="py-2 text-slate-400">არჩეული ალბათობებით პროექტი არ არის.</td></tr>}
@@ -800,6 +812,7 @@ export function PipelineSheet() {
   const [formData, setFormData] = useState<any>({});
   const [formaSearch, setFormaSearch] = useState('');
   const [formaFilterManager, setFormaFilterManager] = useState('all');
+  const [formaFilterYear, setFormaFilterYear] = useState('all');
   const [formaFilterQuarter, setFormaFilterQuarter] = useState('all');
   const [formaFilterStatus, setFormaFilterStatus] = useState('all');
   const [formaFilterSource, setFormaFilterSource] = useState('all');
@@ -809,6 +822,7 @@ export function PipelineSheet() {
     return projects.filter(proj => {
       let match = true;
       if (formaFilterManager !== 'all' && proj.manager !== formaFilterManager) match = false;
+      if (formaFilterYear !== 'all' && projYear(proj) !== formaFilterYear) match = false;
       if (formaFilterQuarter !== 'all' && proj.quarter !== formaFilterQuarter) match = false;
       if (formaFilterStatus === 'grp_plus') { if (!isPlus(proj)) match = false; }
       else if (formaFilterStatus === 'grp_minus') { if (!isMinus(proj)) match = false; }
@@ -825,7 +839,7 @@ export function PipelineSheet() {
       }
       return match;
     });
-  }, [projects, formaSearch, formaFilterManager, formaFilterQuarter, formaFilterStatus, formaFilterSource, formaFilterSize]);
+  }, [projects, formaSearch, formaFilterManager, formaFilterYear, formaFilterQuarter, formaFilterStatus, formaFilterSource, formaFilterSize]);
 
   const removeRow = (id: string) => {
     if(window.confirm('ნამდვილად გსურთ წაშლა? ჩანაწერი სანაგვეში გადავა.')) {
@@ -928,10 +942,9 @@ export function PipelineSheet() {
               let dashProjects = projects.filter(p => {
                 let match = true;
                 // თარიღი არ აქვს (ფორმა 505 — მიმდინარე წლის პაიპლაინი) → მიმდინარე წელი
-                let y = String(new Date().getFullYear());
+                const y = projYear(p);
                 let m = 'all';
                 if(p.contractDate) {
-                  y = p.contractDate.substring(0, 4);
                   m = p.contractDate.substring(5, 7);
                 }
                 
@@ -1447,6 +1460,14 @@ export function PipelineSheet() {
                   {managerOptions.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <select 
+                  value={formaFilterYear} 
+                  onChange={(e) => setFormaFilterYear(e.target.value)}
+                  className=" border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 text-xs rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-slate-400 appearance-none"
+                >
+                  <option value="all">ყველა წელი</option>
+                  {Array.from(new Set([...YEAR_OPTIONS, ...projects.map((x) => projYear(x))])).sort().map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select 
                   value={formaFilterQuarter} 
                   onChange={(e) => setFormaFilterQuarter(e.target.value)}
                   className=" border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 text-xs rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-slate-400 appearance-none"
@@ -1490,8 +1511,8 @@ export function PipelineSheet() {
                   onClick={() => {
                     setIsModalOpen(true);
                     setEditingId(null);
-                    // ცარიელი ფორმა — ყველა ველს შემყვანი ავსებს
-                    setFormData({});
+                    // ცარიელი ფორმა — ყველა ველს შემყვანი ავსებს (წელი — მიმდინარე, შეცვლადი)
+                    setFormData({ year: new Date().getFullYear() });
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded text-xs flex items-center gap-1 transition-colors shrink-0"
                 >
@@ -1521,6 +1542,7 @@ export function PipelineSheet() {
                     <th className="px-3 py-2 font-medium">მოწოდების პერიოდი</th>
                     <th className="px-3 py-2 font-medium text-center">ალბათობა (%)</th>
                     <th className="px-3 py-2 font-medium">კომენტარი</th>
+                    <th className="px-3 py-2 font-medium">წელი</th>
                     <th className="px-3 py-2 font-medium">კვარტალი</th>
                     <th className="px-3 py-2 font-medium">მენეჯერი</th>
                     <th className="px-3 py-2 font-medium">წყარო</th>
@@ -1551,6 +1573,7 @@ export function PipelineSheet() {
                       <td className="px-3 py-1.5">{proj.deliveryMonth || ''}</td>
                       <td className="px-3 py-1.5 text-center">{proj.probability ? proj.probability + '%' : ''}</td>
                       <td className="px-3 py-1.5 truncate max-w-[150px]" title={proj.comment}>{proj.comment || ''}</td>
+                      <td className="px-3 py-1.5">{projYear(proj)}</td>
                       <td className="px-3 py-1.5">{proj.quarter}</td>
                       <td className="px-3 py-1.5">{proj.manager}</td>
                       <td className="px-3 py-1.5">
