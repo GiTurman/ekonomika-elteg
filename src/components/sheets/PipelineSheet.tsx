@@ -5,10 +5,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, ComposedChart
 } from 'recharts';
-import { LayoutDashboard, Table, Plus, Search, CheckCircle2, TrendingUp, AlertCircle, BarChart2, Activity, Trash2, Save, X, Database, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Table, Plus, Search, CheckCircle2, TrendingUp, AlertCircle, BarChart2, Activity, Trash2, Save, X, Database, Loader2, Download } from 'lucide-react';
 import { usePipelineProjects } from '@/lib/pipeline';
 import { listSalesPlans, PLAN_SCOPE_LABEL, type SalesPlan, type PlanScope } from '@/lib/salesPlans';
 import { usePipelineNorms, PROJECT_SIZES, type PipelineNorms } from '@/lib/pipelineNorms';
+import { exportPipelineDashboardXlsx } from '@/lib/pipeline-export';
 
 // ============================================================================
 // TYPES
@@ -586,6 +587,24 @@ function RepPipelineDashboard({ projects, managers, planUsers, plans, year }: {
     plan: rows.reduce((a, r) => a + r.plan, 0),
   };
   const chartData = rows.map((r) => ({ name: r.m, 'გეგმა': Math.round(r.plan), ...Object.fromEntries(PROB_BUCKETS.map((b) => [b, Math.round(r.byBucket[b] as number)])) }));
+
+  const handleExport = () => {
+    exportPipelineDashboardXlsx({
+      rows: rows.map((r) => ({
+        manager: r.m, n: r.n, bySize: r.bySize, byBrand: r.byBrand,
+        value: r.value, potential: r.potential, plan: r.plan,
+        projects: [...r.list].sort((a, b) => amountOf(b) - amountOf(a)).map((p) => ({
+          name: p.name, size: p.size || '', brand: p.brand, bucket: bucketOf(p),
+          probPct: Math.round(probOf(p) * 100), value: p.value || 0, revenue: p.revenue || 0,
+          sharePct: Math.round(shareOf(p) * 100), amount: amountOf(p), period: `${projYear(p)} ${p.quarter}`,
+        })),
+      })),
+      sizeLabels: [...PROJECT_SIZES], brandLabels: [...BRAND_GROUPS],
+      metricLabel: metric === 'overall' ? 'შემოსავალი (მარჟა)' : metric === 'kleemann' ? 'კლემანი' : 'ჰიტაჩი',
+      weighted, year,
+    }).catch((e) => console.error('[pipeline] export failed', e));
+  };
+
   const th = 'px-2 py-2 font-medium text-right';
   const cov = (pot: number, plan: number) => plan > 0
     ? <span className={pot >= plan ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-semibold'}>{((pot / plan) * 100).toFixed(0)}%</span>
@@ -626,6 +645,10 @@ function RepPipelineDashboard({ projects, managers, planUsers, plans, year }: {
             <button onClick={() => setWeighted(false)} className={'px-3 py-1 rounded-md ' + (!weighted ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500')}>სრული თანხა</button>
             <button onClick={() => setWeighted(true)} className={'px-3 py-1 rounded-md ' + (weighted ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500')}>ალბათობით შეწონილი</button>
           </div>
+          <button onClick={handleExport}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors">
+            <Download className="w-3.5 h-3.5" /> Excel-ში ექსპორტი
+          </button>
         </div>
       </div>
 
