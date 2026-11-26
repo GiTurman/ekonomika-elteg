@@ -1646,7 +1646,7 @@ export function PipelineSheet() {
       {isModalOpen && (
         <ProjectModal 
           managerOptions={managerOptions}
-          lockedKeys={canManage ? [] : ['source', 'planShare']}
+          lockedKeys={[]}
           brandOptions={Array.from(new Set(projects.map((p: any) => p.brand).filter(Boolean))).sort()}
           locationOptions={Array.from(new Set(projects.map((p: any) => p.location).filter(Boolean))).sort()}
           isOpen={isModalOpen} 
